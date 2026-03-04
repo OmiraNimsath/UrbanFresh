@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import LandingPage from './pages/landing/LandingPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import LoginPage from './pages/auth/LoginPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
@@ -23,13 +24,14 @@ function App() {
         <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
         <Routes>
           {/* ── Public routes ── */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           {/* ── Protected role-based dashboards ── */}
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <ProtectedRoute allowedRoles={['CUSTOMER']}>
                 <CustomerDashboard />
@@ -62,7 +64,7 @@ function App() {
           />
 
           {/* Default redirect */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

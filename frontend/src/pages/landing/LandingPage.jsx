@@ -1,0 +1,221 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { getFeaturedProducts, getNearExpiryProducts } from '../../services/productService';
+
+/**
+ * Page Layer – Public landing page for UrbanFresh.
+ * Displays a hero banner, featured products, and near-expiry offers.
+ * Accessible without authentication; shows login/register links in the nav.
+ */
+export default function LandingPage() {
+  const [featured, setFeatured] = useState([]);
+  const [nearExpiry, setNearExpiry] = useState([]);
+  const [loadingFeatured, setLoadingFeatured] = useState(true);
+  const [loadingNearExpiry, setLoadingNearExpiry] = useState(true);
+  const [errorFeatured, setErrorFeatured] = useState(null);
+  const [errorNearExpiry, setErrorNearExpiry] = useState(null);
+
+  useEffect(() => {
+    // Fetch both sections independently so one failure doesn't blank the whole page
+    getFeaturedProducts()
+      .then(setFeatured)
+      .catch(() => setErrorFeatured('Could not load featured products.'))
+      .finally(() => setLoadingFeatured(false));
+
+    getNearExpiryProducts(7)
+      .then(setNearExpiry)
+      .catch(() => setErrorNearExpiry('Could not load near-expiry offers.'))
+      .finally(() => setLoadingNearExpiry(false));
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* ── Navigation ── */}
+      <nav className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link to="/" className="text-2xl font-bold text-green-600 tracking-tight">
+            UrbanFresh
+          </Link>
+          <div className="flex gap-3">
+            <Link
+              to="/login"
+              className="px-4 py-2 text-sm font-medium text-green-700 border border-green-600 rounded-lg hover:bg-green-50 transition-colors"
+            >
+              Log In
+            </Link>
+            <Link
+              to="/register"
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Register
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* ── Hero ── */}
+      <section className="bg-green-600 text-white py-20 px-4 text-center">
+        <h1 className="text-4xl md:text-5xl font-extrabold mb-4">
+          Fresh Groceries, Smart Deals
+        </h1>
+        <p className="text-lg md:text-xl text-green-100 max-w-xl mx-auto mb-8">
+          Shop quality produce and save big on near-expiry offers — good for your wallet
+          and the planet.
+        </p>
+        <div className="flex gap-4 justify-center flex-wrap">
+          <Link
+            to="/register"
+            className="px-6 py-3 bg-white text-green-700 font-semibold rounded-lg hover:bg-green-50 transition-colors"
+          >
+            Get Started
+          </Link>
+          <Link
+            to="/login"
+            className="px-6 py-3 border border-white text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Log In
+          </Link>
+        </div>
+      </section>
+
+      {/* ── Featured Products ── */}
+      <section className="max-w-6xl mx-auto px-4 py-14">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">⭐ Featured Products</h2>
+        {loadingFeatured && <ProductGridSkeleton />}
+        {errorFeatured && <ErrorMessage message={errorFeatured} />}
+        {!loadingFeatured && !errorFeatured && featured.length === 0 && (
+          <EmptyState message="No featured products at the moment. Check back soon!" />
+        )}
+        {!loadingFeatured && !errorFeatured && featured.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {featured.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Near-Expiry Offers ── */}
+      <section className="bg-amber-50 py-14">
+        <div className="max-w-6xl mx-auto px-4">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">🕐 Near-Expiry Offers</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            In-stock items expiring within 7 days — discounted to reduce waste.
+          </p>
+          {loadingNearExpiry && <ProductGridSkeleton />}
+          {errorNearExpiry && <ErrorMessage message={errorNearExpiry} />}
+          {!loadingNearExpiry && !errorNearExpiry && nearExpiry.length === 0 && (
+            <EmptyState message="No near-expiry offers right now. Check back tomorrow!" />
+          )}
+          {!loadingNearExpiry && !errorNearExpiry && nearExpiry.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {nearExpiry.map((product) => (
+                <ProductCard key={product.id} product={product} showExpiry />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm">
+        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
+      </footer>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Sub-components (private to this file)
+───────────────────────────────────────────── */
+
+/**
+ * Displays a single product card.
+ * @param {Object}  product    - ProductResponse from the API
+ * @param {boolean} showExpiry - whether to show the expiry date badge
+ */
+function ProductCard({ product, showExpiry = false }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+      {/* Product image or placeholder */}
+      {product.imageUrl ? (
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          className="w-full h-44 object-cover"
+        />
+      ) : (
+        <div className="w-full h-44 bg-green-100 flex items-center justify-center text-green-400 text-4xl">
+          🥦
+        </div>
+      )}
+
+      <div className="p-4 flex flex-col flex-1">
+        {product.category && (
+          <span className="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">
+            {product.category}
+          </span>
+        )}
+        <h3 className="font-semibold text-gray-800 text-sm mb-1 line-clamp-2">
+          {product.name}
+        </h3>
+        {product.description && (
+          <p className="text-xs text-gray-500 line-clamp-2 mb-2">{product.description}</p>
+        )}
+
+        <div className="mt-auto flex items-center justify-between">
+          <span className="text-green-700 font-bold">${Number(product.price).toFixed(2)}</span>
+          {!product.inStock && (
+            <span className="text-xs text-red-500 font-medium">Out of stock</span>
+          )}
+        </div>
+
+        {/* Show expiry badge only in the near-expiry section */}
+        {showExpiry && product.expiryDate && (
+          <div className="mt-2 text-xs bg-amber-100 text-amber-700 rounded px-2 py-1 text-center font-medium">
+            Expires {product.expiryDate}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Skeleton grid shown while products are loading.
+ */
+function ProductGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden animate-pulse">
+          <div className="w-full h-44 bg-gray-200" />
+          <div className="p-4 space-y-2">
+            <div className="h-3 bg-gray-200 rounded w-1/3" />
+            <div className="h-4 bg-gray-200 rounded w-2/3" />
+            <div className="h-3 bg-gray-200 rounded w-full" />
+            <div className="h-4 bg-gray-200 rounded w-1/4 mt-2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Inline error message for a failed section. */
+function ErrorMessage({ message }) {
+  return (
+    <div className="text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm">
+      {message}
+    </div>
+  );
+}
+
+/** Empty-state placeholder when a section returns no results. */
+function EmptyState({ message }) {
+  return (
+    <div className="text-gray-400 bg-white border border-dashed border-gray-200 rounded-lg px-4 py-10 text-sm text-center">
+      {message}
+    </div>
+  );
+}
