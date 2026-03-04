@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories } from '../../services/productService';
+import Navbar from '../../components/Navbar';
 
 /**
  * Page Layer – Public product listing page.
@@ -70,28 +71,8 @@ export default function ProductListingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ── Navigation ── */}
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="text-2xl font-bold text-green-600 tracking-tight">
-            UrbanFresh
-          </Link>
-          <div className="flex gap-3">
-            <Link
-              to="/login"
-              className="px-4 py-2 text-sm font-medium text-green-700 border border-green-600 rounded-lg hover:bg-green-50 transition-colors"
-            >
-              Log In
-            </Link>
-            <Link
-              to="/register"
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Register
-            </Link>
-          </div>
-        </div>
-      </nav>
+      {/* ── Navigation (auth-aware via shared Navbar) ── */}
+      <Navbar />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">All Products</h1>

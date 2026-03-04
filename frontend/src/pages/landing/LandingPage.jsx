@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getFeaturedProducts, getNearExpiryProducts } from '../../services/productService';
+import Navbar from '../../components/Navbar';
+import { useAuth } from '../../context/AuthContext';
 
 /**
  * Page Layer – Public landing page for UrbanFresh.
@@ -8,6 +10,7 @@ import { getFeaturedProducts, getNearExpiryProducts } from '../../services/produ
  * Accessible without authentication; shows login/register links in the nav.
  */
 export default function LandingPage() {
+  const { isAuthenticated, user } = useAuth();
   const [featured, setFeatured] = useState([]);
   const [nearExpiry, setNearExpiry] = useState([]);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
@@ -28,30 +31,14 @@ export default function LandingPage() {
       .finally(() => setLoadingNearExpiry(false));
   }, []);
 
+  // Derive the dashboard path so the hero CTA sends authenticated
+  // users directly to their role-specific dashboard
+  const heroDashboard = { CUSTOMER: '/dashboard', ADMIN: '/admin', SUPPLIER: '/supplier', DELIVERY: '/delivery' }[user?.role] || '/dashboard';
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ── Navigation ── */}
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="text-2xl font-bold text-green-600 tracking-tight">
-            UrbanFresh
-          </Link>
-          <div className="flex gap-3">
-            <Link
-              to="/login"
-              className="px-4 py-2 text-sm font-medium text-green-700 border border-green-600 rounded-lg hover:bg-green-50 transition-colors"
-            >
-              Log In
-            </Link>
-            <Link
-              to="/register"
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Register
-            </Link>
-          </div>
-        </div>
-      </nav>
+      {/* ── Navigation (auth-aware via shared Navbar) ── */}
+      <Navbar />
 
       {/* ── Hero ── */}
       <section className="bg-green-600 text-white py-20 px-4 text-center">
@@ -63,18 +50,39 @@ export default function LandingPage() {
           and the planet.
         </p>
         <div className="flex gap-4 justify-center flex-wrap">
-          <Link
-            to="/register"
-            className="px-6 py-3 bg-white text-green-700 font-semibold rounded-lg hover:bg-green-50 transition-colors"
-          >
-            Get Started
-          </Link>
-          <Link
-            to="/login"
-            className="px-6 py-3 border border-white text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
-          >
-            Log In
-          </Link>
+          {isAuthenticated ? (
+            /* Authenticated hero CTAs — skip sign-in prompts */
+            <>
+              <Link
+                to="/products"
+                className="px-6 py-3 bg-white text-green-700 font-semibold rounded-lg hover:bg-green-50 transition-colors"
+              >
+                Browse Products
+              </Link>
+              <Link
+                to={heroDashboard}
+                className="px-6 py-3 border border-white text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+              >
+                My Dashboard
+              </Link>
+            </>
+          ) : (
+            /* Guest hero CTAs */
+            <>
+              <Link
+                to="/register"
+                className="px-6 py-3 bg-white text-green-700 font-semibold rounded-lg hover:bg-green-50 transition-colors"
+              >
+                Get Started
+              </Link>
+              <Link
+                to="/login"
+                className="px-6 py-3 border border-white text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Log In
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
