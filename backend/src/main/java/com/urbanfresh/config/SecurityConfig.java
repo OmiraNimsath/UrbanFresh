@@ -2,10 +2,12 @@ package com.urbanfresh.config;
 
 import com.urbanfresh.security.JwtAuthFilter;
 import com.urbanfresh.security.JwtAuthEntryPoint;
+import com.urbanfresh.security.RoleAccessDeniedHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -16,16 +18,21 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 /**
  * Config Layer – Spring Security configuration.
- * Defines password encoding, session policy, endpoint access rules,
+ * Defines password encoding, stateless session policy, URL-level role restrictions,
  * and registers the JWT authentication filter.
+ * Enables method-level security (@PreAuthorize) as a second layer of defence.
+ * Returns JSON 401 (JwtAuthEntryPoint) for missing/invalid tokens and JSON 403
+ * (RoleAccessDeniedHandler) for wrong-role requests.
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity  // enables @PreAuthorize / @PostAuthorize on controllers
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final JwtAuthEntryPoint jwtAuthEntryPoint;
+    private final RoleAccessDeniedHandler roleAccessDeniedHandler;
 
     /**
      * BCrypt encoder used by AuthService to hash passwords.
@@ -40,8 +47,11 @@ public class SecurityConfig {
      * - Stateless sessions (no server-side sessions)
      * - CSRF disabled (not needed for stateless REST APIs)
      * - Public access to /api/auth/** endpoints
+     * - Role-specific URL restrictions for /api/admin/**, /api/supplier/**, /api/delivery/**
      * - All other endpoints require a valid JWT
      * - JwtAuthFilter runs before UsernamePasswordAuthenticationFilter
+     * - 401 → JwtAuthEntryPoint (no token or invalid token)
+     * - 403 → RoleAccessDeniedHandler (valid token but wrong role)
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -59,9 +69,15 @@ public class SecurityConfig {
                         // Product listing, search, and category filter are public
                         .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/categories").permitAll()
+                        // Role-based URL-level restrictions (first line of defence)
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/supplier/**").hasRole("SUPPLIER")
+                        .requestMatchers("/api/delivery/**").hasRole("DELIVERY")
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthEntryPoint))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(jwtAuthEntryPoint)
+                        .accessDeniedHandler(roleAccessDeniedHandler))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
