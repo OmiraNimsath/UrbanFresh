@@ -1,5 +1,6 @@
 /**
- * Service Layer – API calls for product data used by the public landing page.
+ * Service Layer – API calls for product data.
+ * Covers the public landing page endpoints and the product listing/search page.
  * Uses the shared Axios instance so auth headers are attached automatically
  * when a token exists, but these endpoints work without one too.
  */
@@ -23,3 +24,28 @@ export const getFeaturedProducts = () =>
  */
 export const getNearExpiryProducts = (days = 7) =>
   api.get('/api/products/near-expiry', { params: { days } }).then((res) => res.data);
+
+/**
+ * Searches and filters the product catalogue with optional pagination.
+ * Calls GET /api/products (public endpoint).
+ *
+ * @param {Object} params
+ * @param {string} [params.search]   - substring to match in name/description
+ * @param {string} [params.category] - category to filter by
+ * @param {string} [params.sortBy]   - "price_asc" | "price_desc" | omit for name A–Z
+ * @param {number} [params.page=0]   - zero-based page index
+ * @param {number} [params.size=12]  - items per page
+ * @returns {Promise<ProductPageResponse>} paginated result
+ */
+export const getProducts = ({ search, category, sortBy, page = 0, size = 12 } = {}) =>
+  api.get('/api/products', { params: { search, category, sortBy, page, size } })
+    .then((res) => res.data);
+
+/**
+ * Fetches all distinct category names for the filter dropdown.
+ * Calls GET /api/products/categories (public endpoint).
+ *
+ * @returns {Promise<Array<string>>} sorted list of category strings
+ */
+export const getCategories = () =>
+  api.get('/api/products/categories').then((res) => res.data);

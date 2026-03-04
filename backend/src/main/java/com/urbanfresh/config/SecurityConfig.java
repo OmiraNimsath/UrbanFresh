@@ -56,6 +56,9 @@ public class SecurityConfig {
                         // Landing page product endpoints are public — no JWT required
                         .requestMatchers(HttpMethod.GET, "/api/products/featured").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/near-expiry").permitAll()
+                        // Product listing, search, and category filter are public
+                        .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/categories").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthEntryPoint))

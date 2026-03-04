@@ -2,6 +2,7 @@ package com.urbanfresh.service;
 
 import java.util.List;
 
+import com.urbanfresh.dto.response.ProductPageResponse;
 import com.urbanfresh.dto.response.ProductResponse;
 
 /**
@@ -26,4 +27,24 @@ public interface ProductService {
      * @return list of near-expiry products ordered by earliest expiry first
      */
     List<ProductResponse> getNearExpiryProducts(int daysAhead);
+
+    /**
+     * Searches and filters the product catalogue with optional pagination.
+     * Any combination of parameters is valid; null values skip that filter.
+     *
+     * @param search   substring to match in product name or description; null = no filter
+     * @param category exact category to filter by; null = all categories
+     * @param sortBy   field to sort by: "name", "price_asc", "price_desc" (default "name")
+     * @param page     zero-based page index
+     * @param size     number of items per page
+     * @return paginated product results wrapped in ProductPageResponse
+     */
+    ProductPageResponse searchProducts(String search, String category, String sortBy, int page, int size);
+
+    /**
+     * Returns all distinct category names for the frontend filter dropdown.
+     *
+     * @return sorted list of category strings (empty list when none exist)
+     */
+    List<String> getCategories();
 }

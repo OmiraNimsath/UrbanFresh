@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/landing/LandingPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import LoginPage from './pages/auth/LoginPage';
+import ProductListingPage from './pages/products/ProductListingPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
@@ -25,6 +26,7 @@ function App() {
         <Routes>
           {/* ── Public routes ── */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/products" element={<ProductListingPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
