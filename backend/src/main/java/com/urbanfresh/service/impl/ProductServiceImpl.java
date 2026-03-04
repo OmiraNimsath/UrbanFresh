@@ -3,8 +3,14 @@ package com.urbanfresh.service.impl;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+import com.urbanfresh.dto.response.ProductPageResponse;
 import com.urbanfresh.dto.response.ProductResponse;
 import com.urbanfresh.model.Product;
 import com.urbanfresh.repository.ProductRepository;
@@ -54,6 +60,63 @@ public class ProductServiceImpl implements ProductService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Searches the product catalogue with optional name/description search, category filter,
+     * sort, and pagination. Null/blank values for search and category disable those filters.
+     *
+     * @param search   substring search term; null or blank = no filter
+     * @param category category to filter by; null or blank = all categories
+     * @param sortBy   "price_asc", "price_desc", or anything else defaults to name ASC
+     * @param page     zero-based page index
+     * @param size     page size
+     * @return ProductPageResponse with the product list and pagination metadata
+     */
+    @Override
+    public ProductPageResponse searchProducts(String search, String category, String sortBy, int page, int size) {
+        // Convert blank strings to null so the JPQL query skips those filters
+        String searchParam   = StringUtils.hasText(search)   ? search.trim()   : null;
+        String categoryParam = StringUtils.hasText(category) ? category.trim() : null;
+
+        Sort sort = resolveSort(sortBy);
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<Product> resultPage = productRepository.searchProducts(searchParam, categoryParam, pageable);
+
+        return ProductPageResponse.builder()
+                .products(resultPage.getContent().stream().map(this::toResponse).toList())
+                .totalElements(resultPage.getTotalElements())
+                .totalPages(resultPage.getTotalPages())
+                .currentPage(resultPage.getNumber())
+                .pageSize(resultPage.getSize())
+                .build();
+    }
+
+    /**
+     * Returns all distinct, non-null category values for the frontend filter dropdown.
+     *
+     * @return sorted list of category strings
+     */
+    @Override
+    public List<String> getCategories() {
+        return productRepository.findAllCategories();
+    }
+
+    /**
+     * Translates the sortBy string from the query param into a Spring Data Sort.
+     * Defaults to name ASC so the list is always deterministic when no sort is chosen.
+     *
+     * @param sortBy sort key from the request param
+     * @return Sort instance
+     */
+    private Sort resolveSort(String sortBy) {
+        if (sortBy == null) return Sort.by("name").ascending();
+        return switch (sortBy) {
+            case "price_asc"  -> Sort.by("price").ascending();
+            case "price_desc" -> Sort.by("price").descending();
+            default           -> Sort.by("name").ascending();
+        };
     }
 
     /**
