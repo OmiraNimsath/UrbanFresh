@@ -49,3 +49,14 @@ export const getProducts = ({ search, category, sortBy, page = 0, size = 12 } = 
  */
 export const getCategories = () =>
   api.get('/api/products/categories').then((res) => res.data);
+
+/**
+ * Fetches the full details of a single product by ID.
+ * Calls GET /api/products/{id} (public endpoint).
+ * Rejects with an Axios error (status 404) when the product does not exist.
+ *
+ * @param {number|string} id - product primary key
+ * @returns {Promise<Object>} ProductResponse object
+ */
+export const getProductById = (id) =>
+  api.get(`/api/products/${id}`).then((res) => res.data);
