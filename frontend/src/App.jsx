@@ -8,6 +8,7 @@ import LoginPage from './pages/auth/LoginPage';
 import ProductListingPage from './pages/products/ProductListingPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
+import ProfilePage from './pages/customer/ProfilePage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
@@ -40,6 +41,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['CUSTOMER']}>
                 <CustomerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute allowedRoles={['CUSTOMER']}>
+                <ProfilePage />
               </ProtectedRoute>
             }
           />

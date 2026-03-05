@@ -1,5 +1,5 @@
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 /**
@@ -31,9 +31,23 @@ export default function CustomerDashboard() {
         <p className="text-gray-600">
           Welcome, <span className="font-semibold">{user?.name}</span>!
         </p>
-        <p className="text-gray-400 text-sm mt-2">
+        <p className="text-gray-400 text-sm mt-2 mb-6">
           Customer portal coming in upcoming sprints.
         </p>
+
+        {/* Quick-access cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            to="/profile"
+            className="flex items-center gap-3 p-4 border border-green-200 rounded-xl hover:bg-green-50 transition-colors group"
+          >
+            <span className="text-2xl">👤</span>
+            <div>
+              <p className="text-sm font-semibold text-green-700 group-hover:text-green-800">My Profile</p>
+              <p className="text-xs text-gray-400">Update your name, phone &amp; address</p>
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   );

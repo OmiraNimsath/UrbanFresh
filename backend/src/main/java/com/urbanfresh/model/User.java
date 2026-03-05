@@ -48,6 +48,10 @@ public class User {
     @Column(length = 15)
     private String phone;
 
+    // Delivery address kept on the user record to pre-fill checkout and reduce re-entry
+    @Column(length = 300)
+    private String address;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;

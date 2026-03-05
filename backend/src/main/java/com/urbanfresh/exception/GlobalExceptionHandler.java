@@ -68,6 +68,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle user not found → 404 Not Found.
+     */
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleUserNotFound(UserNotFoundException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
      * Handle product not found → 404 Not Found.
      */
     @ExceptionHandler(ProductNotFoundException.class)
