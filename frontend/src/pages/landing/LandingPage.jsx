@@ -145,7 +145,10 @@ export default function LandingPage() {
  */
 function ProductCard({ product, showExpiry = false }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+    <Link
+      to={`/products/${product.id}`}
+      className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col"
+    >
       {/* Product image or placeholder */}
       {product.imageUrl ? (
         <img
@@ -186,7 +189,7 @@ function ProductCard({ product, showExpiry = false }) {
           </div>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 
