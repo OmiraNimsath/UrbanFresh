@@ -1,14 +1,26 @@
 package com.urbanfresh.controller;
 
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.urbanfresh.dto.request.ProductRequest;
+import com.urbanfresh.dto.response.AdminProductResponse;
 import com.urbanfresh.dto.response.AdminStatsResponse;
+import com.urbanfresh.service.AdminProductService;
 import com.urbanfresh.service.AdminService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -27,16 +39,93 @@ import lombok.RequiredArgsConstructor;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AdminProductService adminProductService;
 
     /**
      * Returns high-level platform statistics for the admin dashboard.
      * GET /api/admin/stats
      *
-     * @return 200 OK  with totalUsers and totalProducts counts;
-     *         403 Forbidden if the caller does not have ADMIN role
+     * @return 200 OK with totalUsers and totalProducts counts
      */
     @GetMapping("/stats")
     public ResponseEntity<AdminStatsResponse> getStats() {
         return ResponseEntity.ok(adminService.getStats());
     }
+
+    // ── Product CRUD ───────────────────────────────────────────────────────────
+
+    /**
+     * Returns a paginated list of all products for the admin product table.
+     * GET /api/admin/products?page=0&size=20
+     *
+     * @param page zero-based page index (default 0)
+     * @param size items per page (default 20, clamped to 1–100)
+     * @return 200 OK with page of AdminProductResponse
+     */
+    @GetMapping("/products")
+    public ResponseEntity<Page<AdminProductResponse>> getProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        int safeSize = Math.max(1, Math.min(size, 100));
+        int safePage = Math.max(0, page);
+        return ResponseEntity.ok(adminProductService.getProducts(safePage, safeSize));
+    }
+
+    /**
+     * Returns a single product by ID.
+     * GET /api/admin/products/{id}
+     *
+     * @param id product ID
+     * @return 200 OK with AdminProductResponse; 404 if not found
+     */
+    @GetMapping("/products/{id}")
+    public ResponseEntity<AdminProductResponse> getProduct(@PathVariable Long id) {
+        return ResponseEntity.ok(adminProductService.getProductById(id));
+    }
+
+    /**
+     * Creates a new product and adds it to the catalogue immediately.
+     * POST /api/admin/products
+     *
+     * @param request validated product payload
+     * @return 201 Created with the persisted AdminProductResponse
+     */
+    @PostMapping("/products")
+    public ResponseEntity<AdminProductResponse> createProduct(
+            @Valid @RequestBody ProductRequest request) {
+
+        AdminProductResponse created = adminProductService.createProduct(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    /**
+     * Replaces all editable fields of an existing product (full update).
+     * PUT /api/admin/products/{id}
+     *
+     * @param id      product ID to update
+     * @param request validated product payload with new values
+     * @return 200 OK with updated AdminProductResponse; 404 if not found
+     */
+    @PutMapping("/products/{id}")
+    public ResponseEntity<AdminProductResponse> updateProduct(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductRequest request) {
+
+        return ResponseEntity.ok(adminProductService.updateProduct(id, request));
+    }
+
+    /**
+     * Permanently deletes a product from the catalogue.
+     * DELETE /api/admin/products/{id}
+     *
+     * @param id product ID to delete
+     * @return 204 No Content on success; 404 if not found
+     */
+    @DeleteMapping("/products/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+        adminProductService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
+    }
 }
+

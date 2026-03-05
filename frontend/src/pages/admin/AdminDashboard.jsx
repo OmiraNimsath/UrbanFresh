@@ -1,5 +1,5 @@
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 /**
@@ -28,12 +28,23 @@ export default function AdminDashboard() {
             Logout
           </button>
         </div>
-        <p className="text-gray-600">
+        <p className="text-gray-600 mb-6">
           Welcome, <span className="font-semibold">{user?.name}</span> (Admin)
         </p>
-        <p className="text-gray-400 text-sm mt-2">
-          Admin panel coming in upcoming sprints.
-        </p>
+
+        {/* Quick-action cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            to="/admin/products"
+            className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-colors"
+          >
+            <div className="text-3xl">🛒</div>
+            <div>
+              <p className="font-semibold text-gray-800">Manage Products</p>
+              <p className="text-xs text-gray-400 mt-0.5">Add, edit, delete products</p>
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   );

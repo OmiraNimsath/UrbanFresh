@@ -68,6 +68,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle product not found → 404 Not Found.
+     */
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleProductNotFound(ProductNotFoundException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
      * Handle @PreAuthorize / method-level security rejections → 403 Forbidden.
      * Complements RoleAccessDeniedHandler which covers URL-level rejections.
      * Declared before the catch-all Exception handler so it takes priority.
