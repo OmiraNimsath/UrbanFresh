@@ -1,4 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { uploadProductImage } from '../../services/adminProductService';
+
+const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 /**
  * Presentation Layer – Reusable modal form for creating and editing a product.
@@ -24,6 +28,13 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
     stockQuantity: '',
   });
 
+  // Image upload state
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile]       = useState(null);
+  const [uploadError, setUploadError]   = useState('');
+  const [isDragging, setIsDragging]     = useState(false);
+  const fileInputRef = useRef(null);
+
   // Pre-fill form when editing an existing product
   useEffect(() => {
     if (isEdit) {
@@ -37,6 +48,8 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
         expiryDate: product.expiryDate ?? '',
         stockQuantity: product.stockQuantity ?? '',
       });
+      // Show existing URL as preview (backwards-compatible)
+      if (product.imageUrl) setImagePreview(product.imageUrl);
     }
   }, [product, isEdit]);
 
@@ -48,14 +61,49 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
     }));
   };
 
-  const handleSubmit = (e) => {
+  // ── Image upload helpers ──────────────────────────────────────────────────
+  const validateAndSetFile = (file) => {
+    setUploadError('');
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setUploadError('Unsupported format. Use JPG, PNG, or WebP.');
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setUploadError('File exceeds the 5 MB limit.');
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleFileInput  = (e) => { const f = e.target.files?.[0]; if (f) validateAndSetFile(f); };
+  const handleDrop       = (e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files?.[0]; if (f) validateAndSetFile(f); };
+  const handleDragOver   = (e) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave  = ()  => setIsDragging(false);
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setUploadError('');
+
+    let resolvedImageUrl = form.imageUrl.trim() || null;
+
+    if (imageFile) {
+      try {
+        const { url } = await uploadProductImage(imageFile);
+        resolvedImageUrl = url;
+      } catch {
+        setUploadError('Image upload failed. Please try again.');
+        return;
+      }
+    }
+
     onSubmit({
       name: form.name.trim(),
       description: form.description.trim() || null,
       price: parseFloat(form.price),
       category: form.category.trim() || null,
-      imageUrl: form.imageUrl.trim() || null,
+      imageUrl: resolvedImageUrl,
       featured: form.featured,
       // Send null for empty expiry so backend treats it as no expiry
       expiryDate: form.expiryDate || null,
@@ -139,16 +187,74 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
             />
           </Field>
 
-          {/* Image URL */}
-          <Field label="Image URL">
-            <input
-              name="imageUrl"
-              value={form.imageUrl}
-              onChange={handleChange}
-              maxLength={500}
-              className={inputCls}
-              placeholder="https://..."
-            />
+          {/* Image Upload */}
+          <Field label="Product Image">
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={() => fileInputRef.current?.click()}
+              className={`relative flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg p-4 cursor-pointer transition-colors ${
+                isDragging
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-300 hover:border-green-400 hover:bg-gray-50'
+              }`}
+            >
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt="Product preview"
+                  className="h-32 w-auto rounded object-cover"
+                />
+              ) : (
+                <>
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M3 16.5V19a1 1 0 001 1h16a1 1 0 001-1v-2.5M16 9l-4-4m0 0L8 9m4-4v12" />
+                  </svg>
+                  <p className="text-xs text-gray-500 text-center">
+                    Drag &amp; drop an image here, or{' '}
+                    <span className="text-green-600 font-medium">click to browse</span>
+                  </p>
+                  <p className="text-xs text-gray-400">JPG, PNG, WebP · max 5 MB</p>
+                </>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileInput}
+              />
+            </div>
+
+            {imagePreview && (
+              <div className="flex gap-3 mt-1">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  className="text-xs text-green-600 hover:underline"
+                >
+                  Change image
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImagePreview(null);
+                    setImageFile(null);
+                    setForm((prev) => ({ ...prev, imageUrl: '' }));
+                  }}
+                  className="text-xs text-red-500 hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+
+            {uploadError && (
+              <p className="text-xs text-red-600 mt-1">{uploadError}</p>
+            )}
           </Field>
 
           {/* Expiry Date */}

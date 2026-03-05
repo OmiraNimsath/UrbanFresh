@@ -71,6 +71,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/products/categories").permitAll()
                         // Product detail page is public — any visitor can view a single product
                         .requestMatchers(HttpMethod.GET, "/api/products/*").permitAll()
+                        // Uploaded product images are public static assets
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         // Role-based URL-level restrictions (first line of defence)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/supplier/**").hasRole("SUPPLIER")

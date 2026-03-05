@@ -57,3 +57,20 @@ export const updateProduct = (id, data) =>
  */
 export const deleteProduct = (id) =>
   api.delete(`/api/admin/products/${id}`).then((res) => res.data);
+
+/**
+ * Uploads a product image to the server.
+ * Calls POST /api/admin/products/upload-image  (multipart/form-data)
+ *
+ * @param {File} file - image file (JPG, PNG, or WebP; max 5 MB)
+ * @returns {Promise<{url: string}>} object containing the public image URL
+ */
+export const uploadProductImage = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api
+    .post('/api/admin/products/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((res) => res.data);
+};
