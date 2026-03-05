@@ -117,6 +117,15 @@ export function AuthProvider({ children }) {
     setUser(userData);
   };
 
+  /**
+   * Update the stored user object in-place (e.g. after a profile edit).
+   * Only patches the provided fields; does not touch the token or expiry timer.
+   * @param {Partial<{name: string, phone: string, address: string}>} patch
+   */
+  const updateUser = (patch) => {
+    setUser((prev) => ({ ...prev, ...patch }));
+  };
+
   const isAuthenticated = !!token && !isTokenExpired(token);
 
   return (
@@ -128,6 +137,7 @@ export function AuthProvider({ children }) {
         sessionExpired,
         login,
         logout,
+        updateUser,
         expireSession,
         clearSessionExpired,
       }}
@@ -139,7 +149,7 @@ export function AuthProvider({ children }) {
 
 /**
  * Hook to access auth state from any component.
- * @returns {{ token, user, isAuthenticated, sessionExpired, login, logout, expireSession, clearSessionExpired }}
+ * @returns {{ token, user, isAuthenticated, sessionExpired, login, logout, updateUser, expireSession, clearSessionExpired }}
  */
 export const useAuth = () => {
   const context = useContext(AuthContext);
