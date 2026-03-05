@@ -113,14 +113,19 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
   };
 
   return (
-    /* Backdrop */
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">
-          {isEdit ? 'Edit Product' : 'Add Product'}
-        </h2>
+    /* Backdrop — overflowY so the whole overlay scrolls on very short screens */
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-6 overflow-y-auto">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh] my-auto">
+        {/* Sticky header */}
+        <div className="px-6 pt-6 pb-2 flex-shrink-0">
+          <h2 className="text-lg font-bold text-gray-800">
+            {isEdit ? 'Edit Product' : 'Add Product'}
+          </h2>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Scrollable form body */}
+        <div className="overflow-y-auto px-6 pb-2 flex-1">
+        <form id="product-form" onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <Field label="Name *">
             <input
@@ -300,7 +305,7 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
           </label>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2 pb-4">
             <button
               type="button"
               onClick={onClose}
@@ -318,6 +323,7 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );
