@@ -49,18 +49,22 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<String> findAllCategories();
 
     /**
-     * Returns up to {@code pageable.getPageSize()} product names whose name contains the
-     * given query string (case-insensitive). Used by the lightweight autocomplete endpoint.
-     * Searching by name only (not description) keeps suggestions fast and relevant.
+     * Returns up to {@code pageable.getPageSize()} lightweight suggestion payloads
+     * for products whose name contains the given query string (case-insensitive).
+     * Uses a JPQL constructor expression so only the five needed columns are fetched;
+     * the full entity is never loaded.
      *
      * @param query    substring to match in product name
      * @param pageable page request used purely to cap result size (e.g. PageRequest.of(0, 8))
-     * @return list of matching product name strings
+     * @return list of matching ProductSuggestionResponse objects
      */
-    @Query("SELECT p.name FROM Product p " +
+    @Query("SELECT NEW com.urbanfresh.dto.response.ProductSuggestionResponse(" +
+           "p.id, p.name, p.imageUrl, p.price, p.unit) " +
+           "FROM Product p " +
            "WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
            "ORDER BY p.name ASC")
-    List<String> findNameSuggestions(@Param("query") String query, Pageable pageable);
+    List<com.urbanfresh.dto.response.ProductSuggestionResponse> findNameSuggestions(
+            @Param("query") String query, Pageable pageable);
 
     /**
      * Retrieves all products marked as featured (featured = true).

@@ -93,17 +93,17 @@ public class ProductController {
     }
 
     /**
-     * Returns up to 8 product name suggestions for the search autocomplete dropdown.
-     * This is a lightweight endpoint — it searches product names only and returns
-     * plain strings so the payload stays tiny. Intentionally separate from the
-     * main GET /api/products endpoint so typing never triggers the full catalogue fetch.
+     * Returns up to 8 lightweight product suggestion payloads for the search autocomplete
+     * dropdown. Each result carries id, name, imageUrl, price, and unit — enough to render
+     * a rich preview row in the frontend without a second request.
+     * Intentionally separate from GET /api/products so typing never triggers a grid reload.
      * GET /api/products/suggestions?q=milk
      *
      * @param q the partial query string typed by the user (min 2 chars enforced in service)
-     * @return 200 with a list of up to 8 matching product name strings
+     * @return 200 with a list of up to 8 ProductSuggestionResponse objects
      */
     @GetMapping("/suggestions")
-    public ResponseEntity<List<String>> getProductSuggestions(
+    public ResponseEntity<List<com.urbanfresh.dto.response.ProductSuggestionResponse>> getProductSuggestions(
             @RequestParam(required = false, defaultValue = "") String q) {
         return ResponseEntity.ok(productService.getProductSuggestions(q));
     }

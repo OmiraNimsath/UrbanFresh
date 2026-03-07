@@ -1,14 +1,13 @@
 import { useState, useRef, useCallback } from 'react';
 import useSearchSuggestions from '../hooks/useSearchSuggestions';
+import { formatPrice } from '../utils/priceUtils';
 
 /**
- * Component Layer – Search input with an autocomplete suggestions dropdown.
+ * Component Layer – Search input with a rich autocomplete suggestions dropdown.
  *
- * Responsibilities:
- *  - Renders the controlled text input and the submit button inside a <form>
- *  - Shows a debounced suggestions list as the user types (via useSearchSuggestions)
- *  - Supports full keyboard navigation (↓ ↑ Enter to select, Escape to close)
- *  - Notifies parent of two distinct events: typing (onChange) and committing (onCommit)
+ * Each suggestion row shows a product thumbnail, name, and formatted price so the
+ * user can confirm the right product before committing the search. Keyboard navigation
+ * (↓ ↑ Enter Escape) is fully supported.
  *
  * The parent must keep inputValue and committedSearch as separate states so that
  * typing here never triggers the main product catalogue fetch.
@@ -50,17 +49,17 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
       setOpen(false);
       setHighlightedIndex(-1);
     } else if (e.key === 'Enter' && highlightedIndex >= 0) {
-      // Prevent form submission — we handle the commit here from the suggestion
       e.preventDefault();
       selectSuggestion(suggestions[highlightedIndex]);
     }
   };
 
-  const selectSuggestion = useCallback((name) => {
-    onChange(name);
+  // suggestion is now a ProductSuggestionResponse object {id, name, imageUrl, price, unit}
+  const selectSuggestion = useCallback((suggestion) => {
+    onChange(suggestion.name);
     setOpen(false);
     setHighlightedIndex(-1);
-    onCommit(name);
+    onCommit(suggestion.name);
   }, [onChange, onCommit]);
 
   const handleFormSubmit = (e) => {
@@ -70,11 +69,7 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
     onCommit(value);
   };
 
-  // Close dropdown when the user clicks outside this component.
-  // Using mousedown (fires before blur) lets us register the click on a
-  // suggestion item before the input's blur event would hide the list.
   const handleBlur = () => {
-    // Small delay so a suggestion mousedown event registers first
     setTimeout(() => setOpen(false), 150);
   };
 
@@ -103,28 +98,20 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
         />
 
-        {/* Suggestions dropdown */}
+        {/* Rich suggestions dropdown */}
         {showDropdown && (
           <ul
             role="listbox"
-            className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+            className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
           >
-            {suggestions.map((name, idx) => (
-              <li
-                key={name}
-                role="option"
-                aria-selected={idx === highlightedIndex}
-                // mousedown fires before blur so we can capture the click
-                onMouseDown={() => selectSuggestion(name)}
+            {suggestions.map((suggestion, idx) => (
+              <SuggestionItem
+                key={suggestion.id}
+                suggestion={suggestion}
+                highlighted={idx === highlightedIndex}
+                onMouseDown={() => selectSuggestion(suggestion)}
                 onMouseEnter={() => setHighlightedIndex(idx)}
-                className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
-                  idx === highlightedIndex
-                    ? 'bg-green-50 text-green-800 font-medium'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {name}
-              </li>
+              />
             ))}
           </ul>
         )}
@@ -137,5 +124,63 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
         Search
       </button>
     </form>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Private sub-component: one row in the suggestions dropdown
+───────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Renders a single suggestion row: thumbnail on the left, product name and
+ * formatted price on the right. Highlighted state applies a green tint.
+ *
+ * @param {Object}   props
+ * @param {Object}   props.suggestion  - ProductSuggestionResponse {id, name, imageUrl, price, unit}
+ * @param {boolean}  props.highlighted - whether this row is keyboard-focused
+ * @param {Function} props.onMouseDown - selects this suggestion
+ * @param {Function} props.onMouseEnter
+ */
+function SuggestionItem({ suggestion, highlighted, onMouseDown, onMouseEnter }) {
+  return (
+    <li
+      role="option"
+      aria-selected={highlighted}
+      onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
+        highlighted ? 'bg-green-50' : 'hover:bg-gray-50'
+      }`}
+    >
+      {/* Thumbnail */}
+      <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-green-100 flex items-center justify-center">
+        {suggestion.imageUrl ? (
+          <img
+            src={suggestion.imageUrl}
+            alt={suggestion.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span className="text-lg">🥦</span>
+        )}
+      </div>
+
+      {/* Text */}
+      <div className="flex flex-col min-w-0 flex-1">
+        <span
+          className={`text-sm font-medium truncate ${
+            highlighted ? 'text-green-800' : 'text-gray-800'
+          }`}
+        >
+          {suggestion.name}
+        </span>
+        <span className="text-xs text-green-600 font-semibold mt-0.5">
+          {formatPrice(suggestion.price, suggestion.unit)}
+        </span>
+      </div>
+
+      {/* Chevron hint */}
+      <span className="text-gray-300 text-xs shrink-0">↵</span>
+    </li>
   );
 }
