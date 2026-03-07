@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useSearchSuggestions from '../hooks/useSearchSuggestions';
 import { formatPrice } from '../utils/priceUtils';
 
@@ -25,6 +26,7 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
   const inputRef = useRef(null);
 
   const { suggestions } = useSearchSuggestions(value);
+  const navigate = useNavigate();
 
   const showDropdown = open && suggestions.length > 0;
 
@@ -56,11 +58,12 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
 
   // suggestion is now a ProductSuggestionResponse object {id, name, imageUrl, price, unit}
   const selectSuggestion = useCallback((suggestion) => {
-    onChange(suggestion.name);
+    // Navigate directly to the product detail page on suggestion select
+    // (avoid performing a listing search)
     setOpen(false);
     setHighlightedIndex(-1);
-    onCommit(suggestion.name);
-  }, [onChange, onCommit]);
+    navigate(`/products/${suggestion.id}`);
+  }, [navigate]);
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
