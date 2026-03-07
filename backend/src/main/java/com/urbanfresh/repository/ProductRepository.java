@@ -2,15 +2,19 @@ package com.urbanfresh.repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.urbanfresh.model.Product;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * Repository Layer – Spring Data JPA repository for Product entities.
@@ -47,6 +51,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      */
     @Query("SELECT DISTINCT p.category FROM Product p WHERE p.category IS NOT NULL ORDER BY p.category ASC")
     List<String> findAllCategories();
+
+    /**
+     * Fetches a product row with a PESSIMISTIC_WRITE database lock.
+     * Used during order placement so two concurrent transactions cannot both
+     * read the same stock level and over-sell the last unit.
+     *
+     * @param id product ID to lock and load
+     * @return Optional containing the locked product, empty if not found
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional<Product> findByIdWithLock(@Param("id") Long id);
 
     /**
      * Retrieves all products marked as featured (featured = true).

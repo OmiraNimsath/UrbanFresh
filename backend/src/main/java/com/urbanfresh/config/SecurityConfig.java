@@ -1,9 +1,5 @@
 package com.urbanfresh.config;
 
-import com.urbanfresh.security.JwtAuthFilter;
-import com.urbanfresh.security.JwtAuthEntryPoint;
-import com.urbanfresh.security.RoleAccessDeniedHandler;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,6 +11,12 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import com.urbanfresh.security.JwtAuthEntryPoint;
+import com.urbanfresh.security.JwtAuthFilter;
+import com.urbanfresh.security.RoleAccessDeniedHandler;
+
+import lombok.RequiredArgsConstructor;
 
 /**
  * Config Layer – Spring Security configuration.
@@ -77,6 +79,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/supplier/**").hasRole("SUPPLIER")
                         .requestMatchers("/api/delivery/**").hasRole("DELIVERY")
+                        // Order endpoints require authentication; role check done via @PreAuthorize
+                        .requestMatchers("/api/orders/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
