@@ -41,6 +41,7 @@ public class LoyaltyServiceImpl implements LoyaltyService {
      * @return LoyaltyPointsResponse with balance, earned, redeemed, and the conversion rule
      */
     @Override
+    @Transactional(readOnly = true)
     public LoyaltyPointsResponse getLoyaltyPoints(String customerEmail) {
         User customer = userRepository.findByEmail(customerEmail)
                 .orElseThrow(() -> new UserNotFoundException("Customer not found: " + customerEmail));
@@ -63,8 +64,11 @@ public class LoyaltyServiceImpl implements LoyaltyService {
     @Override
     @Transactional
     public void awardPoints(User customer, BigDecimal orderTotal) {
+        // Pessimistic write lock prevents a lost-update race when two orders for the same
+        // customer are placed concurrently: both would otherwise read the same earnedPoints
+        // value, add their points independently, and one write would silently overwrite the other.
         LoyaltyPoints ledger = loyaltyPointsRepository
-                .findByCustomerId(customer.getId())
+                .findByCustomerIdWithLock(customer.getId())
                 .orElseGet(() -> {
                     // First order — bootstrap a fresh ledger for this customer
                     LoyaltyPoints fresh = LoyaltyPoints.builder()

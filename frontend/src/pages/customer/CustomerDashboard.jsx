@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { getMyOrders, getLoyaltyPoints } from '../../services/orderService';
+import { formatAmount } from '../../utils/priceUtils';
 
 /**
  * Presentation Layer – Customer dashboard page.
@@ -20,14 +21,23 @@ export default function CustomerDashboard() {
   const [loyalty, setLoyalty] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /** Load orders and loyalty points in parallel on mount. */
+  /** Load orders and loyalty points in parallel on mount.
+   * allSettled ensures partial success: if one call fails, the other section
+   * still renders instead of both being hidden by a single catch. */
   useEffect(() => {
-    Promise.all([getMyOrders(), getLoyaltyPoints()])
-      .then(([ordersRes, loyaltyRes]) => {
-        setOrders(ordersRes.data);
-        setLoyalty(loyaltyRes.data);
+    Promise.allSettled([getMyOrders(), getLoyaltyPoints()])
+      .then(([ordersResult, loyaltyResult]) => {
+        if (ordersResult.status === 'fulfilled') {
+          setOrders(ordersResult.value.data);
+        } else {
+          toast.error('Failed to load your orders. Please refresh.');
+        }
+        if (loyaltyResult.status === 'fulfilled') {
+          setLoyalty(loyaltyResult.value.data);
+        } else {
+          toast.error('Failed to load loyalty points. Please refresh.');
+        }
       })
-      .catch(() => toast.error('Failed to load dashboard data. Please refresh.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -170,7 +180,7 @@ function OrderCard({ order }) {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold text-gray-800">
-            LKR {Number(order.totalAmount).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+            {formatAmount(order.totalAmount)}
           </span>
           <StatusBadge status={order.status} />
           <button
@@ -200,12 +210,8 @@ function OrderCard({ order }) {
                 <tr key={idx} className="border-t border-gray-50">
                   <td className="py-1">{item.productName}</td>
                   <td className="text-right py-1">{item.quantity}</td>
-                  <td className="text-right py-1">
-                    LKR {Number(item.unitPrice).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="text-right py-1">
-                    LKR {Number(item.lineTotal).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
-                  </td>
+                  <td className="text-right py-1">{formatAmount(item.unitPrice)}</td>
+                  <td className="text-right py-1">{formatAmount(item.lineTotal)}</td>
                 </tr>
               ))}
             </tbody>

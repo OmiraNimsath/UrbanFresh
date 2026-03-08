@@ -27,3 +27,20 @@ export function formatPrice(price, unit) {
   const suffix = UNIT_LABELS[unit] ?? '';
   return suffix ? `${amount} ${suffix}` : amount;
 }
+
+/**
+ * Formats a plain currency amount with the standard Rs. prefix and exactly
+ * two decimal places. Use this for order totals, line totals, and any
+ * monetary value that does not carry a per-unit suffix.
+ *
+ * Example: formatAmount(1234.5) → "Rs. 1,234.50"
+ *
+ * @param {number|string} amount - monetary value
+ * @returns {string} formatted string, e.g. "Rs. 1,234.50"
+ */
+export function formatAmount(amount) {
+  return `Rs. ${Number(amount).toLocaleString('en-LK', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
