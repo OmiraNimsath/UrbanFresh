@@ -22,6 +22,7 @@ import com.urbanfresh.model.User;
 import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
+import com.urbanfresh.service.LoyaltyService;
 import com.urbanfresh.service.OrderService;
 
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final LoyaltyService loyaltyService;
 
     /**
      * Places an order for the authenticated customer.
@@ -127,7 +129,30 @@ public class OrderServiceImpl implements OrderService {
 
         Order saved = orderRepository.save(order);
 
+        // Award loyalty points after successful order persistence
+        loyaltyService.awardPoints(customer, total);
+
         return toOrderResponse(saved);
+    }
+
+    /**
+     * Returns all orders for the authenticated customer, newest first.
+     * Returns an empty list (not an error) when no orders have been placed.
+     *
+     * @param customerEmail email from JWT principal
+     * @return list of OrderResponse DTOs
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getMyOrders(String customerEmail) {
+        User customer = userRepository.findByEmail(customerEmail)
+                .orElseThrow(() -> new UserNotFoundException("Customer not found: " + customerEmail));
+
+        return orderRepository
+                .findByCustomerIdOrderByCreatedAtDesc(customer.getId())
+                .stream()
+                .map(this::toOrderResponse)
+                .toList();
     }
 
     /**
