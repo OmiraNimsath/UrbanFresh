@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.urbanfresh.dto.response.ProductPageResponse;
 import com.urbanfresh.dto.response.ProductResponse;
+import com.urbanfresh.dto.response.ProductSuggestionResponse;
 
 /**
  * Service Layer – Contract for product-related business operations.
@@ -47,6 +48,17 @@ public interface ProductService {
      * @return sorted list of category strings (empty list when none exist)
      */
     List<String> getCategories();
+
+    /**
+     * Returns up to 8 lightweight suggestion payloads for the autocomplete dropdown.
+     * Each result carries the product id, name, thumbnail URL, price, and unit so the
+     * frontend can render a rich preview row without a second request.
+     * Returns an empty list when the query is blank or shorter than 2 characters.
+     *
+     * @param query the partial product name typed by the user
+     * @return list of up to 8 ProductSuggestionResponse objects
+     */
+    List<ProductSuggestionResponse> getProductSuggestions(String query);
 
     /**
      * Returns a single product by its primary-key ID.

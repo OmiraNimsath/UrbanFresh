@@ -1,73 +1,117 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories } from '../../services/productService';
 import Navbar from '../../components/Navbar';
+import SearchBar from '../../components/SearchBar';
 import { formatPrice } from '../../utils/priceUtils';
 
 /**
  * Page Layer – Public product listing page.
  * Allows visitors and authenticated users to browse, search, filter by category,
- * and sort the full product catalogue. Supports URL-driven state so results are
- * shareable and the browser back button works correctly.
+ * and sort the full product catalogue.
+ *
+ * State architecture (fixes keystroke-per-request bug):
+ *  - inputValue     : local state bound to the <SearchBar> input. Changes on every
+ *                     keystroke but is NEVER a dependency of the product fetch.
+ *  - committedSearch: derived directly from the URL (?search=). Only changes when
+ *                     the user explicitly submits a search or selects a suggestion.
+ *  - All other filter params (category, sortBy, page) are also derived from the URL.
+ *
+ * The URL is the single source of truth for all committed filter state, which means
+ * browser back/forward navigation correctly restores the previous search results.
  */
 export default function ProductListingPage() {
-  // Sync filter state with URL query params so results are bookmarkable
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [search, setSearch]     = useState(searchParams.get('search')   || '');
-  const [category, setCategory] = useState(searchParams.get('category') || '');
-  const [sortBy, setSortBy]     = useState(searchParams.get('sortBy')   || '');
-  const [page, setPage]         = useState(Number(searchParams.get('page') || 0));
+  // ── Derive committed filter state directly from the URL ─────────────────────
+  // These are NOT useState — they are plain derived values. Changing the URL
+  // (via setSearchParams) updates them, which in turn re-runs the fetch effect.
+  const committedSearch = searchParams.get('search')   || '';
+  const category        = searchParams.get('category') || '';
+  const sortBy          = searchParams.get('sortBy')   || '';
+  const page            = Number(searchParams.get('page') || 0);
+
+  // ── Local input state — only for what's typed in the search box ─────────────
+  // Initialised from the URL on mount so a bookmarked/shared URL pre-fills the input.
+  // This state MUST NOT be a dependency of the product fetch — that's the core fix.
+  const [inputValue, setInputValue] = useState(committedSearch);
+
+  // Keep inputValue in sync when the URL changes from browser back/forward.
+  // We track the previous committed value with a ref to avoid re-running on
+  // every render caused by other URL param changes (category, sort, page).
+  const prevCommittedRef = useRef(committedSearch);
+  useEffect(() => {
+    if (committedSearch !== prevCommittedRef.current) {
+      setInputValue(committedSearch);
+      prevCommittedRef.current = committedSearch;
+    }
+  }, [committedSearch]);
 
   const [result, setResult]         = useState(null);   // ProductPageResponse
   const [categories, setCategories] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
 
-  // ── Fetch category list once on mount ──
+  // ── Fetch category list once on mount ──────────────────────────────────────
   useEffect(() => {
     getCategories()
       .then(setCategories)
-      .catch(() => setCategories([])); // non-critical; dropdown just stays empty
+      .catch(() => setCategories([])); // non-critical; dropdown stays empty
   }, []);
 
-  // ── Fetch products whenever filters or page change ──
-  const fetchProducts = useCallback(() => {
+  // ── Fetch products whenever committed filter state (URL params) change ──────
+  // inputValue is intentionally absent from this dependency array.
+  // Typing updates inputValue only; the fetch only fires when the URL changes.
+  useEffect(() => {
     setLoading(true);
     setError(null);
-
-    // Keep URL in sync with current filter state
-    const params = {};
-    if (search)   params.search   = search;
-    if (category) params.category = category;
-    if (sortBy)   params.sortBy   = sortBy;
-    if (page > 0) params.page     = page;
-    setSearchParams(params, { replace: true });
-
-    getProducts({ search, category, sortBy, page, size: 12 })
+    getProducts({ search: committedSearch, category, sortBy, page, size: 12 })
       .then(setResult)
       .catch(() => setError('Could not load products. Please try again.'))
       .finally(() => setLoading(false));
-  }, [search, category, sortBy, page, setSearchParams]);
+  }, [committedSearch, category, sortBy, page]);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+  // ── URL mutation helpers ────────────────────────────────────────────────────
 
-  // Reset to page 0 whenever a filter changes (prevents empty pages)
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    setPage(0);
+  /**
+   * Writes a new committed search term to the URL, which triggers the fetch effect.
+   * Resets the page to 0 so the first results page is always shown on a new search.
+   */
+  const commitSearch = (value) => {
+    const trimmed = value.trim();
+    setInputValue(trimmed); // keep the input box in sync
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (trimmed) next.set('search', trimmed); else next.delete('search');
+      next.delete('page'); // always back to page 0 on a new search
+      return next;
+    });
   };
 
   const handleCategoryChange = (val) => {
-    setCategory(val);
-    setPage(0);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (val) next.set('category', val); else next.delete('category');
+      next.delete('page');
+      return next;
+    });
   };
 
   const handleSortChange = (val) => {
-    setSortBy(val);
-    setPage(0);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (val) next.set('sortBy', val); else next.delete('sortBy');
+      next.delete('page');
+      return next;
+    });
+  };
+
+  const handlePageChange = (newPage) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (newPage > 0) next.set('page', String(newPage)); else next.delete('page');
+      return next;
+    }, { replace: true }); // replace so paging doesn't pollute browser history
   };
 
   return (
@@ -80,22 +124,12 @@ export default function ProductListingPage() {
 
         {/* ── Search + Filter + Sort bar ── */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-col sm:flex-row gap-3">
-          {/* Search */}
-          <form onSubmit={handleSearchSubmit} className="flex flex-1 gap-2">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search products…"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Search
-            </button>
-          </form>
+          {/* Search — uses SearchBar which keeps inputValue separate from the fetch */}
+          <SearchBar
+            value={inputValue}
+            onChange={setInputValue}
+            onCommit={commitSearch}
+          />
 
           {/* Category filter */}
           <select
@@ -157,7 +191,7 @@ export default function ProductListingPage() {
         {result && result.totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-8">
             <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              onClick={() => handlePageChange(Math.max(0, page - 1))}
               disabled={page === 0}
               className="px-4 py-2 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
             >
@@ -167,7 +201,7 @@ export default function ProductListingPage() {
               Page {page + 1} of {result.totalPages}
             </span>
             <button
-              onClick={() => setPage((p) => Math.min(result.totalPages - 1, p + 1))}
+              onClick={() => handlePageChange(Math.min(result.totalPages - 1, page + 1))}
               disabled={page >= result.totalPages - 1}
               className="px-4 py-2 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
             >

@@ -60,3 +60,15 @@ export const getCategories = () =>
  */
 export const getProductById = (id) =>
   api.get(`/api/products/${id}`).then((res) => res.data);
+
+/**
+ * Fetches up to 8 product name suggestions for the search autocomplete dropdown.
+ * Calls GET /api/products/suggestions?q={query} (public endpoint).
+ * This is intentionally separate from getProducts so typing in the search box
+ * never triggers the heavier paginated catalogue fetch.
+ *
+ * @param {string} query - partial product name (min 2 chars; service silently returns [] otherwise)
+ * @returns {Promise<string[]>} array of matching product name strings
+ */
+export const getProductSuggestions = (query) =>
+  api.get('/api/products/suggestions', { params: { q: query } }).then((res) => res.data);

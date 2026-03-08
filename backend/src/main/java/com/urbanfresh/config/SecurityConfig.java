@@ -71,6 +71,8 @@ public class SecurityConfig {
                         // Product listing, search, and category filter are public
                         .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/categories").permitAll()
+                        // Lightweight autocomplete suggestions — public, no auth required
+                        .requestMatchers(HttpMethod.GET, "/api/products/suggestions").permitAll()
                         // Product detail page is public — any visitor can view a single product
                         .requestMatchers(HttpMethod.GET, "/api/products/*").permitAll()
                         // Uploaded product images are public static assets
