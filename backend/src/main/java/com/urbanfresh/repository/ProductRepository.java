@@ -69,7 +69,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
            "ORDER BY p.name ASC")
     List<com.urbanfresh.dto.response.ProductSuggestionResponse> findNameSuggestions(
             @Param("query") String query, Pageable pageable);
-    /*
+            
+    /**
      * Fetches a product row with a PESSIMISTIC_WRITE database lock.
      * Used during order placement so two concurrent transactions cannot both
      * read the same stock level and over-sell the last unit.
