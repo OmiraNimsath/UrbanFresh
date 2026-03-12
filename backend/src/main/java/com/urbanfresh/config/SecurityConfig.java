@@ -81,6 +81,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/supplier/**").hasRole("SUPPLIER")
                         .requestMatchers("/api/delivery/**").hasRole("DELIVERY")
+                        // Cart endpoints require authentication; role check done via @PreAuthorize
+                        .requestMatchers("/api/cart/**").authenticated()
                         // Order endpoints require authentication; role check done via @PreAuthorize
                         .requestMatchers("/api/orders/**").authenticated()
                         // Customer dashboard endpoints (order history + loyalty) — CUSTOMER only via @PreAuthorize
