@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { getProductById } from '../../services/productService';
+import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import Navbar from '../../components/Navbar';
 import { formatPrice } from '../../utils/priceUtils';
 
@@ -100,6 +103,10 @@ export default function ProductDetailPage() {
  * @param {Object} product - ProductResponse received from the API
  */
 function ProductDetail({ product }) {
+  const { isAuthenticated, user } = useAuth();
+  const { addToCart } = useCart();
+  const navigate = useNavigate();
+  const [adding, setAdding] = useState(false);
   // Days until expiry — drives the near-expiry banner display
   const daysUntilExpiry = product.expiryDate
     ? Math.ceil((new Date(product.expiryDate) - new Date()) / 86_400_000)
@@ -164,9 +171,27 @@ function ProductDetail({ product }) {
           {product.inStock ? (
             <>
               <span className="text-xs text-green-600 font-medium">✓ In Stock</span>
-              {/* Add to Cart is a UI placeholder — cart feature is out of scope for SCRUM-12 */}
-              <button className="px-6 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 active:scale-95 transition-all">
-                Add to Cart
+              <button
+                disabled={adding}
+                onClick={async () => {
+                  // Redirect guests to login; only CUSTOMER role may use the cart.
+                  if (!isAuthenticated || user?.role !== 'CUSTOMER') {
+                    navigate('/login');
+                    return;
+                  }
+                  setAdding(true);
+                  try {
+                    await addToCart(product.id, 1);
+                    toast.success(`${product.name} added to cart`);
+                  } catch (err) {
+                    toast.error(err?.response?.data?.message || 'Could not add to cart');
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+                className="px-6 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {adding ? 'Adding…' : 'Add to Cart'}
               </button>
             </>
           ) : (

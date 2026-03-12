@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { CartProvider } from './context/CartContext';
+import CartPage from './pages/customer/CartPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/landing/LandingPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -18,12 +20,14 @@ import UnauthorizedPage from './pages/error/UnauthorizedPage';
 
 /**
  * App – Root component.
- * Wraps the app in AuthProvider for global auth state.
+ * Wraps the app in AuthProvider for global auth state and
+ * CartProvider for customer cart state.
  * Declares all application routes (public & protected).
  */
 function App() {
   return (
     <AuthProvider>
+      <CartProvider>
       <BrowserRouter>
         {/* Global toast notifications */}
         <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
@@ -36,7 +40,15 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-          {/* ── Protected role-based dashboards ── */}
+          {/* ── Protected customer routes ── */}
+          <Route
+            path="/cart"
+            element={
+              <ProtectedRoute allowedRoles={['CUSTOMER']}>
+                <CartPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/dashboard"
             element={
@@ -98,6 +110,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </CartProvider>
     </AuthProvider>
   );
 }

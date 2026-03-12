@@ -82,6 +82,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle cart item not found or not owned by the requesting customer → 404 Not Found.
+     */
+    @ExceptionHandler(CartItemNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleCartItemNotFound(CartItemNotFoundException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
      * Handle product not found → 404 Not Found.
      */
     @ExceptionHandler(ProductNotFoundException.class)
