@@ -110,6 +110,34 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle order not found → 404 Not Found.
+     */
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleOrderNotFound(OrderNotFoundException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
+     * Handle invalid order status transition → 400 Bad Request.
+     */
+    @ExceptionHandler(InvalidOrderStatusTransitionException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidOrderTransition(InvalidOrderStatusTransitionException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
      * Handle insufficient stock on order placement → 409 Conflict.
      * Message already names the failing product(s) — pass it straight through.
      */

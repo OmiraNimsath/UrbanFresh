@@ -35,6 +35,7 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
   const [uploadError, setUploadError]   = useState('');
   const [isDragging, setIsDragging]     = useState(false);
   const fileInputRef = useRef(null);
+  const prevObjectUrlRef = useRef(null);
 
   // Pre-fill form when editing an existing product
   useEffect(() => {
@@ -74,8 +75,15 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
       setUploadError('File exceeds the 5 MB limit.');
       return;
     }
+    // Revoke previously created object URL to avoid memory leaks
+    if (prevObjectUrlRef.current) {
+      try { URL.revokeObjectURL(prevObjectUrlRef.current); } catch (e) {}
+      prevObjectUrlRef.current = null;
+    }
+    const objUrl = URL.createObjectURL(file);
     setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    setImagePreview(objUrl);
+    prevObjectUrlRef.current = objUrl;
   };
 
   const handleFileInput  = (e) => { const f = e.target.files?.[0]; if (f) validateAndSetFile(f); };
@@ -84,31 +92,46 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
   const handleDragLeave  = ()  => setIsDragging(false);
   // ─────────────────────────────────────────────────────────────────────────
 
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (prevObjectUrlRef.current) {
+        try { URL.revokeObjectURL(prevObjectUrlRef.current); } catch (e) {}
+        prevObjectUrlRef.current = null;
+      }
+    };
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUploadError('');
-
-    let resolvedImageUrl = form.imageUrl.trim() || null;
+    // Safely resolve values (avoid calling .trim() on null/undefined)
+    let resolvedImageUrl = (form.imageUrl ?? '').trim() || null;
 
     if (imageFile) {
       try {
         const { url } = await uploadProductImage(imageFile);
         resolvedImageUrl = url;
-      } catch {
+      } catch (err) {
         setUploadError('Image upload failed. Please try again.');
         return;
       }
     }
 
+    const priceVal = parseFloat(String(form.price));
+    const stockVal = parseInt(String(form.stockQuantity), 10);
+
     onSubmit({
-      name: form.name.trim(),
-      description: form.description.trim() || null,
-      price: parseFloat(form.price),
-      category: form.category.trim() || null,      unit: form.unit || 'PER_ITEM',      imageUrl: resolvedImageUrl,
-      featured: form.featured,
+      name: (form.name ?? '').trim(),
+      description: ((form.description ?? '').trim()) || null,
+      price: Number.isFinite(priceVal) ? priceVal : 0,
+      category: ((form.category ?? '').trim()) || null,
+      unit: form.unit || 'PER_ITEM',
+      imageUrl: resolvedImageUrl,
+      featured: !!form.featured,
       // Send null for empty expiry so backend treats it as no expiry
       expiryDate: form.expiryDate || null,
-      stockQuantity: parseInt(form.stockQuantity, 10),
+      stockQuantity: Number.isInteger(stockVal) ? stockVal : 0,
     });
   };
 
