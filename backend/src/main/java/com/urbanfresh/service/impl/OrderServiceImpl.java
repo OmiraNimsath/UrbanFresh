@@ -51,40 +51,41 @@ import lombok.RequiredArgsConstructor;
 public class OrderServiceImpl implements OrderService {
 
         private static final int MAX_PAGE_SIZE = 100;
-        private static final String ADMIN_ALLOWED_STATUS_LABELS = "PENDING, PROCESSING, READY, CANCELLED";
-        private static final String FULL_STATUS_LABELS =
-                        "PENDING, PROCESSING, READY, CANCELLED, OUT_FOR_DELIVERY, DELIVERED, RETURNED";
+		private static final String ADMIN_ALLOWED_STATUS_LABELS = "PROCESSING, READY, CANCELLED";
+		private static final String FULL_STATUS_LABELS =
+				"PENDING, CONFIRMED, PROCESSING, READY, CANCELLED, OUT_FOR_DELIVERY, DELIVERED, RETURNED";
 
-        private static final Set<OrderStatus> ADMIN_MANAGEABLE_CURRENT_STATUSES = Set.of(
-                        OrderStatus.PENDING,
-                        OrderStatus.PROCESSING,
-                        OrderStatus.READY,
-                        OrderStatus.CANCELLED
-        );
+        		// CONFIRMED is set only by the payment webhook — admins cannot set it directly
+		private static final Set<OrderStatus> ADMIN_MANAGEABLE_CURRENT_STATUSES = Set.of(
+				OrderStatus.CONFIRMED,   // admin can advance a paid order to PROCESSING
+				OrderStatus.PROCESSING,
+				OrderStatus.READY,
+				OrderStatus.CANCELLED
+		);
 
-        private static final Set<OrderStatus> ADMIN_ALLOWED_TARGET_STATUSES = Set.of(
-                        OrderStatus.PENDING,
-                        OrderStatus.PROCESSING,
-                        OrderStatus.READY,
-                        OrderStatus.CANCELLED
-        );
+		private static final Set<OrderStatus> ADMIN_ALLOWED_TARGET_STATUSES = Set.of(
+				OrderStatus.PROCESSING,
+				OrderStatus.READY,
+				OrderStatus.CANCELLED
+		);
 
-        private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_ADMIN_TRANSITIONS = Map.of(
-                        OrderStatus.PENDING, Set.of(OrderStatus.PROCESSING, OrderStatus.CANCELLED),
-                        OrderStatus.PROCESSING, Set.of(OrderStatus.READY, OrderStatus.CANCELLED),
-                        OrderStatus.READY, Set.of(OrderStatus.PROCESSING),
-                        OrderStatus.CANCELLED, Set.of(OrderStatus.PROCESSING)
-        );
+		private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_ADMIN_TRANSITIONS = Map.of(
+				OrderStatus.CONFIRMED,  Set.of(OrderStatus.PROCESSING, OrderStatus.CANCELLED),
+				OrderStatus.PROCESSING, Set.of(OrderStatus.READY, OrderStatus.CANCELLED),
+				OrderStatus.READY, Set.of(OrderStatus.PROCESSING),
+				OrderStatus.CANCELLED, Set.of(OrderStatus.PROCESSING)
+		);
 
-        private static final Map<OrderStatus, Integer> ORDER_STATUS_PROGRESS_INDEX = Map.of(
-                        OrderStatus.PENDING, 0,
-                        OrderStatus.PROCESSING, 1,
-                        OrderStatus.READY, 2,
-                        OrderStatus.OUT_FOR_DELIVERY, 3,
-                        OrderStatus.DELIVERED, 4,
-                        OrderStatus.RETURNED, 5,
-                        OrderStatus.CANCELLED, 6
-        );
+        		private static final Map<OrderStatus, Integer> ORDER_STATUS_PROGRESS_INDEX = Map.of(
+				OrderStatus.PENDING, 0,
+				OrderStatus.CONFIRMED, 1,   // payment succeeded
+				OrderStatus.PROCESSING, 2,
+				OrderStatus.READY, 3,
+				OrderStatus.OUT_FOR_DELIVERY, 4,
+				OrderStatus.DELIVERED, 5,
+				OrderStatus.RETURNED, 6,
+				OrderStatus.CANCELLED, 7
+		);
 
     private final OrderRepository orderRepository;
         private final OrderStatusHistoryRepository orderStatusHistoryRepository;

@@ -81,6 +81,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/supplier/**").hasRole("SUPPLIER")
                         .requestMatchers("/api/delivery/**").hasRole("DELIVERY")
+                        // Payment webhook is called by Stripe — no JWT, secured by HMAC signature instead
+                        .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
+                        // Payment create-intent requires an authenticated customer (role check via @PreAuthorize)
+                        .requestMatchers("/api/payments/**").authenticated()
                         // Cart endpoints require authentication; role check done via @PreAuthorize
                         .requestMatchers("/api/cart/**").authenticated()
                         // Order endpoints require authentication; role check done via @PreAuthorize

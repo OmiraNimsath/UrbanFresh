@@ -153,6 +153,36 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle stripe API errors or unexpected payment processor responses → 502 Bad Gateway.
+     * 502 signals the error is upstream (Stripe), not a client mistake.
+     */
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<ApiErrorResponse> handlePaymentException(PaymentException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.BAD_GATEWAY.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response);
+    }
+
+    /**
+     * Handle payment ownership violations → 403 Forbidden.
+     * Fired when a customer attempts to pay for an order belonging to another customer.
+     */
+    @ExceptionHandler(PaymentAccessException.class)
+    public ResponseEntity<ApiErrorResponse> handlePaymentAccess(PaymentAccessException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.FORBIDDEN.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    /**
      * Handle @PreAuthorize / method-level security rejections → 403 Forbidden.
      * Complements RoleAccessDeniedHandler which covers URL-level rejections.
      * Declared before the catch-all Exception handler so it takes priority.
