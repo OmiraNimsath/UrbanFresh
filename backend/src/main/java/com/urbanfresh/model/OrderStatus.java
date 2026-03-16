@@ -6,6 +6,7 @@ package com.urbanfresh.model;
  */
 public enum OrderStatus {
     PENDING,
+    CONFIRMED,   // Payment succeeded; awaiting admin processing
     PROCESSING,
     READY,
     CANCELLED,
