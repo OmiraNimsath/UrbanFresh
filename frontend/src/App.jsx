@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import CartPage from './pages/customer/CartPage';
+import CheckoutPage from './pages/customer/CheckoutPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/landing/LandingPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -48,6 +49,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['CUSTOMER']}>
                 <CartPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/checkout"
+            element={
+              <ProtectedRoute allowedRoles={['CUSTOMER']}>
+                <CheckoutPage />
               </ProtectedRoute>
             }
           />

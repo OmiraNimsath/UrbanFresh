@@ -1,131 +1,139 @@
 /**
  * Page Layer – Payment result feedback page.
  * Displayed after a Stripe payment attempt succeeds or fails.
- * Reads the outcome from URL query parameters (?status=success|failed&orderId=…)
- * so the checkout page (built by another dev) can redirect here after confirmation.
+ * Reads the outcome from ?status=success|failed&orderId=… URL params.
  *
- * Scenario 1 – success: shows confirmation message, links to dashboard.
- * Scenario 2 – failure: shows clear failure message, links back to cart.
+ * Styling matches the site-wide green-50 / white-card / green-600 convention.
+ * Bug fix: navigate() is NOT called inside a setState updater (which caused the
+ * "Cannot update BrowserRouter while rendering" warning). Countdown decrement
+ * and navigation are split into separate useEffect calls.
  */
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import styles from './PaymentResultPage.module.css';
+import Navbar from '../../components/Navbar';
 
 export default function PaymentResultPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  /** 'success' | 'failed' | null — resolved from the ?status= query param */
-  const status = searchParams.get('status');
+  const status  = searchParams.get('status');   // 'success' | 'failed'
   const orderId = searchParams.get('orderId');
 
   const [countdown, setCountdown] = useState(5);
 
-  // Auto-redirect to dashboard on success after 5 seconds
+  // Tick the countdown down once per second (success only)
   useEffect(() => {
     if (status !== 'success') return;
-
     const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          navigate('/dashboard');
-        }
-        return prev - 1;
-      });
+      setCountdown((prev) => prev - 1); // pure updater — no side effects
     }, 1000);
-
     return () => clearInterval(timer);
-  }, [status, navigate]);
+  }, [status]);
 
-  // Guard: redirect home if no valid status param present
-  if (!status || (status !== 'success' && status !== 'failed')) {
+  // Navigate when countdown reaches 0 — kept in its own effect so navigate()
+  // is never called inside a setState updater, fixing the BrowserRouter warning.
+  useEffect(() => {
+    if (status === 'success' && countdown <= 0) {
+      navigate('/dashboard');
+    }
+  }, [countdown, status, navigate]);
+
+  const isSuccess = status === 'success';
+  const isFailure = status === 'failed';
+
+  // Guard: unknown status param
+  if (!isSuccess && !isFailure) {
     return (
-      <div className={styles.page}>
-        <div className={styles.card}>
-          <p className={styles.subtitle}>Invalid payment result. Redirecting…</p>
-        </div>
+      <div className="min-h-screen bg-green-50 flex items-center justify-center">
+        <p className="text-gray-500 text-sm">Invalid payment result. Please go back.</p>
       </div>
     );
   }
 
-  const isSuccess = status === 'success';
-
   return (
-    <div className={styles.page}>
-      <div className={`${styles.card} ${isSuccess ? styles.success : styles.failed}`}>
-        {/* Status icon */}
-        <div className={styles.iconWrap}>
-          {isSuccess ? (
-            <svg
-              className={styles.icon}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
-          ) : (
-            <svg
-              className={styles.icon}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M15 9l-6 6M9 9l6 6" />
-            </svg>
-          )}
-        </div>
+    <div className="min-h-screen bg-green-50">
+      <Navbar />
 
-        {/* Heading */}
-        <h1 className={styles.heading} id="payment-result-heading">
-          {isSuccess ? 'Payment Successful!' : 'Payment Failed'}
-        </h1>
+      <div className="max-w-lg mx-auto px-4 py-16">
+        <div className="bg-white rounded-2xl shadow-sm p-10 text-center">
 
-        {/* Message */}
-        <p className={styles.subtitle}>
-          {isSuccess
-            ? `Your order${orderId ? ` #${orderId}` : ''} has been confirmed and is being prepared.`
-            : 'Your payment could not be processed. No charge was made.'}
-        </p>
+          {/* ── Icon ── */}
+          <div className={`mx-auto mb-5 flex items-center justify-center w-20 h-20 rounded-full ${
+            isSuccess ? 'bg-green-100' : 'bg-red-100'
+          }`}>
+            {isSuccess ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                className="w-10 h-10 text-green-600" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                className="w-10 h-10 text-red-500" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M15 9l-6 6M9 9l6 6" />
+              </svg>
+            )}
+          </div>
 
-        {/* Auto-redirect notice (success only) */}
-        {isSuccess && (
-          <p className={styles.countdown}>
-            Redirecting to your dashboard in <strong>{countdown}</strong> second
-            {countdown !== 1 ? 's' : ''}…
+          {/* ── Heading ── */}
+          <h1 id="payment-result-heading"
+            className={`text-2xl font-bold mb-2 ${isSuccess ? 'text-green-700' : 'text-red-600'}`}>
+            {isSuccess ? 'Payment Successful!' : 'Payment Failed'}
+          </h1>
+
+          {/* ── Message ── */}
+          <p className="text-sm text-gray-500 mb-4">
+            {isSuccess
+              ? `Your order${orderId ? ` #${orderId}` : ''} has been confirmed and is being prepared.`
+              : 'Your payment could not be processed. No charge was made.'}
           </p>
-        )}
 
-        {/* Call-to-action buttons */}
-        <div className={styles.actions}>
-          {isSuccess ? (
-            <Link to="/dashboard" className={`${styles.btn} ${styles.btnPrimary}`} id="view-orders-btn">
-              View My Orders
-            </Link>
-          ) : (
-            <>
-              <Link to="/cart" className={`${styles.btn} ${styles.btnPrimary}`} id="retry-payment-btn">
-                Back to Cart
-              </Link>
-              <Link to="/dashboard" className={`${styles.btn} ${styles.btnSecondary}`} id="go-dashboard-btn">
-                My Orders
-              </Link>
-            </>
+          {/* ── Countdown (success) ── */}
+          {isSuccess && (
+            <p className="text-xs text-gray-400 mb-6">
+              Redirecting to your dashboard in <span className="font-semibold text-gray-600">{Math.max(countdown, 0)}</span> second{countdown !== 1 ? 's' : ''}…
+            </p>
           )}
+
+          {/* ── CTAs ── */}
+          <div className={`flex gap-3 justify-center ${!isSuccess ? 'mt-2' : ''}`}>
+            {isSuccess ? (
+              <Link
+                to="/dashboard"
+                id="view-orders-btn"
+                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                View My Orders
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/cart"
+                  id="retry-payment-btn"
+                  className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  Back to Cart
+                </Link>
+                <Link
+                  to="/dashboard"
+                  id="go-dashboard-btn"
+                  className="px-6 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition-colors"
+                >
+                  My Orders
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
+        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
+      </footer>
     </div>
   );
 }

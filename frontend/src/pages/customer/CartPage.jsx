@@ -208,8 +208,12 @@ function CartItemRow({ item, onUpdate, onRemove }) {
  * @param {Function} navigate - react-router navigate function
  */
 function OrderSummary({ cart, navigate }) {
-  // Disable checkout if any item is out of stock — prevents placing an unserviceable order.
-  const hasOutOfStockItem = cart.items.some((item) => !item.inStock);
+  const MIN_ORDER_LKR = 200;
+
+  // Disable checkout for out-of-stock items or below the minimum order amount
+  const hasOutOfStockItem   = cart.items.some((item) => !item.inStock);
+  const isBelowMinimum      = cart.totalAmount < MIN_ORDER_LKR;
+  const cannotCheckout      = hasOutOfStockItem || isBelowMinimum;
 
   return (
     <div className="lg:w-80 flex-shrink-0">
@@ -232,14 +236,27 @@ function OrderSummary({ cart, navigate }) {
           <span className="text-green-700">{formatAmount(cart.totalAmount)}</span>
         </div>
 
-        {hasOutOfStockItem && (
+        {/* Minimum order notice */}
+        {isBelowMinimum && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+            <p className="text-xs text-amber-800 font-medium">
+              Minimum order is Rs. {MIN_ORDER_LKR}.00
+            </p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Add Rs. {(MIN_ORDER_LKR - cart.totalAmount).toFixed(2)} more to proceed.
+            </p>
+          </div>
+        )}
+
+        {/* Out-of-stock notice */}
+        {hasOutOfStockItem && !isBelowMinimum && (
           <p className="text-xs text-red-500">
             Remove out-of-stock items before checking out.
           </p>
         )}
 
         <button
-          disabled={hasOutOfStockItem}
+          disabled={cannotCheckout}
           onClick={() => navigate('/checkout')}
           className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >

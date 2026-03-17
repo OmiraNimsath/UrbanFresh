@@ -34,20 +34,20 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Service Layer – Implements Stripe payment processing.
  * Handles PaymentIntent creation (server-side) and webhook event processing.
- * Order status changes are only made after Stripe confirms the event via a signed webhook.
+ * Order status changes are only made after Stripe confirms the event via a
+ * signed webhook.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
 
-    // Stripe amount is always in the smallest currency unit (cents / pence).
-    // LKR has no sub-unit so multiply by 100 gives the correct integer representation.
-    private static final long STRIPE_CURRENCY_MULTIPLIER = 100L;
-    private static final String STRIPE_CURRENCY = "lkr";
+    // Stripe sandbox only accepts currencies enabled for the account.
+    // USD is universally accepted; we convert from LKR using the configured rate.
+    private static final String STRIPE_CURRENCY = "usd";
 
     private static final String EVENT_PAYMENT_SUCCEEDED = "payment_intent.succeeded";
-    private static final String EVENT_PAYMENT_FAILED    = "payment_intent.payment_failed";
+    private static final String EVENT_PAYMENT_FAILED = "payment_intent.payment_failed";
 
     @Value("${stripe.publishable-key}")
     private String publishableKey;
@@ -55,22 +55,34 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${stripe.webhook-secret}")
     private String webhookSecret;
 
-    private final OrderRepository    orderRepository;
-    private final PaymentRepository  paymentRepository;
-    private final UserRepository     userRepository;
+    /**
+     * Exchange rate: how many LKR equal 1 USD. Configured in
+     * application.properties.
+     */
+    @Value("${stripe.lkr-to-usd-rate:311.33}")
+    private double lkrToUsdRate;
+
+    /** Minimum order total in LKR before payment is accepted. */
+    @Value("${app.min-order-amount-lkr:200}")
+    private int minOrderAmountLkr;
+
+    private final OrderRepository orderRepository;
+    private final PaymentRepository paymentRepository;
+    private final UserRepository userRepository;
 
     /**
      * Creates a Stripe PaymentIntent for a customer-owned order.
      * Steps:
-     *  1. Resolve customer from JWT email.
-     *  2. Load the order and verify ownership — never trust client-supplied amounts.
-     *  3. Call Stripe to create a PaymentIntent with the server-side amount.
-     *  4. Persist a PENDING Payment record linked to the order.
-     *  5. Return the clientSecret + publishableKey to the frontend.
+     * 1. Resolve customer from JWT email.
+     * 2. Load the order and verify ownership — never trust client-supplied amounts.
+     * 3. Call Stripe to create a PaymentIntent with the server-side amount.
+     * 4. Persist a PENDING Payment record linked to the order.
+     * 5. Return the clientSecret + publishableKey to the frontend.
      *
      * @param request       orderId from the client
      * @param customerEmail authenticated customer email
-     * @return PaymentIntentResponse with clientSecret, publishableKey, paymentIntentId
+     * @return PaymentIntentResponse with clientSecret, publishableKey,
+     *         paymentIntentId
      */
     @Override
     @Transactional
@@ -82,7 +94,8 @@ public class PaymentServiceImpl implements PaymentService {
         Order order = orderRepository.findById(request.getOrderId())
                 .orElseThrow(() -> new OrderNotFoundException(request.getOrderId()));
 
-        // Ownership check — prevent one customer from initiating payment on another's order
+        // Ownership check — prevent one customer from initiating payment on another's
+        // order
         if (!order.getCustomer().getId().equals(customer.getId())) {
             throw new PaymentAccessException("You are not authorised to pay for this order.");
         }
@@ -93,23 +106,40 @@ public class PaymentServiceImpl implements PaymentService {
                     "Order " + order.getId() + " cannot be paid — current status: " + order.getStatus());
         }
 
-        // Convert BigDecimal total to Stripe integer amount (smallest currency unit)
-        long stripeAmount = order.getTotalAmount()
-                .multiply(BigDecimal.valueOf(STRIPE_CURRENCY_MULTIPLIER))
+        // Minimum order amount check — prevents Stripe amount_too_small errors
+        // and enforces the business rule. Configured via app.min-order-amount-lkr.
+        if (order.getTotalAmount().compareTo(BigDecimal.valueOf(minOrderAmountLkr)) < 0) {
+            throw new PaymentException(
+                    "Minimum order amount is Rs. " + minOrderAmountLkr
+                            + ". Your order total is Rs. " + order.getTotalAmount().toPlainString() + ".");
+        }
+
+        // Convert LKR order total → USD cents for Stripe.
+        // Formula: usdCents = round(lkrAmount / lkrToUsdRate * 100)
+        // Example: Rs 3000 / 300 = $10.00 USD = 1000 cents
+        BigDecimal lkrAmount = order.getTotalAmount();
+        long stripeAmount = lkrAmount
+                .divide(BigDecimal.valueOf(lkrToUsdRate), 6, java.math.RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(0, java.math.RoundingMode.HALF_UP)
                 .longValue();
+
+        log.info("Currency conversion: Rs {} LKR → {} USD cents (rate: {})",
+                lkrAmount, stripeAmount, lkrToUsdRate);
 
         PaymentIntent intent;
         try {
             PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
                     .setAmount(stripeAmount)
                     .setCurrency(STRIPE_CURRENCY)
-                    // Store the order ID in Stripe metadata so webhooks can be traced
+                    // Restrict to card payments only — matches the card-only checkout UI
+                    .addPaymentMethodType("card")
+                    // Store the original LKR amount in metadata for dashboard traceability
                     .putMetadata("orderId", String.valueOf(order.getId()))
                     .putMetadata("customerEmail", customerEmail)
-                    .setAutomaticPaymentMethods(
-                            PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
-                                    .setEnabled(true)
-                                    .build())
+                    .putMetadata("amountLKR", lkrAmount.toPlainString())
+                    .putMetadata("amountUSDCents", String.valueOf(stripeAmount))
+                    .putMetadata("lkrToUsdRate", String.valueOf(lkrToUsdRate))
                     .build();
 
             intent = PaymentIntent.create(params);
@@ -140,10 +170,13 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * Processes an inbound Stripe webhook event.
-     * Signature verification is mandatory — requests without a valid signature are rejected.
-     * Only processes event types relevant to payment lifecycle; all others are silently ignored.
+     * Signature verification is mandatory — requests without a valid signature are
+     * rejected.
+     * Only processes event types relevant to payment lifecycle; all others are
+     * silently ignored.
      *
-     * @param payload   raw JSON request body (must not be parsed before reaching this method)
+     * @param payload   raw JSON request body (must not be parsed before reaching
+     *                  this method)
      * @param sigHeader Stripe-Signature HTTP header value
      */
     @Override
@@ -174,17 +207,18 @@ public class PaymentServiceImpl implements PaymentService {
 
         switch (eventType) {
             case EVENT_PAYMENT_SUCCEEDED -> handlePaymentSucceeded(intent);
-            case EVENT_PAYMENT_FAILED    -> handlePaymentFailed(intent);
+            case EVENT_PAYMENT_FAILED -> handlePaymentFailed(intent);
             default -> log.debug("Unhandled Stripe event type: {} — no action taken.", eventType);
         }
     }
 
     // ──────────────────────────────────────────
-    //  Private event handlers
+    // Private event handlers
     // ──────────────────────────────────────────
 
     /**
-     * Marks the Payment record as PAID and transitions the associated Order to CONFIRMED.
+     * Marks the Payment record as PAID and transitions the associated Order to
+     * CONFIRMED.
      *
      * @param intent succeeded PaymentIntent from the Stripe event
      */
@@ -197,7 +231,8 @@ public class PaymentServiceImpl implements PaymentService {
                     return null;
                 });
 
-        if (payment == null) return;
+        if (payment == null)
+            return;
 
         payment.setStatus(PaymentStatus.PAID);
         paymentRepository.save(payment);
@@ -223,12 +258,14 @@ public class PaymentServiceImpl implements PaymentService {
                     return null;
                 });
 
-        if (payment == null) return;
+        if (payment == null)
+            return;
 
         payment.setStatus(PaymentStatus.FAILED);
         paymentRepository.save(payment);
 
-        // Update the order's paymentStatus field so the customer sees FAILED in their dashboard
+        // Update the order's paymentStatus field so the customer sees FAILED in their
+        // dashboard
         Order order = payment.getOrder();
         order.setPaymentStatus(PaymentStatus.FAILED);
         orderRepository.save(order);

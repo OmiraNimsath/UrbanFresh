@@ -6,6 +6,17 @@
 import api from './api';
 
 /**
+ * Place a new order for the authenticated customer.
+ * POST /api/orders
+ *
+ * @param {string} deliveryAddress - confirmed delivery address
+ * @param {Array<{productId: number, quantity: number}>} items - cart items to order
+ * @returns {Promise<OrderResponse>} created order with orderId, status, totalAmount, items
+ */
+export const placeOrder = (deliveryAddress, items) =>
+  api.post('/api/orders', { deliveryAddress, items }).then((res) => res.data);
+
+/**
  * Fetch the authenticated customer's order history, newest first.
  * GET /api/customer/orders
  *
