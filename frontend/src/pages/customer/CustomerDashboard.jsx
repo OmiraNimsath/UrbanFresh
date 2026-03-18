@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { getMyOrders, getLoyaltyPoints } from '../../services/orderService';
 import { formatAmount } from '../../utils/priceUtils';
+import PaymentModal from '../../components/PaymentModal';
 
 /**
  * Presentation Layer – Customer dashboard page.
@@ -20,6 +21,8 @@ export default function CustomerDashboard() {
   const [orders, setOrders] = useState([]);
   const [loyalty, setLoyalty] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
 
   /** Load orders and loyalty points in parallel on mount.
    * allSettled ensures partial success: if one call fails, the other section
@@ -45,6 +48,11 @@ export default function CustomerDashboard() {
     logout();
     toast.success('Logged out successfully');
     navigate('/login', { replace: true });
+  };
+
+  const handleRetryPayment = (order) => {
+    setSelectedOrderForPayment(order);
+    setPaymentModalOpen(true);
   };
 
   if (loading) {
@@ -131,13 +139,28 @@ export default function CustomerDashboard() {
           ) : (
             <div className="space-y-4">
               {orders.map((order) => (
-                <OrderCard key={order.orderId} order={order} />
+                <OrderCard 
+                  key={order.orderId} 
+                  order={order}
+                  onRetryPayment={handleRetryPayment}
+                />
               ))}
             </div>
           )}
         </div>
 
       </div>
+
+      {/* Payment Retry Modal */}
+      {selectedOrderForPayment && (
+        <PaymentModal
+          orderId={selectedOrderForPayment.orderId}
+          totalAmount={selectedOrderForPayment.totalAmount}
+          isOpen={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          onSuccess={() => navigate(`/payment-result?status=success&orderId=${selectedOrderForPayment.orderId}`)}
+        />
+      )}
     </div>
   );
 }
@@ -166,8 +189,9 @@ function LoyaltyStat({ label, value, highlight = false }) {
 /**
  * Displays a single order row with status badge, total, and expandable item list.
  * @param {{ orderId, status, deliveryAddress, totalAmount, createdAt, items[] }} order
+ * @param {function} onRetryPayment - callback for retry payment button
  */
-function OrderCard({ order }) {
+function OrderCard({ order, onRetryPayment }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -183,6 +207,29 @@ function OrderCard({ order }) {
             {formatAmount(order.totalAmount)}
           </span>
           <StatusBadge status={order.status} />
+            {order.status === 'PENDING' && onRetryPayment && (
+              <button
+                onClick={() => onRetryPayment(order)}
+                aria-label="Retry payment"
+                title="Retry payment"
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                  <polyline points="21 3 21 9 15 9" />
+                </svg>
+              </button>
+            )}
           <button
             onClick={() => setExpanded((prev) => !prev)}
             className="text-xs text-green-600 hover:text-green-800 font-medium transition-colors"
