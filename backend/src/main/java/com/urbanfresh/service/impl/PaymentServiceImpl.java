@@ -44,7 +44,8 @@ public class PaymentServiceImpl implements PaymentService {
 
     // Stripe sandbox only accepts currencies enabled for the account.
     // USD is universally accepted; we convert from LKR using the configured rate.
-    private static final String STRIPE_CURRENCY = "usd";
+    private static final String STRIPE_CURRENCY = "usd";   // sent to Stripe API
+    private static final String DB_CURRENCY      = "lkr";  // stored in payments table
 
     private static final String EVENT_PAYMENT_SUCCEEDED = "payment_intent.succeeded";
     private static final String EVENT_PAYMENT_FAILED = "payment_intent.payment_failed";
@@ -154,7 +155,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .order(order)
                 .stripePaymentIntentId(intent.getId())
                 .amount(order.getTotalAmount())
-                .currency(STRIPE_CURRENCY)
+                .currency(DB_CURRENCY)
                 .status(PaymentStatus.PENDING)
                 .build());
 
