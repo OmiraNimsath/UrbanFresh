@@ -40,6 +40,7 @@ export default function CheckoutPage() {
 
   const [orderId, setOrderId]             = useState(null);
   const [orderTotal, setOrderTotal]       = useState(0);   // snapshot before cart is cleared
+  const [orderItemsSnapshot, setOrderItemsSnapshot] = useState([]); // snapshot of items
   const [stripePromise, setStripePromise] = useState(null);
   const [clientSecret, setClientSecret]   = useState(null);
 
@@ -79,6 +80,7 @@ export default function CheckoutPage() {
       setClientSecret(secret);
       setOrderId(order.orderId);
       setOrderTotal(order.totalAmount);   // ← captured from order, not cart
+      setOrderItemsSnapshot(order.items); // ← capture items from order response
       setStep('payment');
 
       // Cart cleared after step flip (stock already reserved)
@@ -142,11 +144,13 @@ export default function CheckoutPage() {
           <OrderSummaryPanel
             cart={cart}
             orderTotal={orderTotal}
+            orderItemsSnapshot={orderItemsSnapshot} // ← new prop
             deliveryAddress={deliveryAddress}
             showAddress={step === 'payment'}
           />
         </div>
       </div>
+
 
       <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
         © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
@@ -293,10 +297,15 @@ function PaymentStep({ orderId, total, clientSecret }) {
 // Order summary panel (right sidebar — mirrors CartPage layout)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OrderSummaryPanel({ cart, orderTotal, deliveryAddress, showAddress }) {
+function OrderSummaryPanel({ cart, orderTotal, orderItemsSnapshot, deliveryAddress, showAddress }) {
   // Use orderTotal snapshot (set at order placement) so the total stays correct
   // after clearCart() zeroes cart.totalAmount in the payment step.
   const displayTotal = orderTotal > 0 ? orderTotal : cart.totalAmount;
+
+  // Use snapshot items if available (during payment step), else cart items
+  const displayItems = (orderItemsSnapshot && orderItemsSnapshot.length > 0)
+    ? orderItemsSnapshot
+    : cart.items;
 
   return (
     <div className="lg:w-80 flex-shrink-0">
@@ -304,8 +313,8 @@ function OrderSummaryPanel({ cart, orderTotal, deliveryAddress, showAddress }) {
         <h2 className="text-lg font-bold text-gray-800">Order Summary</h2>
 
         <div className="space-y-2">
-          {cart.items.map((item) => (
-            <div key={item.cartItemId} className="flex justify-between text-sm text-gray-600">
+          {displayItems.map((item, idx) => (
+            <div key={item.cartItemId || item.productId || idx} className="flex justify-between text-sm text-gray-600">
               <span className="truncate flex-1 mr-2">
                 {item.productName}
                 <span className="text-gray-400"> × {item.quantity}</span>
