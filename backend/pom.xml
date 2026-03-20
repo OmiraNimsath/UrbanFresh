@@ -11,7 +11,7 @@
 	<groupId>com.urbanfresh</groupId>
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>backend</name>
+	<name>UrbanFresh</name>
 	<description>Backend for urbanfresh webstore</description>
 	<url/>
 	<licenses>
@@ -81,6 +81,13 @@
 			<artifactId>jjwt-jackson</artifactId>
 			<version>0.12.5</version>
 			<scope>runtime</scope>
+		</dependency>
+
+		<!-- Stripe Java SDK -->
+		<dependency>
+			<groupId>com.stripe</groupId>
+			<artifactId>stripe-java</artifactId>
+			<version>29.2.0</version>
 		</dependency>
 
 		<!-- Test -->

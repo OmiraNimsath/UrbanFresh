@@ -81,6 +81,15 @@ public class Product {
     @Builder.Default
     private int stockQuantity = 0;
 
+    /** Minimum stock level below which a restock alert should be raised. Defaults to 0. */
+    @Column(nullable = false)
+    @Builder.Default
+    private int reorderThreshold = 0;
+
+    /** Email of the admin who last updated inventory fields (stockQuantity / reorderThreshold). */
+    @Column(length = 150)
+    private String inventoryUpdatedBy;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

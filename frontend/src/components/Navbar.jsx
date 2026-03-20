@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
 /**
  * Presentation Layer – Shared auth-aware navigation bar.
@@ -24,6 +25,9 @@ const ROLE_DASHBOARD = {
  */
 export default function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
+  // Cart context is only available when the user is a CUSTOMER;
+  // useCart() is safe to call here because CartProvider wraps the whole tree.
+  const { cart } = useCart();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -49,6 +53,22 @@ export default function Navbar() {
               <span className="inline-flex items-center justify-center w-5 h-5 bg-green-100 rounded-full text-green-600 text-xs">✓</span>
               Welcome back, {user?.name}!
             </span>
+
+            {/* Cart shortcut — visible to CUSTOMER only */}
+            {user?.role === 'CUSTOMER' && (
+              <Link
+                to="/cart"
+                className="relative px-3 py-2 text-sm font-medium text-green-700 border border-green-600 rounded-lg hover:bg-green-50 transition-colors flex items-center gap-1"
+                aria-label="Shopping cart"
+              >
+                🛒
+                {cart.itemCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-green-600 text-white text-xs font-bold rounded-full flex items-center justify-center px-0.5">
+                    {cart.itemCount > 99 ? '99+' : cart.itemCount}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {/* Dashboard shortcut */}
             <Link

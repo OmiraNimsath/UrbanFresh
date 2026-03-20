@@ -15,8 +15,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -26,11 +28,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.urbanfresh.dto.request.OrderStatusUpdateRequest;
 import com.urbanfresh.dto.request.ProductRequest;
+import com.urbanfresh.dto.response.AdminOrderResponse;
+import com.urbanfresh.dto.response.AdminOrderReviewResponse;
 import com.urbanfresh.dto.response.AdminProductResponse;
 import com.urbanfresh.dto.response.AdminStatsResponse;
 import com.urbanfresh.service.AdminProductService;
 import com.urbanfresh.service.AdminService;
+import com.urbanfresh.service.OrderService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +68,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AdminProductService adminProductService;
+    private final OrderService orderService;
 
     /**
      * Returns high-level platform statistics for the admin dashboard.
@@ -72,6 +79,52 @@ public class AdminController {
     @GetMapping("/stats")
     public ResponseEntity<AdminStatsResponse> getStats() {
         return ResponseEntity.ok(adminService.getStats());
+    }
+
+    /**
+     * Returns a paginated list of all customer orders for admin management.
+     * GET /api/admin/orders?page=0&size=20
+     *
+     * @param page zero-based page index (default 0)
+     * @param size items per page (default 20, clamped to 1–100)
+     * @return 200 OK with page of AdminOrderResponse
+     */
+    @GetMapping("/orders")
+    public ResponseEntity<Page<AdminOrderResponse>> getOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        return ResponseEntity.ok(orderService.getAllOrdersForAdmin(page, size));
+    }
+
+    /**
+     * Returns complete details for a single order review.
+     * GET /api/admin/orders/{orderId}
+     *
+     * @param orderId order ID to review
+     * @return 200 OK with AdminOrderReviewResponse
+     */
+    @GetMapping("/orders/{orderId}")
+    public ResponseEntity<AdminOrderReviewResponse> getOrderReview(@PathVariable Long orderId) {
+        return ResponseEntity.ok(orderService.getOrderReviewForAdmin(orderId));
+    }
+
+    /**
+     * Updates the lifecycle status of a specific order.
+     * PATCH /api/admin/orders/{orderId}/status
+     *
+     * @param orderId order ID to update
+     * @param authentication authenticated admin principal
+     * @param request validated status update payload
+     * @return 200 OK with updated AdminOrderResponse
+     */
+    @PatchMapping("/orders/{orderId}/status")
+    public ResponseEntity<AdminOrderResponse> updateOrderStatus(
+            @PathVariable Long orderId,
+            Authentication authentication,
+            @Valid @RequestBody OrderStatusUpdateRequest request) {
+
+        return ResponseEntity.ok(orderService.updateOrderStatus(orderId, request, authentication.getName()));
     }
 
     // ── Product CRUD ───────────────────────────────────────────────────────────

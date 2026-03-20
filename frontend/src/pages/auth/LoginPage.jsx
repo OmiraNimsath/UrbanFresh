@@ -59,7 +59,13 @@ export default function LoginPage() {
       });
 
       // Store token and user info in AuthContext + localStorage
-      login(data.token, { email: data.email, name: data.name, role: data.role });
+      login(data.token, {
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        phone: data.phone,
+        address: data.address,
+      });
 
       setShowExpiredBanner(false);
       toast.success(`Welcome back, ${data.name}!`);

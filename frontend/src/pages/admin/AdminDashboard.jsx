@@ -44,6 +44,26 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-400 mt-0.5">Add, edit, delete products</p>
             </div>
           </Link>
+          <Link
+            to="/admin/inventory"
+            className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-colors"
+          >
+            <div className="text-3xl">📦</div>
+            <div>
+              <p className="font-semibold text-gray-800">Inventory</p>
+              <p className="text-xs text-gray-400 mt-0.5">Manage stock &amp; reorder levels</p>
+            </div>
+          </Link>
+          <Link
+            to="/admin/orders"
+            className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-colors"
+          >
+            <div className="text-3xl">🧾</div>
+            <div>
+              <p className="font-semibold text-gray-800">Manage Orders</p>
+              <p className="text-xs text-gray-400 mt-0.5">Review and update order status</p>
+            </div>
+          </Link>
         </div>
       </div>
     </div>

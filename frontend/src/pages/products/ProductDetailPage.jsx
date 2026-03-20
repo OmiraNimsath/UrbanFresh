@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { getProductById } from '../../services/productService';
+import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import Navbar from '../../components/Navbar';
 import { formatPrice } from '../../utils/priceUtils';
 
@@ -100,6 +103,11 @@ export default function ProductDetailPage() {
  * @param {Object} product - ProductResponse received from the API
  */
 function ProductDetail({ product }) {
+  const { isAuthenticated, user } = useAuth();
+  const { addToCart } = useCart();
+  const navigate = useNavigate();
+  const [adding, setAdding]     = useState(false);
+  const [quantity, setQuantity] = useState(1);
   // Days until expiry — drives the near-expiry banner display
   const daysUntilExpiry = product.expiryDate
     ? Math.ceil((new Date(product.expiryDate) - new Date()) / 86_400_000)
@@ -159,16 +167,59 @@ function ProductDetail({ product }) {
           <p className="text-xs text-gray-400">Best before: {product.expiryDate}</p>
         )}
 
-        {/* Stock status + Add to Cart */}
-        <div className="mt-auto pt-4 border-t border-gray-100 flex items-center gap-4">
+        {/* Stock status + Quantity selector + Add to Cart */}
+        <div className="mt-auto pt-4 border-t border-gray-100">
           {product.inStock ? (
-            <>
+            <div className="flex flex-col gap-3">
               <span className="text-xs text-green-600 font-medium">✓ In Stock</span>
-              {/* Add to Cart is a UI placeholder — cart feature is out of scope for SCRUM-12 */}
-              <button className="px-6 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 active:scale-95 transition-all">
-                Add to Cart
+
+              {/* Quantity stepper */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700">Quantity</span>
+                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                  <button
+                    aria-label="Decrease quantity"
+                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors text-lg font-bold"
+                  >
+                    −
+                  </button>
+                  <span className="w-10 text-center text-sm font-semibold text-gray-800 select-none">
+                    {quantity}
+                  </span>
+                  <button
+                    aria-label="Increase quantity"
+                    onClick={() => setQuantity((q) => Math.min(99, q + 1))}
+                    className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors text-lg font-bold"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Add to Cart */}
+              <button
+                disabled={adding}
+                onClick={async () => {
+                  if (!isAuthenticated || user?.role !== 'CUSTOMER') {
+                    navigate('/login');
+                    return;
+                  }
+                  setAdding(true);
+                  try {
+                    await addToCart(product.id, quantity);
+                    toast.success(`${product.name} × ${quantity} added to cart`);
+                  } catch (err) {
+                    toast.error(err?.response?.data?.message || 'Could not add to cart');
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+                className="w-full sm:w-auto px-8 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {adding ? 'Adding…' : 'Add to Cart'}
               </button>
-            </>
+            </div>
           ) : (
             <span className="text-sm text-red-500 font-medium">Out of Stock</span>
           )}
