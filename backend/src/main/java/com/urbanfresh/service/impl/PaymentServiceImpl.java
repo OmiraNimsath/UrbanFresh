@@ -6,14 +6,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
+import com.stripe.model.Charge;
 import com.stripe.model.Event;
+import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.PaymentIntent;
+import com.stripe.model.StripeObject;
 import com.stripe.net.Webhook;
 import com.stripe.param.PaymentIntentCreateParams;
 import com.urbanfresh.dto.request.CreatePaymentIntentRequest;
 import com.urbanfresh.dto.response.PaymentIntentResponse;
+import com.urbanfresh.dto.response.PaymentTrackingStatusResponse;
 import com.urbanfresh.exception.OrderNotFoundException;
 import com.urbanfresh.exception.PaymentAccessException;
 import com.urbanfresh.exception.PaymentException;
@@ -49,6 +54,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private static final String EVENT_PAYMENT_SUCCEEDED = "payment_intent.succeeded";
     private static final String EVENT_PAYMENT_FAILED = "payment_intent.payment_failed";
+    private static final String EVENT_CHARGE_UPDATED = "charge.updated";
 
     @Value("${stripe.publishable-key}")
     private String publishableKey;
@@ -194,29 +200,156 @@ public class PaymentServiceImpl implements PaymentService {
 
         String eventType = event.getType();
 
-        // Only process events relevant to payment outcomes
-        if (!eventType.equals(EVENT_PAYMENT_SUCCEEDED) && !eventType.equals(EVENT_PAYMENT_FAILED)) {
+        // Only process events relevant to payment lifecycle tracking.
+        if (!eventType.equals(EVENT_CHARGE_UPDATED)
+            && !eventType.equals(EVENT_PAYMENT_SUCCEEDED)
+            && !eventType.equals(EVENT_PAYMENT_FAILED)) {
             return;
         }
 
         log.info("Processing webhook: type={}", eventType);
 
-        PaymentIntent intent = (PaymentIntent) event.getData().getObject();
+        StripeObject stripeObject = extractStripeObject(event);
 
-        if (intent == null) {
-            log.warn("Event {} has no PaymentIntent — skipping.", eventType);
+        if (stripeObject == null) {
+            log.warn("Event {} has no deserializable Stripe object even after fallback.", eventType);
             return;
         }
 
         switch (eventType) {
-            case EVENT_PAYMENT_SUCCEEDED -> handlePaymentSucceeded(intent);
-            case EVENT_PAYMENT_FAILED -> handlePaymentFailed(intent);
+            case EVENT_CHARGE_UPDATED -> {
+                if (stripeObject instanceof Charge charge) {
+                    handleChargeUpdated(charge);
+                } else {
+                    log.warn("Event {} did not contain a Charge payload.", eventType);
+                }
+            }
+            case EVENT_PAYMENT_SUCCEEDED -> {
+                if (stripeObject instanceof PaymentIntent intent) {
+                    handlePaymentSucceeded(intent);
+                } else {
+                    log.warn("Event {} did not contain a PaymentIntent payload.", eventType);
+                }
+            }
+            case EVENT_PAYMENT_FAILED -> {
+                if (stripeObject instanceof PaymentIntent intent) {
+                    handlePaymentFailed(intent);
+                } else {
+                    log.warn("Event {} did not contain a PaymentIntent payload.", eventType);
+                }
+            }
         }
     }
+
+        /**
+         * Returns latest webhook-backed tracking state for a customer-owned order.
+         *
+         * @param orderId target order ID
+         * @param customerEmail authenticated customer email
+         * @return latest payment tracking status
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public PaymentTrackingStatusResponse getPaymentTrackingStatus(Long orderId, String customerEmail) {
+        User customer = userRepository.findByEmail(customerEmail)
+            .orElseThrow(() -> new UserNotFoundException("Customer not found: " + customerEmail));
+
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (!order.getCustomer().getId().equals(customer.getId())) {
+            throw new PaymentAccessException("You are not authorised to view payment status for this order.");
+        }
+
+        Payment latestPayment = paymentRepository.findTopByOrderIdOrderByCreatedAtDesc(orderId)
+            .orElse(null);
+
+        PaymentStatus effectiveStatus = resolveEffectivePaymentStatus(order, latestPayment);
+
+        return PaymentTrackingStatusResponse.builder()
+            .orderId(order.getId())
+            .paymentIntentId(latestPayment != null ? latestPayment.getStripePaymentIntentId() : null)
+            .paymentStatus(effectiveStatus.name())
+            .chargeUpdatedEventReceived(latestPayment != null
+                && latestPayment.getChargeUpdatedEventReceivedAt() != null)
+            .chargeUpdatedEventReceivedAt(latestPayment != null
+                ? latestPayment.getChargeUpdatedEventReceivedAt()
+                : null)
+            .terminal(effectiveStatus == PaymentStatus.PAID || effectiveStatus == PaymentStatus.FAILED)
+            .build();
+        }
 
     // ──────────────────────────────────────────
     // Private event handlers
     // ──────────────────────────────────────────
+
+    /**
+     * Attempts safe Stripe object deserialization with an unsafe fallback.
+     * Fallback keeps webhook processing resilient when endpoint API version
+     * differs from stripe-java model version.
+     *
+     * @param event verified Stripe event
+     * @return StripeObject payload or null when deserialization fails completely
+     */
+    private StripeObject extractStripeObject(Event event) {
+        EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
+        StripeObject stripeObject = deserializer.getObject().orElse(null);
+        if (stripeObject != null) {
+            return stripeObject;
+        }
+
+        try {
+            return deserializer.deserializeUnsafe();
+        } catch (EventDataObjectDeserializationException ex) {
+            log.warn("Unsafe deserialization failed for event type {}: {}", event.getType(), ex.getMessage());
+            return null;
+        } catch (RuntimeException ex) {
+            log.warn("Failed unsafe deserialization for event type {}: {}", event.getType(), ex.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Marks that charge.updated was acknowledged for this PaymentIntent.
+     *
+     * @param charge updated Charge payload from webhook
+     */
+    private void handleChargeUpdated(Charge charge) {
+        String paymentIntentId = charge.getPaymentIntent();
+
+        if (paymentIntentId == null || paymentIntentId.isBlank()) {
+            log.warn("charge.updated received without payment_intent id.");
+            return;
+        }
+
+        Payment payment = paymentRepository.findByStripePaymentIntentId(paymentIntentId)
+            .orElse(null);
+
+        if (payment == null) {
+            log.warn("No local Payment record for charge.updated PaymentIntent {}.", paymentIntentId);
+            return;
+        }
+
+        if (payment.getChargeUpdatedEventReceivedAt() == null) {
+            payment.setChargeUpdatedEventReceivedAt(java.time.LocalDateTime.now());
+        }
+
+        String chargeStatus = charge.getStatus();
+        boolean paid = Boolean.TRUE.equals(charge.getPaid());
+
+        if (paid || "succeeded".equalsIgnoreCase(chargeStatus)) {
+            applyPaidState(payment, paymentIntentId, "charge.updated");
+            return;
+        }
+
+        if ("failed".equalsIgnoreCase(chargeStatus)) {
+            applyFailedState(payment, paymentIntentId, "charge.updated");
+            return;
+        }
+
+        paymentRepository.save(payment);
+        log.info("charge.updated event acknowledged: paymentIntentId={}", paymentIntentId);
+    }
 
     /**
      * Marks the Payment record as PAID and transitions the associated Order to
@@ -235,6 +368,17 @@ public class PaymentServiceImpl implements PaymentService {
             return;
         }
 
+        applyPaidState(payment, paymentIntentId, EVENT_PAYMENT_SUCCEEDED);
+    }
+
+    /**
+     * Marks payment/order as paid and confirmed.
+     *
+     * @param payment payment entity to mutate
+     * @param paymentIntentId Stripe PaymentIntent ID for logging
+     * @param eventType event source that triggered this transition
+     */
+    private void applyPaidState(Payment payment, String paymentIntentId, String eventType) {
         payment.setStatus(PaymentStatus.PAID);
         paymentRepository.save(payment);
 
@@ -248,7 +392,8 @@ public class PaymentServiceImpl implements PaymentService {
         order.setPaymentStatus(PaymentStatus.PAID);
         orderRepository.save(order);
 
-        log.info("Order confirmed: orderId={}, PaymentIntentId={}", order.getId(), paymentIntentId);
+        log.info("Order confirmed from {}: orderId={}, paymentIntentId={}",
+                eventType, order.getId(), paymentIntentId);
     }
 
     /**
@@ -267,16 +412,50 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment == null)
             return;
 
+        applyFailedState(payment, intent.getId(), EVENT_PAYMENT_FAILED);
+    }
+
+    /**
+     * Marks payment/order as failed while leaving order lifecycle pending for retry.
+     *
+     * @param payment payment entity to mutate
+     * @param paymentIntentId Stripe PaymentIntent ID for logging
+     * @param eventType event source that triggered this transition
+     */
+    private void applyFailedState(Payment payment, String paymentIntentId, String eventType) {
         payment.setStatus(PaymentStatus.FAILED);
         paymentRepository.save(payment);
 
-        // Update the order's paymentStatus field so the customer sees FAILED in their
-        // dashboard
         Order order = payment.getOrder();
+        if (order == null) {
+            log.error("Order not found for Payment: {}", payment.getId());
+            return;
+        }
+
         order.setPaymentStatus(PaymentStatus.FAILED);
         orderRepository.save(order);
 
-        log.info("Payment failed: PaymentIntent={}, orderId={} — order stays PENDING, paymentStatus=FAILED",
-                intent.getId(), order.getId());
+        log.info("Payment failed from {}: paymentIntentId={}, orderId={} — order stays PENDING",
+                eventType, paymentIntentId, order.getId());
+    }
+
+    /**
+     * Resolves the effective status exposed to checkout tracking.
+     * Prefers order.paymentStatus because it is the customer-facing aggregate state.
+     *
+     * @param order latest persisted order
+     * @param latestPayment latest payment attempt (nullable)
+     * @return effective payment status
+     */
+    private PaymentStatus resolveEffectivePaymentStatus(Order order, Payment latestPayment) {
+        if (order.getPaymentStatus() != null) {
+            return order.getPaymentStatus();
+        }
+
+        if (latestPayment != null && latestPayment.getStatus() != null) {
+            return latestPayment.getStatus();
+        }
+
+        return PaymentStatus.PENDING;
     }
 }

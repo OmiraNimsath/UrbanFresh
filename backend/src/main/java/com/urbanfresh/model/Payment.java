@@ -65,6 +65,10 @@ public class Payment {
     @Builder.Default
     private PaymentStatus status = PaymentStatus.PENDING;
 
+    /** Set when charge.updated webhook is received for this PaymentIntent. */
+    @Column(nullable = true)
+    private LocalDateTime chargeUpdatedEventReceivedAt;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

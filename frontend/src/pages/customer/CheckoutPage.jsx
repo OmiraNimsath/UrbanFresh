@@ -23,7 +23,10 @@ import Navbar from '../../components/Navbar';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { placeOrder } from '../../services/orderService';
-import { createPaymentIntent } from '../../services/paymentService';
+import {
+  createPaymentIntent,
+  waitForChargeUpdatedAndFetchLatest,
+} from '../../services/paymentService';
 import { formatAmount } from '../../utils/priceUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -218,8 +221,10 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
   const elements = useElements();
   const navigate = useNavigate();
 
-  const [paying, setPaying]           = useState(false);
+  const [paying, setPaying] = useState(false);
   const [stripeError, setStripeError] = useState(null);
+  const [paymentPhase, setPaymentPhase] = useState('idle');
+  const [liveStatus, setLiveStatus] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -227,25 +232,59 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
 
     setPaying(true);
     setStripeError(null);
+    setLiveStatus(null);
+    setPaymentPhase('confirming');
 
     const cardElement = elements.getElement(CardElement);
 
-    const { error } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: { card: cardElement },
-    });
+    try {
+      const { error } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: { card: cardElement },
+      });
 
-    if (error) {
-      setStripeError(error.message);
-      setPaying(false);
-    } else {
-      navigate(`/order-success?orderId=${orderId}`, {
+      if (error) {
+        setStripeError(error.message || 'Payment could not be confirmed. Please try again.');
+        setPaying(false);
+        setPaymentPhase('idle');
+        return;
+      }
+
+      setPaymentPhase('awaiting-webhook');
+      const { latestStatus, timedOut } = await waitForChargeUpdatedAndFetchLatest({
+        orderId,
+        timeoutMs: 15000,
+        pollIntervalMs: 1500,
+        onUpdate: setLiveStatus,
+      });
+
+      setPaymentPhase('resolving');
+
+      if (timedOut) {
+        toast('Payment confirmation is taking longer than expected. Showing latest order status.', {
+          icon: '⏳',
+        });
+      }
+
+      navigate(buildOrderSuccessPath(orderId, latestStatus?.paymentStatus), {
         state: {
           orderId,
           order: orderSnapshot || null,
+          paymentStatusSnapshot: latestStatus?.paymentStatus || null,
+          chargeUpdatedEventReceived: Boolean(latestStatus?.chargeUpdatedEventReceived),
+          webhookWaitTimedOut: timedOut,
         },
       });
+    } catch (err) {
+      const message = err?.response?.data?.message || 'Unable to finalize payment status. Please try again.';
+      setStripeError(message);
+      toast.error(message);
+      setPaying(false);
+      setPaymentPhase('idle');
     }
   };
+
+  const progressLabel = resolveProgressLabel(paymentPhase, liveStatus?.paymentStatus);
+  const isBusy = paying;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6">
@@ -284,11 +323,20 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
         <button
           id="pay-now-btn"
           type="submit"
-          disabled={!stripe || paying}
+          disabled={!stripe || isBusy}
           className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold rounded-xl active:scale-95 transition-all"
         >
-          {paying ? 'Processing…' : `Pay ${formatAmount(total)}`}
+          {resolvePayButtonLabel(paymentPhase, total)}
         </button>
+
+        {isBusy && (
+          <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+            <p className="text-sm font-semibold text-green-800">{progressLabel}</p>
+            <p className="text-xs text-green-700 mt-1">
+              We are waiting for a charge update from our webhook and syncing the latest status.
+            </p>
+          </div>
+        )}
       </form>
 
       <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
@@ -299,6 +347,49 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
       </div>
     </div>
   );
+}
+
+function resolvePayButtonLabel(paymentPhase, total) {
+  switch (paymentPhase) {
+    case 'confirming':
+      return 'Authorizing payment...';
+    case 'awaiting-webhook':
+      return 'Waiting for payment confirmation...';
+    case 'resolving':
+      return 'Finalizing status...';
+    default:
+      return `Pay ${formatAmount(total)}`;
+  }
+}
+
+function resolveProgressLabel(paymentPhase, paymentStatus) {
+  if (paymentPhase === 'confirming') {
+    return 'Confirming card payment with Stripe...';
+  }
+
+  if (paymentPhase === 'awaiting-webhook') {
+    if (paymentStatus === 'PAID') {
+      return 'Payment confirmed. Redirecting...';
+    }
+    if (paymentStatus === 'FAILED') {
+      return 'Payment result received. Redirecting...';
+    }
+    return 'Waiting for charge update from webhook (up to 15 seconds)...';
+  }
+
+  if (paymentPhase === 'resolving') {
+    return 'Fetching final payment status...';
+  }
+
+  return 'Processing payment...';
+}
+
+function buildOrderSuccessPath(orderId, paymentStatus) {
+  const params = new URLSearchParams({ orderId: String(orderId) });
+  if (paymentStatus) {
+    params.set('paymentStatus', paymentStatus);
+  }
+  return `/order-success?${params.toString()}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,7 +407,7 @@ function OrderSummaryPanel({ cart, orderTotal, orderItemsSnapshot, deliveryAddre
     : cart.items;
 
   return (
-    <div className="lg:w-80 flex-shrink-0">
+    <div className="lg:w-80 shrink-0">
       <div className="bg-white rounded-2xl shadow-sm p-6 lg:sticky lg:top-24 space-y-4">
         <h2 className="text-lg font-bold text-gray-800">Order Summary</h2>
 

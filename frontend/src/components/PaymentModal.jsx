@@ -8,13 +8,16 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import toast from 'react-hot-toast';
-import { createPaymentIntent } from '../services/paymentService';
+import {
+  createPaymentIntent,
+  waitForChargeUpdatedAndFetchLatest,
+} from '../services/paymentService';
 import { formatAmount } from '../utils/priceUtils';
 
 /**
  * Modal component for retrying payment on a PENDING order.
  * Displays Stripe CardElement for secure card entry and submits payment.
- * On success, redirects to payment result page; on failure, shows error.
+ * On submit, waits for charge.updated acknowledgement and resolves latest status.
  * 
  * @param {number}   orderId    - Order ID to retry payment for
  * @param {number}   totalAmount - Order total in LKR (for display only)
@@ -108,12 +111,17 @@ function PaymentFormContent({
 }) {
   const stripe = useStripe();
   const elements = useElements();
+  const [paymentPhase, setPaymentPhase] = useState('idle');
+  const [liveStatus, setLiveStatus] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!stripe || !elements) return;
 
     setLoading(true);
+    setPaymentPhase('confirming');
+    setLiveStatus(null);
+
     try {
       const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
@@ -123,17 +131,40 @@ function PaymentFormContent({
 
       if (result.error) {
         toast.error(result.error.message || 'Card declined. Please try another card.');
-      } else if (result.paymentIntent.status === 'succeeded') {
-        toast.success('Payment successful!');
-        onSuccess?.(orderId);
+        setPaymentPhase('idle');
+      } else {
+        setPaymentPhase('awaiting-webhook');
+
+        const { latestStatus, timedOut } = await waitForChargeUpdatedAndFetchLatest({
+          orderId,
+          timeoutMs: 15000,
+          pollIntervalMs: 1500,
+          onUpdate: setLiveStatus,
+        });
+
+        if (timedOut) {
+          toast('Payment confirmation is taking longer than expected. Showing latest order status.', {
+            icon: '⏳',
+          });
+        }
+
+        onSuccess?.({
+          orderId,
+          latestStatus,
+          timedOut,
+        });
         onClose();
       }
-    } catch (err) {
+    } catch {
       toast.error('Payment failed. Please try again.');
+      setPaymentPhase('idle');
     } finally {
       setLoading(false);
     }
   };
+
+  const buttonLabel = resolvePayButtonLabel(paymentPhase);
+  const progressLabel = resolveProgressLabel(paymentPhase, liveStatus?.paymentStatus);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
@@ -157,8 +188,46 @@ function PaymentFormContent({
         disabled={!stripe || loading}
         className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:cursor-not-allowed"
       >
-        {loading ? 'Processing…' : 'Pay Now'}
+        {loading ? buttonLabel : 'Pay Now'}
       </button>
+
+      {loading && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2">
+          <p className="text-xs font-semibold text-green-800">{progressLabel}</p>
+          <p className="text-xs text-green-700 mt-0.5">
+            Waiting for charge update webhook sync before final redirect.
+          </p>
+        </div>
+      )}
     </form>
   );
+}
+
+function resolvePayButtonLabel(paymentPhase) {
+  switch (paymentPhase) {
+    case 'confirming':
+      return 'Authorizing payment...';
+    case 'awaiting-webhook':
+      return 'Waiting for charge update...';
+    default:
+      return 'Processing...';
+  }
+}
+
+function resolveProgressLabel(paymentPhase, paymentStatus) {
+  if (paymentPhase === 'confirming') {
+    return 'Confirming card payment with Stripe...';
+  }
+
+  if (paymentPhase === 'awaiting-webhook') {
+    if (paymentStatus === 'PAID') {
+      return 'Payment confirmed. Redirecting...';
+    }
+    if (paymentStatus === 'FAILED') {
+      return 'Payment failed. Redirecting...';
+    }
+    return 'Waiting up to 15 seconds for charge.updated...';
+  }
+
+  return 'Processing payment...';
 }

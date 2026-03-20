@@ -158,9 +158,14 @@ export default function CustomerDashboard() {
           totalAmount={selectedOrderForPayment.totalAmount}
           isOpen={paymentModalOpen}
           onClose={() => setPaymentModalOpen(false)}
-          onSuccess={() =>
-            navigate(`/order-success?orderId=${selectedOrderForPayment.orderId}`, {
-              state: { orderId: selectedOrderForPayment.orderId },
+          onSuccess={({ orderId, latestStatus, timedOut }) =>
+            navigate(buildOrderSuccessPath(orderId, latestStatus?.paymentStatus), {
+              state: {
+                orderId,
+                paymentStatusSnapshot: latestStatus?.paymentStatus || null,
+                chargeUpdatedEventReceived: Boolean(latestStatus?.chargeUpdatedEventReceived),
+                webhookWaitTimedOut: timedOut,
+              },
             })
           }
         />
@@ -317,6 +322,14 @@ function PaymentBadge({ paymentStatus }) {
 function normalizePaymentStatus(rawStatus) {
   if (rawStatus === null || rawStatus === undefined) return null;
   return String(rawStatus).trim().toUpperCase();
+}
+
+function buildOrderSuccessPath(orderId, paymentStatus) {
+  const params = new URLSearchParams({ orderId: String(orderId) });
+  if (paymentStatus) {
+    params.set('paymentStatus', paymentStatus);
+  }
+  return `/order-success?${params.toString()}`;
 }
 
 /** Format ISO datetime string to a human-readable local date. */

@@ -20,4 +20,13 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
      * @return the matching Payment, if it was persisted during PaymentIntent creation
      */
     Optional<Payment> findByStripePaymentIntentId(String stripePaymentIntentId);
+
+    /**
+     * Returns the latest payment attempt for the given order.
+     * Useful for checkout tracking when an order has retries.
+     *
+     * @param orderId order ID
+     * @return most recently created payment attempt, if available
+     */
+    Optional<Payment> findTopByOrderIdOrderByCreatedAtDesc(Long orderId);
 }

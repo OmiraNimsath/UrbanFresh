@@ -2,6 +2,7 @@ package com.urbanfresh.service;
 
 import com.urbanfresh.dto.request.CreatePaymentIntentRequest;
 import com.urbanfresh.dto.response.PaymentIntentResponse;
+import com.urbanfresh.dto.response.PaymentTrackingStatusResponse;
 
 /**
  * Service Layer – Contract for Stripe payment operations.
@@ -31,4 +32,14 @@ public interface PaymentService {
      * @param sigHeader value of the "Stripe-Signature" HTTP header
      */
     void handleWebhookEvent(String payload, String sigHeader);
+
+    /**
+     * Reads the latest persisted payment tracking status for a customer-owned order.
+     * Used by checkout polling to wait for webhook acknowledgement and final outcome.
+     *
+     * @param orderId       target order ID
+     * @param customerEmail authenticated customer email from JWT principal
+     * @return latest payment tracking status payload
+     */
+    PaymentTrackingStatusResponse getPaymentTrackingStatus(Long orderId, String customerEmail);
 }

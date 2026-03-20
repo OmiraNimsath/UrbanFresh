@@ -3,6 +3,8 @@ package com.urbanfresh.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.urbanfresh.dto.request.CreatePaymentIntentRequest;
 import com.urbanfresh.dto.response.PaymentIntentResponse;
+import com.urbanfresh.dto.response.PaymentTrackingStatusResponse;
 import com.urbanfresh.service.PaymentService;
 
 import jakarta.validation.Valid;
@@ -48,6 +51,26 @@ public class PaymentController {
 
         String customerEmail = authentication.getName();
         PaymentIntentResponse response = paymentService.createPaymentIntent(request, customerEmail);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Returns the latest webhook-driven payment tracking state for a customer-owned order.
+     * Used by checkout polling while payment confirmation is in progress.
+     *
+     * @param orderId         target order ID
+     * @param authentication  authenticated principal containing customer email
+     * @return 200 OK with latest payment tracking state for the order
+     */
+    @GetMapping("/orders/{orderId}/status")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<PaymentTrackingStatusResponse> getPaymentTrackingStatus(
+            @PathVariable Long orderId,
+            Authentication authentication) {
+
+        String customerEmail = authentication.getName();
+        PaymentTrackingStatusResponse response =
+                paymentService.getPaymentTrackingStatus(orderId, customerEmail);
         return ResponseEntity.ok(response);
     }
 
