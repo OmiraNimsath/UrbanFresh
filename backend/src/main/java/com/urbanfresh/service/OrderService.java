@@ -34,6 +34,16 @@ public interface OrderService {
     List<OrderResponse> getMyOrders(String customerEmail);
 
     /**
+     * Returns a single order by ID for the authenticated customer.
+     * Ownership is enforced; orders from other users are rejected.
+     *
+     * @param orderId order ID requested by the customer
+     * @param customerEmail email extracted from the JWT
+     * @return OrderResponse when found and owned by the authenticated customer
+     */
+    OrderResponse getMyOrderById(Long orderId, String customerEmail);
+
+    /**
      * Returns a paginated list of all orders for admin order management.
      *
      * @param page zero-based page index

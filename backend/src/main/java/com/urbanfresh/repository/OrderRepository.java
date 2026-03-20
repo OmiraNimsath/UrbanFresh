@@ -44,4 +44,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @EntityGraph(attributePaths = {"customer", "items", "items.product"})
     Optional<Order> findDetailedById(Long id);
+
+    /**
+     * Loads a single order with relations for a specific customer.
+     * Used by customer confirmation/detail pages to enforce ownership.
+     *
+     * @param id order ID
+     * @param customerId authenticated customer ID
+     * @return optional order when it belongs to the customer
+     */
+    @EntityGraph(attributePaths = {"customer", "items", "items.product"})
+    Optional<Order> findDetailedByIdAndCustomerId(Long id, Long customerId);
 }

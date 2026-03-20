@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -207,6 +208,33 @@ public class OrderServiceImpl implements OrderService {
                 .toList();
     }
 
+    /**
+     * Returns one order for the authenticated customer by ID.
+     * Enforces ownership and does not expose other customers' order details.
+     *
+     * @param orderId order ID requested by the customer
+     * @param customerEmail email from JWT principal
+     * @return customer-owned order response
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse getMyOrderById(Long orderId, String customerEmail) {
+        User customer = userRepository.findByEmail(customerEmail)
+                .orElseThrow(() -> new UserNotFoundException("Customer not found: " + customerEmail));
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (!order.getCustomer().getId().equals(customer.getId())) {
+            throw new AccessDeniedException("You are not allowed to view this order.");
+        }
+
+        Order detailedOrder = orderRepository.findDetailedByIdAndCustomerId(orderId, customer.getId())
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        return toOrderResponse(detailedOrder);
+    }
+
         /**
          * Returns a paginated list of all orders for admin order operations.
          * Results are sorted newest first to prioritize operational visibility.
@@ -374,6 +402,7 @@ public class OrderServiceImpl implements OrderService {
         return OrderResponse.builder()
                 .orderId(order.getId())
                 .status(order.getStatus().name())
+                .paymentStatus(resolvePersistedPaymentStatus(order))
                 .deliveryAddress(order.getDeliveryAddress())
                 .totalAmount(order.getTotalAmount())
                 .createdAt(order.getCreatedAt())

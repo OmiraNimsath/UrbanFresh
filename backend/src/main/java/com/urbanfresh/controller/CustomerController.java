@@ -2,10 +2,12 @@ package com.urbanfresh.controller;
 
 import java.util.List;
 
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,6 +22,7 @@ import lombok.RequiredArgsConstructor;
  * Controller Layer – Exposes read-only customer dashboard endpoints.
  * Routes:
  *   GET /api/customer/orders  — authenticated customer's order history
+ *   GET /api/customer/orders/{orderId} — authenticated customer's single order
  *   GET /api/customer/loyalty — authenticated customer's loyalty points summary
  * Access: ROLE_CUSTOMER only (enforced via @PreAuthorize on each method).
  */
@@ -44,6 +47,29 @@ public class CustomerController {
         String customerEmail = authentication.getName();
         List<OrderResponse> orders = orderService.getMyOrders(customerEmail);
         return ResponseEntity.ok(orders);
+    }
+
+    /**
+     * Returns one order for the authenticated customer by ID.
+     * Responds with 404 when the order does not exist and 403 when it belongs
+     * to another customer. Response is marked as non-cacheable.
+     *
+     * @param orderId order ID from path
+     * @param authentication Spring Security principal — email extracted from JWT
+     * @return 200 OK with OrderResponse when ownership is valid
+     */
+    @GetMapping("/orders/{orderId}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<OrderResponse> getMyOrderById(
+            @PathVariable Long orderId,
+            Authentication authentication
+    ) {
+        String customerEmail = authentication.getName();
+        OrderResponse order = orderService.getMyOrderById(orderId, customerEmail);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(order);
     }
 
     /**
