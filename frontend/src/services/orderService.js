@@ -25,6 +25,73 @@ export const placeOrder = (deliveryAddress, items) =>
 export const getMyOrders = () => api.get('/api/customer/orders');
 
 /**
+ * Fetch one authenticated customer's order by ID.
+ * Primary path for order-success page rehydration after refresh.
+ *
+ * Note: if backend has not exposed this endpoint yet, callers should
+ * gracefully fallback to getMyOrders().
+ *
+ * GET /api/customer/orders/{orderId}
+ *
+ * @param {number|string} orderId
+ * @returns {Promise<Object>} OrderResponse
+ */
+export const getMyOrderById = (orderId) =>
+	api.get(`/api/customer/orders/${orderId}`, {
+		headers: {
+			'Cache-Control': 'no-store',
+			Pragma: 'no-cache',
+		},
+	}).then((res) => res.data);
+
+/**
+ * Resolve order details for /order-success with robust fallback rules:
+ * 1) Try dedicated by-id endpoint first (if an orderId exists).
+ * 2) If unavailable/not found, fallback to customer order history.
+ * 3) If no orderId provided, return latest order from history.
+ *
+ * @param {{ orderId?: number|string|null }} params
+ * @returns {Promise<{order: Object|null, source: 'id'|'history'|'latest'|'none', unauthorized: boolean}>}
+ */
+export const resolveOrderForSuccess = async ({ orderId } = {}) => {
+	const normalizedId = orderId ? String(orderId) : null;
+
+	if (normalizedId) {
+		try {
+			const order = await getMyOrderById(normalizedId);
+			return { order, source: 'id', unauthorized: false };
+		} catch (error) {
+			if (error?.response?.status === 403) {
+				return { order: null, source: 'none', unauthorized: true };
+			}
+		}
+	}
+
+	const historyResponse = await api.get('/api/customer/orders', {
+		headers: {
+			'Cache-Control': 'no-store',
+			Pragma: 'no-cache',
+		},
+	});
+	const orders = Array.isArray(historyResponse?.data) ? historyResponse.data : [];
+
+	if (normalizedId) {
+		const matchedOrder = orders.find((order) => String(order?.orderId) === normalizedId);
+		return {
+			order: matchedOrder ?? null,
+			source: matchedOrder ? 'history' : 'none',
+			unauthorized: false,
+		};
+	}
+
+	if (orders.length === 0) {
+		return { order: null, source: 'none', unauthorized: false };
+	}
+
+	return { order: orders[0], source: 'latest', unauthorized: false };
+};
+
+/**
  * Fetch the authenticated customer's loyalty points summary.
  * GET /api/customer/loyalty
  *

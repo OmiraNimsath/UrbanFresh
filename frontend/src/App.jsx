@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -12,7 +12,7 @@ import ProductListingPage from './pages/products/ProductListingPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import ProfilePage from './pages/customer/ProfilePage';
-import PaymentResultPage from './pages/customer/PaymentResultPage';
+import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminInventoryPage from './pages/admin/AdminInventoryPage';
@@ -77,12 +77,20 @@ function App() {
             }
           />
           <Route
-            path="/payment/result"
+            path="/order-success"
             element={
               <ProtectedRoute allowedRoles={['CUSTOMER']}>
-                <PaymentResultPage />
+                <OrderSuccessPage />
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="/payment/result"
+            element={<LegacyPaymentResultRedirect />}
+          />
+          <Route
+            path="/payment-result"
+            element={<LegacyPaymentResultRedirect />}
           />
           <Route
             path="/admin"
@@ -140,6 +148,13 @@ function App() {
       </CartProvider>
     </AuthProvider>
   );
+}
+
+function LegacyPaymentResultRedirect() {
+  const location = useLocation();
+  const target = `/order-success${location.search || ''}`;
+
+  return <Navigate to={target} replace state={location.state} />;
 }
 
 export default App;

@@ -41,6 +41,7 @@ export default function CheckoutPage() {
   const [orderId, setOrderId]             = useState(null);
   const [orderTotal, setOrderTotal]       = useState(0);   // snapshot before cart is cleared
   const [orderItemsSnapshot, setOrderItemsSnapshot] = useState([]); // snapshot of items
+  const [orderSnapshot, setOrderSnapshot] = useState(null);
   const [stripePromise, setStripePromise] = useState(null);
   const [clientSecret, setClientSecret]   = useState(null);
 
@@ -81,6 +82,7 @@ export default function CheckoutPage() {
       setOrderId(order.orderId);
       setOrderTotal(order.totalAmount);   // ← captured from order, not cart
       setOrderItemsSnapshot(order.items); // ← capture items from order response
+      setOrderSnapshot(order);
       setStep('payment');
 
       // Cart cleared after step flip (stock already reserved)
@@ -135,6 +137,7 @@ export default function CheckoutPage() {
                   orderId={orderId}
                   total={orderTotal}
                   clientSecret={clientSecret}
+                  orderSnapshot={orderSnapshot}
                 />
               </Elements>
             )}
@@ -210,7 +213,7 @@ function AddressStep({ deliveryAddress, setDeliveryAddress, addressError, loadin
 // Step 2 – Stripe payment form (must be inside <Elements>)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PaymentStep({ orderId, total, clientSecret }) {
+function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
   const stripe   = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
@@ -235,7 +238,12 @@ function PaymentStep({ orderId, total, clientSecret }) {
       setStripeError(error.message);
       setPaying(false);
     } else {
-      navigate(`/payment/result?status=success&orderId=${orderId}`);
+      navigate(`/order-success?orderId=${orderId}`, {
+        state: {
+          orderId,
+          order: orderSnapshot || null,
+        },
+      });
     }
   };
 

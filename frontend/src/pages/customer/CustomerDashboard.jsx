@@ -158,7 +158,11 @@ export default function CustomerDashboard() {
           totalAmount={selectedOrderForPayment.totalAmount}
           isOpen={paymentModalOpen}
           onClose={() => setPaymentModalOpen(false)}
-          onSuccess={() => navigate(`/payment-result?status=success&orderId=${selectedOrderForPayment.orderId}`)}
+          onSuccess={() =>
+            navigate(`/order-success?orderId=${selectedOrderForPayment.orderId}`, {
+              state: { orderId: selectedOrderForPayment.orderId },
+            })
+          }
         />
       )}
     </div>
@@ -193,6 +197,8 @@ function LoyaltyStat({ label, value, highlight = false }) {
  */
 function OrderCard({ order, onRetryPayment }) {
   const [expanded, setExpanded] = useState(false);
+  const paymentStatus = normalizePaymentStatus(order?.paymentStatus);
+  const canRetryPayment = (paymentStatus === 'PENDING' || paymentStatus === 'FAILED') && Boolean(onRetryPayment);
 
   return (
     <div className="border border-gray-200 rounded-xl p-4">
@@ -206,8 +212,9 @@ function OrderCard({ order, onRetryPayment }) {
           <span className="text-sm font-bold text-gray-800">
             {formatAmount(order.totalAmount)}
           </span>
+          <PaymentBadge paymentStatus={paymentStatus} />
           <StatusBadge status={order.status} />
-            {order.status === 'PENDING' && onRetryPayment && (
+            {canRetryPayment && (
               <button
                 onClick={() => onRetryPayment(order)}
                 aria-label="Retry payment"
@@ -286,9 +293,30 @@ function StatusBadge({ status }) {
   };
   return (
     <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${styles[status] ?? 'bg-gray-100 text-gray-600'}`}>
-      {status}
+      ORD: {status}
     </span>
   );
+}
+
+function PaymentBadge({ paymentStatus }) {
+  const styles = {
+    PAID: 'bg-green-100 text-green-700',
+    PENDING: 'bg-yellow-100 text-yellow-700',
+    FAILED: 'bg-red-100 text-red-700',
+  };
+
+  const normalized = paymentStatus || 'PENDING';
+
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${styles[normalized] ?? 'bg-gray-100 text-gray-600'}`}>
+      PAY: {normalized}
+    </span>
+  );
+}
+
+function normalizePaymentStatus(rawStatus) {
+  if (rawStatus === null || rawStatus === undefined) return null;
+  return String(rawStatus).trim().toUpperCase();
 }
 
 /** Format ISO datetime string to a human-readable local date. */
