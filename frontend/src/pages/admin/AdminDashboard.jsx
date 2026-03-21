@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import adminDashboardService from '../../services/adminDashboardService';
-import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 /**
  * Admin Dashboard Component
@@ -9,9 +11,17 @@ import { Link } from 'react-router-dom';
  * Shows: total orders, revenue, product count, supplier count, and alerts for low stock/near expiry
  */
 const AdminDashboard = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Logged out successfully');
+    navigate('/login', { replace: true });
+  };
 
   useEffect(() => {
     fetchDashboardMetrics();
@@ -81,9 +91,33 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
+        {/* Header with User Info and Logout */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-green-700">UrbanFresh Admin</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Welcome, <span className="font-semibold">{user?.name}</span> (Admin)
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/admin/profile"
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            >
+              My Profile
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+
+        {/* Dashboard Title */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Dashboard</h1>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Overview</h2>
           {dashboardData?.summary && (
             <p className="text-sm text-gray-500">
               Last updated: {dashboardData.summary.lastUpdated}

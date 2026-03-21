@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Navbar from '../../components/Navbar';
+import PaymentModal from '../../components/PaymentModal';
 import { useAuth } from '../../context/AuthContext';
 import { resolveOrderForSuccess } from '../../services/orderService';
 import { formatAmount } from '../../utils/priceUtils';
@@ -26,23 +27,19 @@ const PAGE_STATE = {
 
 const PAYMENT_VIEW = {
   SUCCESS: 'success',
-  PENDING: 'pending',
   FAILED: 'failed',
   NEUTRAL: 'neutral',
 };
 
 const PAYMENT_STATUS_SET = {
   SUCCESS: new Set(['SUCCESS', 'SUCCEEDED', 'COMPLETED', 'PAID']),
-  PENDING: new Set(['PENDING', 'PROCESSING', 'IN_PROGRESS', 'REQUIRES_ACTION']),
-  FAILED: new Set(['FAILED', 'FAILURE', 'DECLINED', 'CANCELED', 'CANCELLED', 'EXPIRED']),
+  FAILED: new Set(['FAILED', 'FAILURE', 'DECLINED', 'CANCELED', 'CANCELLED', 'EXPIRED', 'PENDING', 'PROCESSING', 'IN_PROGRESS', 'REQUIRES_ACTION']),
 };
 
 const ORDER_STATUS_SET = {
   CONFIRMED: new Set(['CONFIRMED', 'READY', 'PROCESSING', 'OUT_FOR_DELIVERY', 'DELIVERED']),
 };
 
-const PENDING_REFRESH_INTERVAL_MS = 4000;
-const MAX_PENDING_REFRESH_ATTEMPTS = 8;
 
 export default function OrderSuccessPage() {
   const { isAuthenticated } = useAuth();
@@ -59,8 +56,8 @@ export default function OrderSuccessPage() {
   const [order, setOrder] = useState(stateOrder);
   const [errorMessage, setErrorMessage] = useState('Unable to load order details.');
   const [copied, setCopied] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const latestRequestIdRef = useRef(0);
-  const pendingRefreshAttemptsRef = useRef(0);
 
   const loadOrder = useCallback(async ({ preserveCurrentView = false } = {}) => {
     if (!isAuthenticated) {
@@ -152,29 +149,7 @@ export default function OrderSuccessPage() {
     return () => clearTimeout(timer);
   }, [loadOrder]);
 
-  useEffect(() => {
-    if (pageState !== PAGE_STATE.SUCCESS || !order) {
-      pendingRefreshAttemptsRef.current = 0;
-      return undefined;
-    }
 
-    const currentView = resolvePaymentView(order);
-    if (currentView !== PAYMENT_VIEW.PENDING) {
-      pendingRefreshAttemptsRef.current = 0;
-      return undefined;
-    }
-
-    if (pendingRefreshAttemptsRef.current >= MAX_PENDING_REFRESH_ATTEMPTS) {
-      return undefined;
-    }
-
-    const timer = setTimeout(() => {
-      pendingRefreshAttemptsRef.current += 1;
-      loadOrder({ preserveCurrentView: true });
-    }, PENDING_REFRESH_INTERVAL_MS);
-
-    return () => clearTimeout(timer);
-  }, [pageState, order, loadOrder]);
 
   useEffect(() => {
     if (!copied) return undefined;
@@ -207,6 +182,12 @@ export default function OrderSuccessPage() {
     } catch {
       toast.error('Unable to copy order ID.');
     }
+  };
+
+  const handlePaymentModalSuccess = (result) => {
+    toast.success('Payment completed successfully!');
+    setIsPaymentModalOpen(false);
+    loadOrder({ preserveCurrentView: false });
   };
 
   return (
@@ -271,12 +252,13 @@ export default function OrderSuccessPage() {
                   >
                     Go Back to Checkout
                   </Link>
-                  <Link
-                    to="/dashboard"
+                  <button
+                    type="button"
+                    onClick={() => setIsPaymentModalOpen(true)}
                     className="px-6 py-2.5 border border-red-200 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-lg transition-colors"
                   >
-                    Retry Payment from My Orders
-                  </Link>
+                    Retry Payment
+                  </button>
                 </>
               ) : (
                 <Link
@@ -293,6 +275,16 @@ export default function OrderSuccessPage() {
                 Continue Shopping
               </Link>
             </div>
+
+            {paymentView === PAYMENT_VIEW.FAILED && order && (
+              <PaymentModal
+                orderId={order.orderId}
+                totalAmount={order.totalAmount}
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                onSuccess={handlePaymentModalSuccess}
+              />
+            )}
           </section>
         )}
       </main>
@@ -382,23 +374,6 @@ function StatusInfoCard({ paymentView, deliveryEstimate, deliveryAddress }) {
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6" aria-label="Payment information">
       <h2 className="text-lg font-bold text-gray-800 mb-4">What Happens Next</h2>
-
-      {paymentView === PAYMENT_VIEW.PENDING && (
-        <div className="space-y-4 text-sm text-gray-700">
-          <p>
-            Your order has been received, but payment is still being processed.
-          </p>
-          <p className="text-gray-600">
-            We will update your confirmation once payment is completed.
-          </p>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Shipping Address</p>
-            <p className="text-sm text-gray-700 mt-1 wrap-break-word">
-              {deliveryAddress ? maskAddress(deliveryAddress) : 'Address unavailable'}
-            </p>
-          </div>
-        </div>
-      )}
 
       {paymentView === PAYMENT_VIEW.FAILED && (
         <div className="space-y-3 text-sm text-gray-700">
@@ -507,9 +482,6 @@ function resolvePaymentView(order) {
   const hasSuccessfulPaymentStatus = Boolean(
     normalizedPaymentStatus && PAYMENT_STATUS_SET.SUCCESS.has(normalizedPaymentStatus)
   );
-  const hasPendingPaymentStatus = Boolean(
-    normalizedPaymentStatus && PAYMENT_STATUS_SET.PENDING.has(normalizedPaymentStatus)
-  );
   const hasFailedPaymentStatus = Boolean(
     normalizedPaymentStatus && PAYMENT_STATUS_SET.FAILED.has(normalizedPaymentStatus)
   );
@@ -521,7 +493,7 @@ function resolvePaymentView(order) {
 
   // In this domain, CONFIRMED and beyond implies payment success.
   // Trust this signal when payment status is delayed or temporarily stale.
-  if (hasConfirmedOrderStatus && (hasSuccessfulPaymentStatus || hasPendingPaymentStatus || !normalizedPaymentStatus)) {
+  if (hasConfirmedOrderStatus && (hasSuccessfulPaymentStatus || !normalizedPaymentStatus)) {
     return PAYMENT_VIEW.SUCCESS;
   }
 
@@ -530,10 +502,9 @@ function resolvePaymentView(order) {
       return PAYMENT_VIEW.SUCCESS;
     }
 
-    return PAYMENT_VIEW.PENDING;
+    return PAYMENT_VIEW.FAILED;
   }
 
-  if (hasPendingPaymentStatus) return PAYMENT_VIEW.PENDING;
   if (!normalizedPaymentStatus) return PAYMENT_VIEW.NEUTRAL;
 
   return PAYMENT_VIEW.NEUTRAL;
@@ -576,13 +547,6 @@ function getStatusContent(paymentView) {
     };
   }
 
-  if (paymentView === PAYMENT_VIEW.PENDING) {
-    return {
-      title: 'Payment Pending',
-      subtitle: 'Your order has been received, but payment is still being processed.',
-    };
-  }
-
   if (paymentView === PAYMENT_VIEW.FAILED) {
     return {
       title: 'Payment Failed',
@@ -606,18 +570,6 @@ function getToneStyles(paymentView) {
       orderCardBorder: 'border-green-100',
       orderIdText: 'text-green-700',
       primaryButton: 'bg-green-600 hover:bg-green-700',
-    };
-  }
-
-  if (paymentView === PAYMENT_VIEW.PENDING) {
-    return {
-      pageBg: 'bg-amber-50',
-      bannerBorder: 'border-amber-100',
-      iconBadge: 'bg-amber-100 text-amber-700',
-      titleText: 'text-amber-800',
-      orderCardBorder: 'border-amber-100',
-      orderIdText: 'text-amber-700',
-      primaryButton: 'bg-amber-600 hover:bg-amber-700',
     };
   }
 

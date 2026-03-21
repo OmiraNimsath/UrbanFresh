@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import {
@@ -29,10 +29,22 @@ export default function PaymentModal({ orderId, totalAmount, isOpen, onClose, on
   const [stripePromise, setStripePromise] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
   const [loading, setLoading] = useState(false);
+  const initializationRef = useRef(null);
 
   // Initialize Stripe and fetch clientSecret when modal opens
+  // Use useRef to prevent StrictMode from creating duplicate payment intents
   useEffect(() => {
-    if (!isOpen || !orderId) return;
+    if (!isOpen || !orderId) {
+      initializationRef.current = null;
+      return;
+    }
+
+    // If we've already initiated for this orderId, skip
+    if (initializationRef.current === orderId) {
+      return;
+    }
+
+    initializationRef.current = orderId;
 
     const initializePayment = async () => {
       try {
@@ -143,7 +155,7 @@ function PaymentFormContent({
         });
 
         if (timedOut) {
-          toast('Payment confirmation is taking longer than expected. Showing latest order status.', {
+          toast('Payment confirmation is taking longer than expected. Please try again.', {
             icon: '⏳',
           });
         }
@@ -194,9 +206,6 @@ function PaymentFormContent({
       {loading && (
         <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2">
           <p className="text-xs font-semibold text-green-800">{progressLabel}</p>
-          <p className="text-xs text-green-700 mt-0.5">
-            Waiting for charge update webhook sync before final redirect.
-          </p>
         </div>
       )}
     </form>
@@ -216,7 +225,7 @@ function resolvePayButtonLabel(paymentPhase) {
 
 function resolveProgressLabel(paymentPhase, paymentStatus) {
   if (paymentPhase === 'confirming') {
-    return 'Confirming card payment with Stripe...';
+    return 'Processing payment...';
   }
 
   if (paymentPhase === 'awaiting-webhook') {
@@ -226,7 +235,7 @@ function resolveProgressLabel(paymentPhase, paymentStatus) {
     if (paymentStatus === 'FAILED') {
       return 'Payment failed. Redirecting...';
     }
-    return 'Waiting up to 15 seconds for charge.updated...';
+    return 'Processing... could take up to 15 seconds';
   }
 
   return 'Processing payment...';

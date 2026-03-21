@@ -260,7 +260,7 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
       setPaymentPhase('resolving');
 
       if (timedOut) {
-        toast('Payment confirmation is taking longer than expected. Showing latest order status.', {
+        toast('Payment confirmation is taking longer than expected. Please try again.', {
           icon: '⏳',
         });
       }
@@ -332,19 +332,9 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
         {isBusy && (
           <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
             <p className="text-sm font-semibold text-green-800">{progressLabel}</p>
-            <p className="text-xs text-green-700 mt-1">
-              We are waiting for a charge update from our webhook and syncing the latest status.
-            </p>
           </div>
         )}
       </form>
-
-      <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-        <p className="text-xs text-green-700 font-medium mb-0.5">🧪 Sandbox test card</p>
-        <p className="text-xs text-green-600">
-          <strong>4242 4242 4242 4242</strong> · Any future date · Any CVC · Any ZIP
-        </p>
-      </div>
     </div>
   );
 }
@@ -364,7 +354,7 @@ function resolvePayButtonLabel(paymentPhase, total) {
 
 function resolveProgressLabel(paymentPhase, paymentStatus) {
   if (paymentPhase === 'confirming') {
-    return 'Confirming card payment with Stripe...';
+    return 'Processing payment...';
   }
 
   if (paymentPhase === 'awaiting-webhook') {
@@ -372,13 +362,13 @@ function resolveProgressLabel(paymentPhase, paymentStatus) {
       return 'Payment confirmed. Redirecting...';
     }
     if (paymentStatus === 'FAILED') {
-      return 'Payment result received. Redirecting...';
+      return 'Payment failed. Redirecting...';
     }
-    return 'Waiting for charge update from webhook (up to 15 seconds)...';
+    return 'Processing... could take up to 15 seconds';
   }
 
   if (paymentPhase === 'resolving') {
-    return 'Fetching final payment status...';
+    return 'Finalizing your order...';
   }
 
   return 'Processing payment...';

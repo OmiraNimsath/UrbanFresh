@@ -220,7 +220,7 @@ export default function AdminOrdersPage() {
                       <td className={td}>
                         <div className="flex items-center gap-2">
                           <select
-                            className="border border-gray-300 rounded-lg px-2 py-1 text-xs"
+                            className="border border-gray-300 rounded-lg px-2 py-1 text-xs disabled:appearance-none disabled:bg-gray-50 disabled:cursor-not-allowed"
                             value={order.orderStatus}
                             disabled={
                               updatingOrderId === order.orderId ||
@@ -280,7 +280,7 @@ export default function AdminOrdersPage() {
 }
 
 const ADMIN_FLOW_OPTIONS = {
-  PENDING: ['PENDING', 'PROCESSING', 'CANCELLED'],
+  CONFIRMED: ['CONFIRMED', 'PROCESSING', 'CANCELLED'],
   PROCESSING: ['PROCESSING', 'READY', 'CANCELLED'],
   READY: ['READY', 'PROCESSING'],
   CANCELLED: ['CANCELLED', 'PROCESSING'],
@@ -288,12 +288,13 @@ const ADMIN_FLOW_OPTIONS = {
 
 const STATUS_PROGRESS_INDEX = {
   PENDING: 0,
-  PROCESSING: 1,
-  READY: 2,
-  OUT_FOR_DELIVERY: 3,
-  DELIVERED: 4,
-  RETURNED: 5,
-  CANCELLED: 6,
+  CONFIRMED: 1,
+  PROCESSING: 2,
+  READY: 3,
+  OUT_FOR_DELIVERY: 4,
+  DELIVERED: 5,
+  RETURNED: 6,
+  CANCELLED: 7,
 };
 
 const th = 'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide';
