@@ -100,6 +100,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* ── Protected admin routes ── */}
           <Route
             path="/admin/products"
             element={
