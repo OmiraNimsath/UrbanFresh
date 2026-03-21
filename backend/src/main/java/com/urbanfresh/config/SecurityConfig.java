@@ -78,6 +78,7 @@ public class SecurityConfig {
                         // Uploaded product images are public static assets
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         // Role-based URL-level restrictions (first line of defence)
+                        // /api/admin/dashboard and all /api/admin/** endpoints require ADMIN role
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/supplier/**").hasRole("SUPPLIER")
                         .requestMatchers("/api/delivery/**").hasRole("DELIVERY")
