@@ -18,6 +18,7 @@ import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminInventoryPage from './pages/admin/AdminInventoryPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminProfilePage from './pages/admin/AdminProfilePage';
+import DeliveryPersonnelPage from './pages/admin/DeliveryPersonnelPage';
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
 import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
 import UnauthorizedPage from './pages/error/UnauthorizedPage';
@@ -131,6 +132,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/delivery-personnel"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <DeliveryPersonnelPage />
               </ProtectedRoute>
             }
           />
