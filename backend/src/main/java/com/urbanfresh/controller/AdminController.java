@@ -30,10 +30,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.urbanfresh.dto.request.OrderStatusUpdateRequest;
 import com.urbanfresh.dto.request.ProductRequest;
+import com.urbanfresh.dto.request.CreateSupplierRequest;
+import com.urbanfresh.dto.request.UpdateSupplierStatusRequest;
 import com.urbanfresh.dto.response.AdminOrderResponse;
 import com.urbanfresh.dto.response.AdminOrderReviewResponse;
 import com.urbanfresh.dto.response.AdminProductResponse;
 import com.urbanfresh.dto.response.AdminStatsResponse;
+import com.urbanfresh.dto.response.BrandResponse;
+import com.urbanfresh.dto.response.SupplierResponse;
 import com.urbanfresh.service.AdminProductService;
 import com.urbanfresh.service.AdminService;
 import com.urbanfresh.service.OrderService;
@@ -253,6 +257,58 @@ public class AdminController {
             @Valid @RequestBody com.urbanfresh.dto.request.UpdateDeliveryPersonnelStatusRequest request) {
         var response = adminService.updateDeliveryPersonnelStatus(deliveryPersonnelId, request);
         return ResponseEntity.ok(response);
+    }
+
+    // ── Supplier Management ────────────────────────────────────────────────
+
+    /**
+     * Create a new supplier account with one or more assigned brands.
+     * POST /api/admin/suppliers
+     *
+     * @param request validated supplier creation payload
+     * @return 201 Created with SupplierResponse
+     */
+    @PostMapping("/suppliers")
+    public ResponseEntity<SupplierResponse> createSupplier(@Valid @RequestBody CreateSupplierRequest request) {
+        SupplierResponse response = adminService.createSupplier(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Retrieve all suppliers for admin management.
+     * GET /api/admin/suppliers
+     *
+     * @return 200 OK with list of SupplierResponse
+     */
+    @GetMapping("/suppliers")
+    public ResponseEntity<List<SupplierResponse>> getSuppliers() {
+        return ResponseEntity.ok(adminService.getSuppliers());
+    }
+
+    /**
+     * Activate or deactivate supplier access.
+     * PATCH /api/admin/suppliers/{id}/status
+     *
+     * @param supplierId supplier user ID
+     * @param request activation payload
+     * @return 200 OK with updated SupplierResponse
+     */
+    @PatchMapping("/suppliers/{id}/status")
+    public ResponseEntity<SupplierResponse> updateSupplierStatus(
+            @PathVariable("id") Long supplierId,
+            @Valid @RequestBody UpdateSupplierStatusRequest request) {
+        return ResponseEntity.ok(adminService.updateSupplierStatus(supplierId, request));
+    }
+
+    /**
+     * Returns active brands for supplier assignment forms.
+     * GET /api/admin/brands
+     *
+     * @return 200 OK with list of active brands
+     */
+    @GetMapping("/brands")
+    public ResponseEntity<List<BrandResponse>> getActiveBrands() {
+        return ResponseEntity.ok(adminService.getActiveBrands());
     }
 
     /**

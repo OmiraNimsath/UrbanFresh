@@ -6,8 +6,10 @@ import java.time.format.DateTimeFormatter;
 import org.springframework.stereotype.Service;
 
 import com.urbanfresh.dto.AdminDashboardResponse;
+import com.urbanfresh.model.Role;
 import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.ProductRepository;
+import com.urbanfresh.repository.UserRepository;
 import com.urbanfresh.service.AdminDashboardService;
 
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
     
     @Override
     public AdminDashboardResponse getDashboardMetrics() {
@@ -31,13 +34,13 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         // KPI Metrics
         response.setTotalOrders(orderRepository.count());
         response.setTotalRevenue(calculateTotalRevenue());
-        response.setActiveSuppliersCount(0); // TODO: requires Supplier model in future sprint
+        response.setActiveSuppliersCount(userRepository.countByRoleAndIsActiveTrue(Role.SUPPLIER));
         response.setTotalProductsCount((int) productRepository.count());
         
-        // Alerts (placeholder - will be enhanced when inventory expires/low-stock tracking added)
-        response.setLowStockItemsCount(0); // TODO: enhance with actual low-stock logic from SCRUM-25
-        response.setNearExpiryItemsCount(0); // TODO: enhance when expiry dates tracked
-        response.setWastePercentage(0.0); // TODO: calculate when waste metrics added
+        // Alerts remain zero until inventory analytics features are enabled.
+        response.setLowStockItemsCount(0);
+        response.setNearExpiryItemsCount(0);
+        response.setWastePercentage(0.0);
         
         // Summary
         AdminDashboardResponse.DashboardSummary summary = new AdminDashboardResponse.DashboardSummary();
