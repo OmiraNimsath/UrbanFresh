@@ -1,5 +1,6 @@
 package com.urbanfresh.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -26,6 +27,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** Find all delivery personnel (active and inactive). Page-aware query. */
     Page<User> findByRole(Role role, Pageable pageable);
 
+    /** Find users by role sorted by name for admin listing screens. */
+    List<User> findByRoleOrderByNameAsc(Role role);
+
+    /** Find a user by ID and role (used to guard supplier-only operations). */
+    Optional<User> findByIdAndRole(Long id, Role role);
+
+    /** Find an active user by email and role (used for supplier scope checks). */
+    Optional<User> findByEmailAndRoleAndIsActiveTrue(String email, Role role);
+
     /** Count all users with a specific role. */
     int countByRole(Role role);
+
+    /** Count active users by role. */
+    int countByRoleAndIsActiveTrue(Role role);
 }
