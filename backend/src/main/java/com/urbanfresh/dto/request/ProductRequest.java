@@ -4,10 +4,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import com.urbanfresh.model.PricingUnit;
+
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -37,6 +39,10 @@ public class ProductRequest {
 
     @Size(max = 500, message = "Image URL must not exceed 500 characters")
     private String imageUrl;
+
+    /** Optional brand association. Null means unbranded product. */
+    @Positive(message = "Brand ID must be a positive number")
+    private Long brandId;
 
     /** Whether this product is promoted in the landing page featured section. */
     private boolean featured;

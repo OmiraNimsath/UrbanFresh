@@ -10,11 +10,12 @@ const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
  * otherwise it starts empty (create mode).
  *
  * @param {Object|null} product   - existing product to edit, or null for create
+ * @param {Array}       brands    - active brands for optional assignment
  * @param {Function}    onSubmit  - called with form data object on save
  * @param {Function}    onClose   - called when the modal should close
  * @param {boolean}     loading   - disables the submit button while saving
  */
-export default function ProductFormModal({ product, onSubmit, onClose, loading }) {
+export default function ProductFormModal({ product, brands, onSubmit, onClose, loading }) {
   const isEdit = product !== null && product !== undefined;
 
   const [form, setForm] = useState({
@@ -24,6 +25,7 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
     category: '',
     unit: 'PER_ITEM',
     imageUrl: '',
+    brandId: '',
     featured: false,
     expiryDate: '',
     stockQuantity: '',
@@ -47,6 +49,7 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
         category: product.category ?? '',
         unit: product.unit ?? 'PER_ITEM',
         imageUrl: product.imageUrl ?? '',
+        brandId: product.brandId ?? '',
         featured: product.featured ?? false,
         expiryDate: product.expiryDate ?? '',
         stockQuantity: product.stockQuantity ?? '',
@@ -126,6 +129,7 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
       description: ((form.description ?? '').trim()) || null,
       price: Number.isFinite(priceVal) ? priceVal : 0,
       category: ((form.category ?? '').trim()) || null,
+      brandId: form.brandId ? Number(form.brandId) : null,
       unit: form.unit || 'PER_ITEM',
       imageUrl: resolvedImageUrl,
       featured: !!form.featured,
@@ -140,7 +144,7 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-6 overflow-y-auto">
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh] my-auto">
         {/* Sticky header */}
-        <div className="px-6 pt-6 pb-2 flex-shrink-0">
+        <div className="px-6 pt-6 pb-2 shrink-0">
           <h2 className="text-lg font-bold text-gray-800">
             {isEdit ? 'Edit Product' : 'Add Product'}
           </h2>
@@ -214,6 +218,23 @@ export default function ProductFormModal({ product, onSubmit, onClose, loading }
               className={inputCls}
               placeholder="e.g. Dairy"
             />
+          </Field>
+
+          {/* Optional Brand */}
+          <Field label="Brand (optional)">
+            <select
+              name="brandId"
+              value={form.brandId}
+              onChange={handleChange}
+              className={inputCls}
+            >
+              <option value="">No Brand</option>
+              {brands?.map((brand) => (
+                <option key={brand.id} value={brand.id}>
+                  {brand.name} ({brand.code})
+                </option>
+              ))}
+            </select>
           </Field>
 
           {/* Pricing Unit */}

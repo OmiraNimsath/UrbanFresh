@@ -79,6 +79,8 @@ export default function LoginPage() {
 
       if (status === 401) {
         setError(message || 'Invalid email or password');
+      } else if (status === 403) {
+        setError(message || 'Access denied for this account');
       } else if (status === 400) {
         setError(message || 'Please fill in all fields correctly');
       } else {

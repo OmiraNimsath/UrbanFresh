@@ -10,6 +10,7 @@ import com.urbanfresh.dto.response.LoginResponse;
 import com.urbanfresh.dto.response.RegisterResponse;
 import com.urbanfresh.exception.DuplicateEmailException;
 import com.urbanfresh.exception.InvalidCredentialsException;
+import com.urbanfresh.exception.SupplierInactiveException;
 import com.urbanfresh.model.Role;
 import com.urbanfresh.model.User;
 import com.urbanfresh.repository.UserRepository;
@@ -78,8 +79,12 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidCredentialsException();
         }
 
-        // Check if user account is active (admin may have deactivated it)
-        // Treat inactive as invalid credentials for security (don't reveal account status)
+        // Provide explicit guidance for deactivated suppliers as required by business rules.
+        if (user.getRole() == Role.SUPPLIER && (user.getIsActive() == null || !user.getIsActive())) {
+            throw new SupplierInactiveException();
+        }
+
+        // Keep non-supplier behavior generic to avoid leaking account state.
         if (user.getIsActive() == null || !user.getIsActive()) {
             throw new InvalidCredentialsException();
         }

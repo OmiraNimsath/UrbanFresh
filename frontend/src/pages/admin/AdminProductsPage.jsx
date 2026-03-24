@@ -7,6 +7,7 @@ import {
   updateProduct,
   deleteProduct,
 } from '../../services/adminProductService';
+import { getActiveBrands } from '../../services/adminBrandService';
 import ProductFormModal from '../../components/admin/ProductFormModal';
 import { formatPrice } from '../../utils/priceUtils';
 
@@ -23,6 +24,7 @@ export default function AdminProductsPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [loadingTable, setLoadingTable] = useState(false);
   const [tableError, setTableError] = useState(null);
+  const [brands, setBrands] = useState([]);
 
   // ── Modal state ──────────────────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
@@ -37,8 +39,12 @@ export default function AdminProductsPage() {
     setLoadingTable(true);
     setTableError(null);
     try {
-      const data = await getAdminProducts(page, 20);
+      const [data, activeBrands] = await Promise.all([
+        getAdminProducts(page, 20),
+        getActiveBrands(),
+      ]);
       setPageData(data);
+      setBrands(activeBrands);
     } catch {
       setTableError('Failed to load products. Please try again.');
     } finally {
@@ -151,6 +157,7 @@ export default function AdminProductsPage() {
                 <tr>
                   <th className={th}>Name</th>
                   <th className={th}>Category</th>
+                  <th className={th}>Brand</th>
                   <th className={th}>Price</th>
                   <th className={th}>Unit</th>
                   <th className={th}>Stock</th>
@@ -162,7 +169,7 @@ export default function AdminProductsPage() {
               <tbody>
                 {pageData.content?.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-gray-400">
+                    <td colSpan={9} className="py-10 text-center text-gray-400">
                       No products found. Add one to get started.
                     </td>
                   </tr>
@@ -173,6 +180,7 @@ export default function AdminProductsPage() {
                         <span className="font-medium text-gray-800">{p.name}</span>
                       </td>
                       <td className={td}>{p.category ?? '—'}</td>
+                      <td className={td}>{p.brandName ?? '—'}</td>
                       <td className={td}>{formatPrice(p.price, p.unit)}</td>
                       <td className={td}>{UNIT_DISPLAY[p.unit] ?? p.unit ?? '—'}</td>
                       <td className={td}>
@@ -250,6 +258,7 @@ export default function AdminProductsPage() {
       {modalOpen && (
         <ProductFormModal
           product={editProduct}
+          brands={brands}
           onSubmit={handleSubmit}
           onClose={closeModal}
           loading={saving}

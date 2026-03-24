@@ -68,6 +68,62 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle deactivated supplier login attempts → 403 Forbidden.
+     */
+    @ExceptionHandler(SupplierInactiveException.class)
+    public ResponseEntity<ApiErrorResponse> handleSupplierInactive(SupplierInactiveException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.FORBIDDEN.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    /**
+     * Handle invalid supplier-brand assignment payloads → 400 Bad Request.
+     */
+    @ExceptionHandler(BrandAssignmentException.class)
+    public ResponseEntity<ApiErrorResponse> handleBrandAssignment(BrandAssignmentException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * Handle brand uniqueness conflicts -> 409 Conflict.
+     */
+    @ExceptionHandler(BrandConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleBrandConflict(BrandConflictException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.CONFLICT.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * Handle brand not found -> 404 Not Found.
+     */
+    @ExceptionHandler(BrandNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleBrandNotFound(BrandNotFoundException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
      * Handle user not found → 404 Not Found.
      */
     @ExceptionHandler(UserNotFoundException.class)

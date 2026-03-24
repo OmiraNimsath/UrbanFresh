@@ -7,6 +7,6 @@ package com.urbanfresh.exception;
 public class DuplicateEmailException extends RuntimeException {
 
     public DuplicateEmailException(String email) {
-        super("Email already registered: " + email);
+        super("This email is already registered.");
     }
 }

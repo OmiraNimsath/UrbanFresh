@@ -104,4 +104,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             LocalDate cutoff,
             int minStock
     );
+
+    /**
+     * Returns products visible to a supplier based on assigned brands.
+     *
+     * @param supplierId authenticated supplier user ID
+     * @return list of products owned by assigned active brands
+     */
+    @Query("SELECT DISTINCT p FROM Product p " +
+            "JOIN p.brand b " +
+            "JOIN SupplierBrand sb ON sb.brand.id = b.id " +
+            "WHERE sb.supplier.id = :supplierId " +
+            "AND b.active = true " +
+            "ORDER BY p.name ASC")
+    List<Product> findProductsForSupplier(@Param("supplierId") Long supplierId);
 }

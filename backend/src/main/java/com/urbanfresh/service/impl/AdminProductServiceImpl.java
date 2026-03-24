@@ -7,8 +7,11 @@ import org.springframework.stereotype.Service;
 
 import com.urbanfresh.dto.request.ProductRequest;
 import com.urbanfresh.dto.response.AdminProductResponse;
+import com.urbanfresh.exception.BrandNotFoundException;
 import com.urbanfresh.exception.ProductNotFoundException;
+import com.urbanfresh.model.Brand;
 import com.urbanfresh.model.Product;
+import com.urbanfresh.repository.BrandRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.service.AdminProductService;
 
@@ -24,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class AdminProductServiceImpl implements AdminProductService {
 
     private final ProductRepository productRepository;
+    private final BrandRepository brandRepository;
 
     /**
      * Returns all products sorted by name, paginated, for the admin table.
@@ -65,6 +69,7 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .price(request.getPrice())
                 .unit(request.getUnit() != null ? request.getUnit() : com.urbanfresh.model.PricingUnit.PER_ITEM)
                 .category(request.getCategory())
+            .brand(resolveBrand(request.getBrandId()))
                 .imageUrl(request.getImageUrl())
                 .featured(request.isFeatured())
                 .expiryDate(request.getExpiryDate())
@@ -91,6 +96,7 @@ public class AdminProductServiceImpl implements AdminProductService {
         product.setPrice(request.getPrice());
         product.setUnit(request.getUnit() != null ? request.getUnit() : com.urbanfresh.model.PricingUnit.PER_ITEM);
         product.setCategory(request.getCategory());
+        product.setBrand(resolveBrand(request.getBrandId()));
         product.setImageUrl(request.getImageUrl());
         product.setFeatured(request.isFeatured());
         product.setExpiryDate(request.getExpiryDate());
@@ -119,8 +125,23 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .orElseThrow(() -> new ProductNotFoundException(id));
     }
 
+    /**
+     * Resolve optional brand ID to entity.
+     *
+     * @param brandId optional brand ID
+     * @return resolved Brand entity or null for unbranded products
+     */
+    private Brand resolveBrand(Long brandId) {
+        if (brandId == null) {
+            return null;
+        }
+        return brandRepository.findById(brandId)
+                .orElseThrow(() -> new BrandNotFoundException(brandId));
+    }
+
     /** Maps a Product entity to the admin response DTO (includes stockQuantity). */
     private AdminProductResponse toAdminResponse(Product product) {
+        Brand brand = product.getBrand();
         return AdminProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -128,6 +149,9 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .price(product.getPrice())
                 .unit(product.getUnit())
                 .category(product.getCategory())
+                .brandId(brand != null ? brand.getId() : null)
+                .brandName(brand != null ? brand.getName() : null)
+                .brandCode(brand != null ? brand.getCode() : null)
                 .imageUrl(product.getImageUrl())
                 .featured(product.isFeatured())
                 .expiryDate(product.getExpiryDate())

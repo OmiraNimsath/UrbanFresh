@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.urbanfresh.model.PricingUnit;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -29,6 +30,9 @@ public class AdminProductResponse {
     private BigDecimal price;
     private PricingUnit unit;
     private String category;
+    private Long brandId;
+    private String brandName;
+    private String brandCode;
     private String imageUrl;
     private boolean featured;
     private LocalDate expiryDate;
