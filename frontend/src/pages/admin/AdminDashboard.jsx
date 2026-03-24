@@ -274,6 +274,17 @@ const AdminDashboard = () => {
                 <p className="text-xs text-gray-400">Create & manage accounts</p>
               </div>
             </Link>
+
+            <Link
+              to="/admin/suppliers"
+              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
+            >
+              <span className="text-3xl">🏷️</span>
+              <div>
+                <p className="font-semibold text-gray-800">Manage Suppliers</p>
+                <p className="text-xs text-gray-400">Create suppliers and assign brands</p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>
