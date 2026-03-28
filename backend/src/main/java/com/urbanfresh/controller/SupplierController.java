@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.urbanfresh.dto.response.BrandResponse;
+import com.urbanfresh.dto.response.SupplierDashboardResponse;
 import com.urbanfresh.dto.response.SupplierProductResponse;
 import com.urbanfresh.service.SupplierService;
 
@@ -25,6 +26,17 @@ import lombok.RequiredArgsConstructor;
 public class SupplierController {
 
     private final SupplierService supplierService;
+
+    /**
+     * Retrieves aggregated metrics for the supplier dashboard.
+     *
+     * @param authentication authenticated supplier principal
+     * @return dashboard summary including brand names, sales, and restock counts
+     */
+    @GetMapping("/dashboard")
+    public ResponseEntity<SupplierDashboardResponse> getDashboardData(Authentication authentication) {
+        return ResponseEntity.ok(supplierService.getDashboardData(authentication.getName()));
+    }
 
     /**
      * Returns brands assigned to the authenticated supplier.
