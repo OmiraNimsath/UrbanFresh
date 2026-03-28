@@ -5,6 +5,14 @@ import api from './api';
  */
 
 /**
+ * Retrieves dashboard summary for the supplier.
+ * 
+ * @returns {Promise<Object>} dashboard summary data
+ */
+export const getSupplierDashboard = () =>
+  api.get('/api/supplier/dashboard').then((res) => res.data);
+
+/**
  * Returns brands assigned to the authenticated supplier.
  *
  * @returns {Promise<Array>} array of BrandResponse
