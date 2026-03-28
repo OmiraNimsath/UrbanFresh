@@ -118,4 +118,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             "AND b.active = true " +
             "ORDER BY p.name ASC")
     List<Product> findProductsForSupplier(@Param("supplierId") Long supplierId);
+
+    /**
+     * Counts the number of products requiring restock across all active brands
+     * assigned to a specific supplier.
+     * 
+     * @param supplierId authenticated supplier user ID
+     * @return count of pending restock products
+     */
+    @Query("SELECT COUNT(DISTINCT p) FROM Product p " +
+           "JOIN p.brand b " +
+           "JOIN SupplierBrand sb ON sb.brand.id = b.id " +
+           "WHERE sb.supplier.id = :supplierId " +
+           "AND b.active = true " +
+           "AND p.stockQuantity <= p.reorderThreshold")
+    int countPendingRestocksForSupplier(@Param("supplierId") Long supplierId);
 }
