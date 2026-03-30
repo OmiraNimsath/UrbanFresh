@@ -31,6 +31,7 @@ import com.urbanfresh.model.User;
 import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.PaymentRepository;
 import com.urbanfresh.repository.UserRepository;
+import com.urbanfresh.service.LoyaltyService;
 import com.urbanfresh.service.PaymentService;
 
 import lombok.RequiredArgsConstructor;
@@ -76,6 +77,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
+    private final LoyaltyService loyaltyService;
 
     /**
      * Creates a Stripe PaymentIntent for a customer-owned order.
@@ -379,18 +381,29 @@ public class PaymentServiceImpl implements PaymentService {
      * @param eventType event source that triggered this transition
      */
     private void applyPaidState(Payment payment, String paymentIntentId, String eventType) {
-        payment.setStatus(PaymentStatus.PAID);
-        paymentRepository.save(payment);
-
         Order order = payment.getOrder();
         if (order == null) {
             log.error("Order not found for Payment: {}", payment.getId());
             return;
         }
 
+        // Idempotency guard — both payment_intent.succeeded and charge.updated can call
+        // this method for the same payment. Only process once.
+        if (order.getStatus() == OrderStatus.CONFIRMED) {
+            log.info("Order {} already CONFIRMED — skipping duplicate {} event.", order.getId(), eventType);
+            return;
+        }
+
+        payment.setStatus(PaymentStatus.PAID);
+        paymentRepository.save(payment);
+
         order.setStatus(OrderStatus.CONFIRMED);
         order.setPaymentStatus(PaymentStatus.PAID);
         orderRepository.save(order);
+
+        // Award loyalty points only now — payment is confirmed and the order is CONFIRMED.
+        // Awarding here prevents customers from earning points on failed/cancelled payments.
+        loyaltyService.awardPoints(order.getCustomer(), order.getTotalAmount());
 
         log.info("Order confirmed from {}: orderId={}, paymentIntentId={}",
                 eventType, order.getId(), paymentIntentId);

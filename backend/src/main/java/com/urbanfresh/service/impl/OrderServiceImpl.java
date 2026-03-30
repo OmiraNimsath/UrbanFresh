@@ -37,7 +37,6 @@ import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.OrderStatusHistoryRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
-import com.urbanfresh.service.LoyaltyService;
 import com.urbanfresh.service.OrderService;
 
 import lombok.RequiredArgsConstructor;
@@ -92,7 +91,6 @@ public class OrderServiceImpl implements OrderService {
         private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
-    private final LoyaltyService loyaltyService;
 
     /**
      * Places an order for the authenticated customer.
@@ -182,8 +180,8 @@ public class OrderServiceImpl implements OrderService {
 
         Order saved = orderRepository.save(order);
 
-        // Award loyalty points after successful order persistence
-        loyaltyService.awardPoints(customer, total);
+        // Loyalty points are awarded only after payment is confirmed (PENDING → CONFIRMED).
+        // See PaymentServiceImpl.applyPaidState() for the award trigger.
 
         return toOrderResponse(saved);
     }
