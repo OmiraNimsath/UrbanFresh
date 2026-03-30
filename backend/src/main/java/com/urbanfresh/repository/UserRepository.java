@@ -30,6 +30,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** Find users by role sorted by name for admin listing screens. */
     List<User> findByRoleOrderByNameAsc(Role role);
 
+    /** Find active users by role sorted by name — used for assignment dropdowns. */
+    List<User> findByRoleAndIsActiveTrueOrderByNameAsc(Role role);
+
     /** Find a user by ID and role (used to guard supplier-only operations). */
     Optional<User> findByIdAndRole(Long id, Role role);
 

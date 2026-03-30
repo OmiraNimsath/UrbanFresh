@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { getAllOrders, getOrderReview, updateOrderStatus } from '../../services/orderService';
+import {
+  getAllOrders,
+  getOrderReview,
+  updateOrderStatus,
+  assignDeliveryPersonnel,
+  getActiveDeliveryPersonnel,
+} from '../../services/orderService';
 import { formatAmount } from '../../utils/priceUtils';
 import OrderStatusCorrectionModal from '../../components/admin/OrderStatusCorrectionModal';
 import OrderReviewModal from '../../components/admin/OrderReviewModal';
@@ -22,6 +28,8 @@ export default function AdminOrdersPage() {
   const [orderReviewOpen, setOrderReviewOpen] = useState(false);
   const [loadingOrderReview, setLoadingOrderReview] = useState(false);
   const [selectedOrderReview, setSelectedOrderReview] = useState(null);
+  const [deliveryPersonnel, setDeliveryPersonnel] = useState([]);
+  const [selectedDeliveryPerson, setSelectedDeliveryPerson] = useState({});
 
   /**
    * Loads a page of admin orders from the backend.
@@ -44,6 +52,13 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     fetchOrders(currentPage);
   }, [currentPage, fetchOrders]);
+
+  // Load active delivery personnel once for the assignment dropdowns
+  useEffect(() => {
+    getActiveDeliveryPersonnel()
+      .then((list) => setDeliveryPersonnel(list))
+      .catch(() => toast.error('Could not load delivery personnel list.'));
+  }, []);
 
   /**
    * Updates status for a single order row and patches local UI state on success.
@@ -127,6 +142,38 @@ export default function AdminOrdersPage() {
       toast.error('Failed to load order review details. Please try again.');
     } finally {
       setLoadingOrderReview(false);
+    }
+  };
+
+  /**
+   * Assigns the selected delivery person to a READY order.
+   * The backend transitions the order to OUT_FOR_DELIVERY automatically.
+   *
+   * @param {number} orderId target order ID
+   */
+  const handleAssignDelivery = async (orderId) => {
+    const deliveryPersonId = selectedDeliveryPerson[orderId];
+    if (!deliveryPersonId) {
+      toast.error('Please select a delivery person first.');
+      return;
+    }
+    setUpdatingOrderId(orderId);
+    try {
+      const updated = await assignDeliveryPersonnel(orderId, Number(deliveryPersonId));
+      setPageData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          content: prev.content.map((row) => (row.orderId === orderId ? updated : row)),
+        };
+      });
+      setSelectedDeliveryPerson((prev) => { const next = { ...prev }; delete next[orderId]; return next; });
+      toast.success(`Order #${orderId} assigned to ${updated.deliveryPersonName ?? 'delivery person'}.`);
+    } catch (err) {
+      const message = err.response?.data?.message ?? 'Failed to assign delivery person.';
+      toast.error(message);
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -218,29 +265,67 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className={td}>{formatDate(order.orderDate)}</td>
                       <td className={td}>
-                        <div className="flex items-center gap-2">
-                          <select
-                            className="border border-gray-300 rounded-lg px-2 py-1 text-xs disabled:appearance-none disabled:bg-gray-50 disabled:cursor-not-allowed"
-                            value={order.orderStatus}
-                            disabled={
-                              updatingOrderId === order.orderId ||
-                              getAllowedNextStatuses(order.orderStatus).length === 0
-                            }
-                            onChange={(e) => handleStatusChange(order.orderId, e.target.value)}
-                          >
-                            {getStatusOptions(order.orderStatus).map((status) => (
-                              <option key={status} value={status}>
-                                {status}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => openOrderReview(order.orderId)}
-                            className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
-                          >
-                            Review
-                          </button>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <select
+                              className="border border-gray-300 rounded-lg px-2 py-1 text-xs disabled:appearance-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                              value={order.orderStatus}
+                              disabled={
+                                updatingOrderId === order.orderId ||
+                                getAllowedNextStatuses(order.orderStatus).length === 0
+                              }
+                              onChange={(e) => handleStatusChange(order.orderId, e.target.value)}
+                            >
+                              {getStatusOptions(order.orderStatus).map((status) => (
+                                <option key={status} value={status}>
+                                  {status}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => openOrderReview(order.orderId)}
+                              className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                            >
+                              Review
+                            </button>
+                          </div>
+
+                          {order.orderStatus === 'READY' && (
+                            <div className="flex items-center gap-2">
+                              <select
+                                className="border border-blue-300 rounded-lg px-2 py-1 text-xs flex-1 min-w-[130px]"
+                                value={selectedDeliveryPerson[order.orderId] ?? ''}
+                                onChange={(e) =>
+                                  setSelectedDeliveryPerson((prev) => ({
+                                    ...prev,
+                                    [order.orderId]: e.target.value,
+                                  }))
+                                }
+                              >
+                                <option value="">Assign delivery...</option>
+                                {deliveryPersonnel.map((dp) => (
+                                  <option key={dp.id} value={dp.id}>
+                                    {dp.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order.orderId || !selectedDeliveryPerson[order.orderId]}
+                                onClick={() => handleAssignDelivery(order.orderId)}
+                                className="rounded-md bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                              >
+                                Assign
+                              </button>
+                            </div>
+                          )}
+
+                          {order.orderStatus === 'OUT_FOR_DELIVERY' && order.deliveryPersonName && (
+                            <p className="text-xs text-gray-500">
+                              🚚 {order.deliveryPersonName}
+                            </p>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -313,6 +398,8 @@ function orderBadgeClass(status) {
   if (status === 'READY') return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700';
   if (status === 'PROCESSING') return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700';
   if (status === 'CANCELLED') return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700';
+  if (status === 'OUT_FOR_DELIVERY') return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700';
+  if (status === 'DELIVERED') return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
   return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700';
 }
 

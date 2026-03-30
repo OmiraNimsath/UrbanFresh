@@ -131,3 +131,24 @@ export const updateOrderStatus = (orderId, status, changeReason = null) =>
  */
 export const getOrderReview = (orderId) =>
 	api.get(`/api/admin/orders/${orderId}`).then((res) => res.data);
+
+/**
+ * Assigns an active delivery person to a READY order.
+ * Transitions the order status to OUT_FOR_DELIVERY.
+ * PUT /api/admin/orders/{orderId}/assign-delivery
+ *
+ * @param {number} orderId target order ID (must be READY)
+ * @param {number} deliveryPersonId active delivery personnel user ID
+ * @returns {Promise<Object>} updated AdminOrderResponse with delivery person info
+ */
+export const assignDeliveryPersonnel = (orderId, deliveryPersonId) =>
+	api.put(`/api/admin/orders/${orderId}/assign-delivery`, { deliveryPersonId }).then((res) => res.data);
+
+/**
+ * Fetches all active delivery personnel for the assignment dropdown.
+ * GET /api/admin/delivery-personnel/active
+ *
+ * @returns {Promise<Array>} list of active DeliveryPersonnelResponse objects
+ */
+export const getActiveDeliveryPersonnel = () =>
+	api.get('/api/admin/delivery-personnel/active').then((res) => res.data);

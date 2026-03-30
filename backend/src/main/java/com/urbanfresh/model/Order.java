@@ -84,6 +84,14 @@ public class Order {
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
 
+    /**
+     * Delivery personnel assigned to fulfil this order.
+     * Null until an admin assigns a delivery person (status transitions to OUT_FOR_DELIVERY).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_delivery_person_id")
+    private User assignedDeliveryPerson;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.urbanfresh.dto.request.AssignDeliveryRequest;
 import com.urbanfresh.dto.request.BrandRequest;
 import com.urbanfresh.dto.request.CreateSupplierRequest;
 import com.urbanfresh.dto.request.OrderStatusUpdateRequest;
@@ -259,6 +260,36 @@ public class AdminController {
             @Valid @RequestBody com.urbanfresh.dto.request.UpdateDeliveryPersonnelStatusRequest request) {
         var response = adminService.updateDeliveryPersonnelStatus(deliveryPersonnelId, request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Returns all active delivery personnel as a flat list for order-assignment dropdowns.
+     * GET /api/admin/delivery-personnel/active
+     *
+     * @return 200 OK with list of active DeliveryPersonnelResponse
+     */
+    @GetMapping("/delivery-personnel/active")
+    public ResponseEntity<java.util.List<com.urbanfresh.dto.response.DeliveryPersonnelResponse>> getActiveDeliveryPersonnel() {
+        return ResponseEntity.ok(adminService.getActiveDeliveryPersonnel());
+    }
+
+    /**
+     * Assigns an active delivery person to a READY order and moves it to OUT_FOR_DELIVERY.
+     * PUT /api/admin/orders/{orderId}/assign-delivery
+     *
+     * @param orderId        order ID to assign
+     * @param request        payload containing deliveryPersonId
+     * @param authentication authenticated admin principal
+     * @return 200 OK with updated AdminOrderResponse including delivery person info
+     */
+    @PutMapping("/orders/{orderId}/assign-delivery")
+    public ResponseEntity<AdminOrderResponse> assignDelivery(
+            @PathVariable Long orderId,
+            @Valid @RequestBody AssignDeliveryRequest request,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                orderService.assignDeliveryPersonnel(orderId, request.getDeliveryPersonId(), authentication.getName()));
     }
 
     // ── Supplier Management ────────────────────────────────────────────────

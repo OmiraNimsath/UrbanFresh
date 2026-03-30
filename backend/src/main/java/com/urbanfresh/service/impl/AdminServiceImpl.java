@@ -109,6 +109,21 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /**
+     * Retrieve all active delivery personnel as a flat list for assignment dropdowns.
+     * Returns only active accounts so admins cannot assign inactive personnel.
+     *
+     * @return list of active delivery personnel sorted by name
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<DeliveryPersonnelResponse> getActiveDeliveryPersonnel() {
+        return userRepository.findByRoleAndIsActiveTrueOrderByNameAsc(Role.DELIVERY)
+                .stream()
+                .map(this::toDeliveryPersonnelResponse)
+                .toList();
+    }
+
+    /**
      * Activate or deactivate a delivery personnel account by ID.
      *
      * @param deliveryPersonnelId unique identifier

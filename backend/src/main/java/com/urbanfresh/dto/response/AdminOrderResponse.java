@@ -20,4 +20,10 @@ public class AdminOrderResponse {
     private String paymentStatus;
     private BigDecimal totalAmount;
     private LocalDateTime orderDate;
+
+    /** ID of the delivery person assigned to this order; null if not yet assigned. */
+    private Long deliveryPersonId;
+
+    /** Name of the delivery person assigned to this order; null if not yet assigned. */
+    private String deliveryPersonName;
 }
