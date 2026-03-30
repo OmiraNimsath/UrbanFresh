@@ -417,6 +417,7 @@ public class OrderServiceImpl implements OrderService {
          * @return admin-facing order summary
          */
         private AdminOrderResponse toAdminOrderResponse(Order order) {
+                User deliveryPerson = order.getAssignedDeliveryPerson();
                 return AdminOrderResponse.builder()
                                 .orderId(order.getId())
                                 .customerName(order.getCustomer().getName())
@@ -424,6 +425,8 @@ public class OrderServiceImpl implements OrderService {
                                 .paymentStatus(resolvePersistedPaymentStatus(order))
                                 .totalAmount(order.getTotalAmount())
                                 .orderDate(order.getCreatedAt())
+                                .deliveryPersonId(deliveryPerson != null ? deliveryPerson.getId() : null)
+                                .deliveryPersonName(deliveryPerson != null ? deliveryPerson.getName() : null)
                                 .build();
         }
 
@@ -527,5 +530,54 @@ public class OrderServiceImpl implements OrderService {
                 }
 
                 return paymentStatus.name();
+        }
+
+        /**
+         * Assigns an active delivery person to a READY order and transitions the
+         * status to OUT_FOR_DELIVERY. Records an audit history entry.
+         *
+         * @param orderId          ID of the order to assign
+         * @param deliveryPersonId ID of the active DELIVERY role user
+         * @param adminEmail       authenticated admin email for audit trail
+         * @return updated AdminOrderResponse with delivery person info
+         */
+        @Override
+        @Transactional
+        public AdminOrderResponse assignDeliveryPersonnel(Long orderId, Long deliveryPersonId, String adminEmail) {
+                Order order = orderRepository.findById(orderId)
+                                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+                if (order.getStatus() != OrderStatus.READY) {
+                        throw new InvalidOrderStatusTransitionException(
+                                        "Delivery can only be assigned to orders in READY status. Current status: " + order.getStatus() + "."
+                        );
+                }
+
+                User deliveryPerson = userRepository.findByIdAndRole(deliveryPersonId, com.urbanfresh.model.Role.DELIVERY)
+                                .orElseThrow(() -> new UserNotFoundException(
+                                        "Active delivery personnel not found with ID: " + deliveryPersonId));
+
+                if (!Boolean.TRUE.equals(deliveryPerson.getIsActive())) {
+                        throw new InvalidOrderStatusTransitionException(
+                                        "Cannot assign an inactive delivery person (ID: " + deliveryPersonId + ")."
+                        );
+                }
+
+                User adminUser = userRepository.findByEmail(adminEmail)
+                                .orElseThrow(() -> new UserNotFoundException("Admin not found: " + adminEmail));
+
+                order.setAssignedDeliveryPerson(deliveryPerson);
+                order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+                Order updated = orderRepository.save(order);
+
+                orderStatusHistoryRepository.save(OrderStatusHistory.builder()
+                                .order(updated)
+                                .previousStatus(OrderStatus.READY)
+                                .newStatus(OrderStatus.OUT_FOR_DELIVERY)
+                                .changedByAdmin(adminUser)
+                                .changeReason("Assigned to delivery personnel: " + deliveryPerson.getName())
+                                .build());
+
+                return toAdminOrderResponse(updated);
         }
 }

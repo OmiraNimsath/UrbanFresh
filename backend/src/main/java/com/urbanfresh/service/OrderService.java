@@ -69,4 +69,15 @@ public interface OrderService {
      * @return updated admin-facing order summary
      */
     AdminOrderResponse updateOrderStatus(Long orderId, OrderStatusUpdateRequest request, String adminEmail);
+
+    /**
+     * Assigns an active delivery person to a READY order and transitions
+     * the status to OUT_FOR_DELIVERY.
+     *
+     * @param orderId          ID of the order to assign
+     * @param deliveryPersonId ID of the active DELIVERY role user
+     * @param adminEmail       authenticated admin email used for auditing
+     * @return updated admin-facing order summary with delivery person info
+     */
+    AdminOrderResponse assignDeliveryPersonnel(Long orderId, Long deliveryPersonId, String adminEmail);
 }

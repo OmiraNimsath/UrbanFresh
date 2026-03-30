@@ -49,6 +49,13 @@ public interface AdminService {
     Page<DeliveryPersonnelResponse> getDeliveryPersonnel(Pageable pageable);
 
     /**
+     * Retrieve all active delivery personnel as a flat list for assignment dropdowns.
+     *
+     * @return list of active delivery personnel sorted by name
+     */
+    List<DeliveryPersonnelResponse> getActiveDeliveryPersonnel();
+
+    /**
      * Activate or deactivate a delivery personnel account.
      * When deactivated, the user cannot log in.
      *
