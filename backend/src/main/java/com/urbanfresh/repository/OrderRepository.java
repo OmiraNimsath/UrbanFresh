@@ -42,7 +42,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * @param id order ID
      * @return optional order with all required relations eagerly loaded
      */
-    @EntityGraph(attributePaths = {"customer", "items", "items.product"})
+    @EntityGraph(attributePaths = {"customer", "items", "items.product", "assignedDeliveryPerson"})
     Optional<Order> findDetailedById(Long id);
 
     /**

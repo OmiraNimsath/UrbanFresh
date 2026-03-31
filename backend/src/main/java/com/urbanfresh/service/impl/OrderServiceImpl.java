@@ -582,6 +582,7 @@ public class OrderServiceImpl implements OrderService {
          * @return complete admin order review response
          */
         private AdminOrderReviewResponse toAdminOrderReviewResponse(Order order, List<OrderStatusHistory> historyRows) {
+                User deliveryPerson = order.getAssignedDeliveryPerson();
                 List<AdminOrderReviewResponse.OrderItemInfo> itemRows = order.getItems().stream()
                                 .map(item -> AdminOrderReviewResponse.OrderItemInfo.builder()
                                                 .productId(item.getProduct() != null ? item.getProduct().getId() : null)
@@ -617,6 +618,8 @@ public class OrderServiceImpl implements OrderService {
                                 .orderId(order.getId())
                                 .orderStatus(order.getStatus().name())
                                 .paymentStatus(resolvePersistedPaymentStatus(order))
+                                .deliveryPersonId(deliveryPerson != null ? deliveryPerson.getId() : null)
+                                .deliveryPersonName(deliveryPerson != null ? deliveryPerson.getName() : null)
                                 .orderDate(order.getCreatedAt())
                                 .lastUpdatedDate(resolveLastUpdatedDate(order, historyRows))
                                 .customer(AdminOrderReviewResponse.CustomerInfo.builder()
@@ -677,8 +680,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         /**
-         * Assigns an active delivery person to a READY order and transitions the
-         * status to OUT_FOR_DELIVERY. Records an audit history entry.
+         * Assigns or reassigns an active delivery person.
+         * READY orders are moved to OUT_FOR_DELIVERY, while OUT_FOR_DELIVERY
+         * orders keep the same status and only the assignee is updated.
          *
          * @param orderId          ID of the order to assign
          * @param deliveryPersonId ID of the active DELIVERY role user
@@ -691,9 +695,9 @@ public class OrderServiceImpl implements OrderService {
                 Order order = orderRepository.findById(orderId)
                                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-                if (order.getStatus() != OrderStatus.READY) {
+                if (order.getStatus() != OrderStatus.READY && order.getStatus() != OrderStatus.OUT_FOR_DELIVERY) {
                         throw new InvalidOrderStatusTransitionException(
-                                        "Delivery can only be assigned to orders in READY status. Current status: " + order.getStatus() + "."
+                                        "Delivery can only be assigned to orders in READY or OUT_FOR_DELIVERY status. Current status: " + order.getStatus() + "."
                         );
                 }
 
@@ -710,14 +714,17 @@ public class OrderServiceImpl implements OrderService {
                 User adminUser = userRepository.findByEmail(adminEmail)
                                 .orElseThrow(() -> new UserNotFoundException("Admin not found: " + adminEmail));
 
+                OrderStatus previousStatus = order.getStatus();
                 order.setAssignedDeliveryPerson(deliveryPerson);
-                order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+                if (previousStatus == OrderStatus.READY) {
+                        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+                }
                 Order updated = orderRepository.save(order);
 
                 orderStatusHistoryRepository.save(OrderStatusHistory.builder()
                                 .order(updated)
-                                .previousStatus(OrderStatus.READY)
-                                .newStatus(OrderStatus.OUT_FOR_DELIVERY)
+                                .previousStatus(previousStatus)
+                                .newStatus(updated.getStatus())
                                 .changedByAdmin(adminUser)
                                 .changeReason("Assigned to delivery personnel: " + deliveryPerson.getName())
                                 .build());

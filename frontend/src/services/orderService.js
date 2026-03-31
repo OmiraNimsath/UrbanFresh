@@ -165,8 +165,8 @@ export const getAssignedDeliveryOrders = (page = 0, size = 20) =>
 	}).then((res) => res.data);
 
 /**
- * Assigns an active delivery person to a READY order.
- * Transitions the order status to OUT_FOR_DELIVERY.
+ * Assigns or reassigns an active delivery person.
+ * READY orders transition to OUT_FOR_DELIVERY.
  * PUT /api/admin/orders/{orderId}/assign-delivery
  *
  * @param {number} orderId target order ID (must be READY)

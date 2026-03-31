@@ -274,7 +274,8 @@ public class AdminController {
     }
 
     /**
-     * Assigns an active delivery person to a READY order and moves it to OUT_FOR_DELIVERY.
+     * Assigns or reassigns an active delivery person for READY/OUT_FOR_DELIVERY orders.
+     * READY orders move to OUT_FOR_DELIVERY.
      * PUT /api/admin/orders/{orderId}/assign-delivery
      *
      * @param orderId        order ID to assign
