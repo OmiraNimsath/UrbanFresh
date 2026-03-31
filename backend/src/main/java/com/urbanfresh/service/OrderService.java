@@ -8,6 +8,8 @@ import com.urbanfresh.dto.request.OrderStatusUpdateRequest;
 import com.urbanfresh.dto.request.PlaceOrderRequest;
 import com.urbanfresh.dto.response.AdminOrderResponse;
 import com.urbanfresh.dto.response.AdminOrderReviewResponse;
+import com.urbanfresh.dto.response.DeliveryAssignedOrderResponse;
+import com.urbanfresh.dto.response.DeliveryOrderDetailsResponse;
 import com.urbanfresh.dto.response.OrderResponse;
 
 /**
@@ -80,4 +82,24 @@ public interface OrderService {
      * @return updated admin-facing order summary with delivery person info
      */
     AdminOrderResponse assignDeliveryPersonnel(Long orderId, Long deliveryPersonId, String adminEmail);
+
+    /**
+     * Returns a paginated list of orders assigned to the authenticated delivery user.
+     *
+     * @param deliveryEmail email extracted from the JWT principal
+     * @param page zero-based page index
+     * @param size number of records per page
+     * @return page of delivery dashboard summary rows
+     */
+    Page<DeliveryAssignedOrderResponse> getAssignedOrdersForDelivery(String deliveryEmail, int page, int size);
+
+    /**
+     * Returns delivery details for an order assigned to the authenticated delivery user.
+     * Denies access when the order is not assigned to that delivery person.
+     *
+     * @param orderId order ID requested by delivery personnel
+     * @param deliveryEmail email extracted from the JWT principal
+     * @return delivery-focused order details (address, items, and current status)
+     */
+    DeliveryOrderDetailsResponse getAssignedOrderDetailsForDelivery(Long orderId, String deliveryEmail);
 }

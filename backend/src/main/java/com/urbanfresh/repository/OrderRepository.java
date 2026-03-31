@@ -55,4 +55,26 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @EntityGraph(attributePaths = {"customer", "items", "items.product"})
     Optional<Order> findDetailedByIdAndCustomerId(Long id, Long customerId);
+
+    /**
+     * Loads a single order with relations for a specific assigned delivery person.
+     * Used by delivery details screens to enforce assignment-based access.
+     *
+     * @param id order ID
+     * @param assignedDeliveryPersonId authenticated delivery person ID
+     * @return optional order when assignment matches
+     */
+    @EntityGraph(attributePaths = {"customer", "items", "items.product", "assignedDeliveryPerson"})
+    Optional<Order> findDetailedByIdAndAssignedDeliveryPersonId(Long id, Long assignedDeliveryPersonId);
+
+    /**
+     * Loads paginated orders assigned to a delivery person, newest first.
+     * EntityGraph eagerly fetches customer and items for delivery dashboard cards.
+     *
+     * @param assignedDeliveryPersonId authenticated delivery person ID
+     * @param pageable paging instructions
+     * @return page of assigned orders
+     */
+    @EntityGraph(attributePaths = {"customer", "items", "assignedDeliveryPerson"})
+    Page<Order> findByAssignedDeliveryPersonIdOrderByCreatedAtDesc(Long assignedDeliveryPersonId, Pageable pageable);
 }
