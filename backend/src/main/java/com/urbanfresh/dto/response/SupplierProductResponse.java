@@ -21,4 +21,5 @@ public class SupplierProductResponse {
     private BigDecimal price;
     private PricingUnit unit;
     private Integer stockQuantity;
+    private String approvalStatus;
 }

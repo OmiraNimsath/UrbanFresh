@@ -6,9 +6,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 
+import com.urbanfresh.dto.request.ProductRequest;
 import com.urbanfresh.dto.response.BrandResponse;
 import com.urbanfresh.dto.response.SupplierDashboardResponse;
 import com.urbanfresh.dto.response.SupplierProductResponse;
@@ -58,5 +63,20 @@ public class SupplierController {
     @GetMapping("/products")
     public ResponseEntity<List<SupplierProductResponse>> getSupplierProducts(Authentication authentication) {
         return ResponseEntity.ok(supplierService.getSupplierProducts(authentication.getName()));
+    }
+
+    /**
+     * Submits a request for a new product for a specific brand.
+     *
+     * @param request        product details including brandId
+     * @param authentication authenticated supplier principal
+     * @return the created product with PENDING status
+     */
+    @PostMapping("/products")
+    public ResponseEntity<SupplierProductResponse> requestNewProduct(
+            @Valid @RequestBody ProductRequest request,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(supplierService.requestNewProduct(authentication.getName(), request));
     }
 }

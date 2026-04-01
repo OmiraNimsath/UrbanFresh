@@ -34,8 +34,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      * @param pageable sort and pagination instructions from the controller
      * @return page of matching products
      */
-    @Query("SELECT p FROM Product p WHERE " +
-           "(:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+    @Query("SELECT p FROM Product p WHERE p.approvalStatus = 'APPROVED' " +
+           "AND (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "  OR LOWER(p.description) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:category IS NULL OR LOWER(p.category) = LOWER(:category))")
     Page<Product> searchProducts(
@@ -49,7 +49,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      *
      * @return list of unique category strings
      */
-    @Query("SELECT DISTINCT p.category FROM Product p WHERE p.category IS NOT NULL ORDER BY p.category ASC")
+    @Query("SELECT DISTINCT p.category FROM Product p WHERE p.category IS NOT NULL AND p.approvalStatus = 'APPROVED' ORDER BY p.category ASC")
     List<String> findAllCategories();
 
     /**
@@ -65,7 +65,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT NEW com.urbanfresh.dto.response.ProductSuggestionResponse(" +
            "p.id, p.name, p.imageUrl, p.price, p.unit) " +
            "FROM Product p " +
-           "WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "WHERE p.approvalStatus = 'APPROVED' AND LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +        
            "ORDER BY p.name ASC")
     List<com.urbanfresh.dto.response.ProductSuggestionResponse> findNameSuggestions(
             @Param("query") String query, Pageable pageable);
@@ -83,26 +83,28 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findByIdWithLock(@Param("id") Long id);
 
     /**
-     * Retrieves all products marked as featured (featured = true).
+     * Retrieves all products marked as featured (featured = true) and approved.
      * Used by the landing page "Featured Products" section.
      *
      * @return list of featured products, empty list when none exist
      */
+    @Query("SELECT p FROM Product p WHERE p.featured = true AND p.approvalStatus = 'APPROVED'")
     List<Product> findByFeaturedTrue();
 
     /**
-     * Retrieves in-stock products whose expiry date falls within [today, cutoff].
-     * Ordered by earliest expiry so the most urgent offers appear first.
+     * Retrieves in-stock approved products whose expiry date falls within [today, cutoff].
+     * Ordered by earliest expiry so the most urgent offers appear first.       
      *
      * @param today   the current date (inclusive start of window)
-     * @param cutoff  the last acceptable expiry date (e.g. today + 7 days)
+     * @param cutoff  the last acceptable expiry date (e.g. today + 7 days)     
      * @param minStock minimum stock threshold (pass 0 to exclude zero-stock items)
      * @return list of near-expiry, in-stock products
      */
+    @Query("SELECT p FROM Product p WHERE p.expiryDate BETWEEN :today AND :cutoff AND p.stockQuantity > :minStock AND p.approvalStatus = 'APPROVED' ORDER BY p.expiryDate ASC")
     List<Product> findByExpiryDateBetweenAndStockQuantityGreaterThanOrderByExpiryDateAsc(
-            LocalDate today,
-            LocalDate cutoff,
-            int minStock
+            @Param("today") LocalDate today,
+            @Param("cutoff") LocalDate cutoff,
+            @Param("minStock") int minStock
     );
 
     /**
