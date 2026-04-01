@@ -23,7 +23,10 @@ import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
 import AdminBrandsPage from './pages/admin/AdminBrandsPage';
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
 import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
+import DeliveryCurrentOrdersPage from './pages/delivery/DeliveryCurrentOrdersPage';
+import DeliveryOrderHistoryPage from './pages/delivery/DeliveryOrderHistoryPage';
 import DeliveryOrderDetailsPage from './pages/delivery/DeliveryOrderDetailsPage';
+import DeliveryProfilePage from './pages/delivery/DeliveryProfilePage';
 import UnauthorizedPage from './pages/error/UnauthorizedPage';
 
 /**
@@ -179,10 +182,34 @@ function App() {
             }
           />
           <Route
+            path="/delivery/orders/current"
+            element={
+              <ProtectedRoute allowedRoles={['DELIVERY']}>
+                <DeliveryCurrentOrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/delivery/orders/history"
+            element={
+              <ProtectedRoute allowedRoles={['DELIVERY']}>
+                <DeliveryOrderHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/delivery/orders/:orderId"
             element={
               <ProtectedRoute allowedRoles={['DELIVERY']}>
                 <DeliveryOrderDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/delivery/profile"
+            element={
+              <ProtectedRoute allowedRoles={['DELIVERY']}>
+                <DeliveryProfilePage />
               </ProtectedRoute>
             }
           />

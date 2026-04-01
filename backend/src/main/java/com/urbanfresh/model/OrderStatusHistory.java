@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Persists each admin-initiated order status transition for auditability.
+ * Persists each admin- or delivery-initiated order status transition for auditability.
  * Layer: Entity
  */
 @Entity
@@ -54,9 +54,13 @@ public class OrderStatusHistory {
     @Column(name = "new_status", nullable = false, length = 30)
     private OrderStatus newStatus;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "changed_by_admin_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "changed_by_admin_id")
     private User changedByAdmin;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "changed_by_delivery_id")
+    private User changedByDelivery;
 
     @Column(name = "change_reason", length = 255)
     private String changeReason;

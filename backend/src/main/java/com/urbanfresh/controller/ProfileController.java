@@ -1,10 +1,5 @@
 package com.urbanfresh.controller;
 
-import com.urbanfresh.dto.request.UpdateProfileRequest;
-import com.urbanfresh.dto.response.ProfileResponse;
-import com.urbanfresh.service.ProfileService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,6 +9,13 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.urbanfresh.dto.request.UpdateProfileRequest;
+import com.urbanfresh.dto.response.ProfileResponse;
+import com.urbanfresh.service.ProfileService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Controller Layer – Exposes profile endpoints under /api/profile.
@@ -36,7 +38,7 @@ public class ProfileController {
      * @return 200 ProfileResponse
      */
     @GetMapping
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER','DELIVERY')")
     public ResponseEntity<ProfileResponse> getProfile(
             @AuthenticationPrincipal UserDetails principal) {
 
@@ -54,7 +56,7 @@ public class ProfileController {
      * @return 200 updated ProfileResponse
      */
     @PutMapping
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER','DELIVERY')")
     public ResponseEntity<ProfileResponse> updateProfile(
             @AuthenticationPrincipal UserDetails principal,
             @Valid @RequestBody UpdateProfileRequest request) {

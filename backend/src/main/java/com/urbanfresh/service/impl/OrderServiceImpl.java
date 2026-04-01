@@ -2,11 +2,13 @@ package com.urbanfresh.service.impl;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -58,6 +60,7 @@ public class OrderServiceImpl implements OrderService {
 		private static final String ADMIN_ALLOWED_STATUS_LABELS = "PROCESSING, READY, CANCELLED";
 		private static final String FULL_STATUS_LABELS =
 				"PENDING, CONFIRMED, PROCESSING, READY, CANCELLED, OUT_FOR_DELIVERY, DELIVERED, RETURNED";
+                private static final String DELIVERY_PAYMENT_METHOD_LABEL = "ONLINE (STRIPE)";
 
         		// CONFIRMED is set only by the payment webhook — admins cannot set it directly
 		private static final Set<OrderStatus> ADMIN_MANAGEABLE_CURRENT_STATUSES = Set.of(
@@ -72,6 +75,15 @@ public class OrderServiceImpl implements OrderService {
 				OrderStatus.READY,
 				OrderStatus.CANCELLED
 		);
+
+                private static final Set<OrderStatus> DELIVERY_ALLOWED_CURRENT_STATUSES = Set.of(
+                                OrderStatus.OUT_FOR_DELIVERY
+                );
+
+                private static final Set<OrderStatus> DELIVERY_ALLOWED_TARGET_STATUSES = Set.of(
+                                OrderStatus.DELIVERED,
+                                OrderStatus.RETURNED
+                );
 
 		private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_ADMIN_TRANSITIONS = Map.of(
 				OrderStatus.CONFIRMED,  Set.of(OrderStatus.PROCESSING, OrderStatus.CANCELLED),
@@ -263,13 +275,88 @@ public class OrderServiceImpl implements OrderService {
                         .findDetailedByIdAndAssignedDeliveryPersonId(orderId, deliveryPerson.getId())
                         .orElseThrow(() -> new AccessDeniedException("You are not allowed to view this order."));
 
-                return DeliveryOrderDetailsResponse.builder()
-                                .orderId(order.getId())
-                                .status(order.getStatus().name())
-                                .deliveryAddress(order.getDeliveryAddress())
-                                .items(toOrderItemResponses(order))
-                                .build();
+                return toDeliveryOrderDetailsResponse(order);
         }
+
+                /**
+                 * Updates status for an order assigned to the authenticated delivery user.
+                 * Allowed transitions are limited to OUT_FOR_DELIVERY -> DELIVERED/RETURNED.
+                 *
+                 * @param orderId order ID requested by delivery personnel
+                 * @param request validated delivery status update payload
+                 * @param deliveryEmail email from JWT principal
+                 * @return updated delivery-focused order details payload
+                 */
+                @Override
+                @Transactional
+                public DeliveryOrderDetailsResponse updateAssignedOrderStatusForDelivery(
+                                Long orderId,
+                                OrderStatusUpdateRequest request,
+                                String deliveryEmail
+                ) {
+                                User deliveryPerson = userRepository.findByEmailAndRoleAndIsActiveTrue(deliveryEmail, Role.DELIVERY)
+                                                .orElseThrow(() -> new UserNotFoundException("Delivery personnel not found: " + deliveryEmail));
+
+                                Order order = orderRepository.findById(orderId)
+                                                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+                                User assignedDeliveryPerson = order.getAssignedDeliveryPerson();
+                                if (assignedDeliveryPerson == null || !assignedDeliveryPerson.getId().equals(deliveryPerson.getId())) {
+                                                throw new AccessDeniedException("You are not allowed to update this order.");
+                                }
+
+                                OrderStatus targetStatus;
+                                String requestedStatus = request.getStatus();
+                                if (requestedStatus == null || requestedStatus.isBlank()) {
+                                                throw new InvalidOrderStatusTransitionException("status is required.");
+                                }
+                                try {
+                                                targetStatus = OrderStatus.valueOf(requestedStatus.trim().toUpperCase());
+                                } catch (IllegalArgumentException ex) {
+                                                throw new InvalidOrderStatusTransitionException(
+                                                                "Invalid order status '" + requestedStatus +
+                                                                "'. Allowed values: " + FULL_STATUS_LABELS + "."
+                                                );
+                                }
+
+                                if (!DELIVERY_ALLOWED_TARGET_STATUSES.contains(targetStatus)) {
+                                                throw new InvalidOrderStatusTransitionException(
+                                                                "Delivery personnel can only set statuses: DELIVERED, RETURNED."
+                                                );
+                                }
+
+                                OrderStatus currentStatus = order.getStatus();
+                                if (!DELIVERY_ALLOWED_CURRENT_STATUSES.contains(currentStatus)) {
+                                                throw new InvalidOrderStatusTransitionException(
+                                                                "Delivery status can only be updated when order is OUT_FOR_DELIVERY. Current status: "
+                                                                                + currentStatus + "."
+                                                );
+                                }
+
+                                if (currentStatus == targetStatus) {
+                                                Order detailedOrder = orderRepository
+                                                                .findDetailedByIdAndAssignedDeliveryPersonId(orderId, deliveryPerson.getId())
+                                                                .orElse(order);
+                                                return toDeliveryOrderDetailsResponse(detailedOrder);
+                                }
+
+                                order.setStatus(targetStatus);
+                                Order updated = orderRepository.save(order);
+
+                                orderStatusHistoryRepository.save(OrderStatusHistory.builder()
+                                                .order(updated)
+                                                .previousStatus(currentStatus)
+                                                .newStatus(targetStatus)
+                                                .changedByDelivery(deliveryPerson)
+                                                .changeReason(normalizeChangeReason(request.getChangeReason()))
+                                                .build());
+
+                                Order detailedUpdatedOrder = orderRepository
+                                                .findDetailedByIdAndAssignedDeliveryPersonId(orderId, deliveryPerson.getId())
+                                                .orElse(updated);
+
+                                return toDeliveryOrderDetailsResponse(detailedUpdatedOrder);
+                }
 
         /**
          * Returns paginated orders assigned to the authenticated delivery user.
@@ -294,9 +381,20 @@ public class OrderServiceImpl implements OrderService {
                                 Sort.by(Sort.Direction.DESC, "createdAt")
                 );
 
-                return orderRepository
-                                .findByAssignedDeliveryPersonIdOrderByCreatedAtDesc(deliveryPerson.getId(), pageable)
-                                .map(this::toDeliveryAssignedOrderResponse);
+                Page<Order> assignedOrdersPage = orderRepository
+                                .findByAssignedDeliveryPersonIdOrderByCreatedAtDesc(deliveryPerson.getId(), pageable);
+
+                Map<Long, java.time.LocalDateTime> finalStatusTimesByOrderId =
+                                resolveFinalStatusTimesByOrderId(assignedOrdersPage.getContent());
+
+                List<DeliveryAssignedOrderResponse> rows = assignedOrdersPage.getContent().stream()
+                                .map(order -> toDeliveryAssignedOrderResponse(
+                                                order,
+                                                finalStatusTimesByOrderId.get(order.getId())
+                                ))
+                                .toList();
+
+                return new PageImpl<>(rows, pageable, assignedOrdersPage.getTotalElements());
         }
 
         /**
@@ -490,19 +588,66 @@ public class OrderServiceImpl implements OrderService {
          * @param order assigned order entity with customer and items preloaded
          * @return compact delivery dashboard row
          */
-        private DeliveryAssignedOrderResponse toDeliveryAssignedOrderResponse(Order order) {
+        private DeliveryAssignedOrderResponse toDeliveryAssignedOrderResponse(
+                        Order order,
+                        java.time.LocalDateTime finalStatusAt
+        ) {
                 String fullAddress = order.getDeliveryAddress();
 
                 return DeliveryAssignedOrderResponse.builder()
                                 .orderId(order.getId())
                                 .customerName(order.getCustomer() != null ? order.getCustomer().getName() : null)
+                                .customerPhone(order.getCustomer() != null ? order.getCustomer().getPhone() : null)
                                 .shortDeliveryAddress(toShortAddress(fullAddress))
                                 .fullDeliveryAddress(fullAddress)
                                 .status(order.getStatus().name())
                                 .itemCount(order.getItems() != null ? order.getItems().size() : 0)
                                 .itemsSummary(toItemsSummary(order))
+                                .totalAmount(order.getTotalAmount())
+                                .paymentStatus(resolvePersistedPaymentStatus(order))
+                                .paymentMethod(resolveDeliveryPaymentMethod())
                                 .createdAt(order.getCreatedAt())
+                                .finalStatusAt(finalStatusAt)
                                 .build();
+        }
+
+        /**
+         * Resolves latest terminal status timestamps for delivered/returned orders.
+         *
+         * @param orders orders in the current assigned-deliveries page
+         * @return map of orderId to terminal status timestamp
+         */
+        private Map<Long, java.time.LocalDateTime> resolveFinalStatusTimesByOrderId(List<Order> orders) {
+                if (orders == null || orders.isEmpty()) {
+                        return Map.of();
+                }
+
+                List<Long> targetOrderIds = orders.stream()
+                                .filter(order -> order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.RETURNED)
+                                .map(Order::getId)
+                                .toList();
+
+                if (targetOrderIds.isEmpty()) {
+                        return Map.of();
+                }
+
+                List<OrderStatusHistory> historyRows = orderStatusHistoryRepository
+                                .findByOrderIdInAndNewStatusInOrderByChangedAtDesc(
+                                                targetOrderIds,
+                                                List.of(OrderStatus.DELIVERED, OrderStatus.RETURNED)
+                                );
+
+                Map<Long, java.time.LocalDateTime> resolved = new HashMap<>();
+                for (OrderStatusHistory row : historyRows) {
+                        Long orderId = row.getOrder() != null ? row.getOrder().getId() : null;
+                        if (orderId == null || resolved.containsKey(orderId)) {
+                                continue;
+                        }
+
+                        resolved.put(orderId, row.getChangedAt());
+                }
+
+                return resolved;
         }
 
         /**
@@ -608,7 +753,7 @@ public class OrderServiceImpl implements OrderService {
                                 .map(row -> AdminOrderReviewResponse.StatusHistoryEntry.builder()
                                                 .previousStatus(row.getPreviousStatus().name())
                                                 .newStatus(row.getNewStatus().name())
-                                                .changedBy(row.getChangedByAdmin().getName())
+                                                .changedBy(resolveStatusChangedByName(row))
                                                 .changeReason(row.getChangeReason())
                                                 .changedAt(row.getChangedAt())
                                                 .build())
@@ -678,6 +823,53 @@ public class OrderServiceImpl implements OrderService {
 
                 return paymentStatus.name();
         }
+
+                /**
+                 * Resolves the actor name responsible for a status change row.
+                 *
+                 * @param row status history record
+                 * @return actor display name
+                 */
+                private String resolveStatusChangedByName(OrderStatusHistory row) {
+                                if (row.getChangedByAdmin() != null) {
+                                                return row.getChangedByAdmin().getName();
+                                }
+
+                                if (row.getChangedByDelivery() != null) {
+                                                return row.getChangedByDelivery().getName();
+                                }
+
+                                return "System";
+                }
+
+                /**
+                 * Maps an assigned order entity to delivery order details response.
+                 *
+                 * @param order order entity
+                 * @return delivery order details response
+                 */
+                private DeliveryOrderDetailsResponse toDeliveryOrderDetailsResponse(Order order) {
+                                return DeliveryOrderDetailsResponse.builder()
+                                                .orderId(order.getId())
+                                                .status(order.getStatus().name())
+                                                .customerName(order.getCustomer() != null ? order.getCustomer().getName() : null)
+                                                .customerPhone(order.getCustomer() != null ? order.getCustomer().getPhone() : null)
+                                                .deliveryAddress(order.getDeliveryAddress())
+                                                .totalAmount(order.getTotalAmount())
+                                                .paymentStatus(resolvePersistedPaymentStatus(order))
+                                                .paymentMethod(resolveDeliveryPaymentMethod())
+                                                .items(toOrderItemResponses(order))
+                                                .build();
+                }
+
+                /**
+                 * Resolves payment method label for delivery-facing responses.
+                 *
+                 * @return payment method label used in delivery UI
+                 */
+                private String resolveDeliveryPaymentMethod() {
+                                return DELIVERY_PAYMENT_METHOD_LABEL;
+                }
 
         /**
          * Assigns or reassigns an active delivery person.
