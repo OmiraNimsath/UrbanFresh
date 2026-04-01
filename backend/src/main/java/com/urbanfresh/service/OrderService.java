@@ -102,4 +102,19 @@ public interface OrderService {
      * @return delivery-focused order details (address, items, and current status)
      */
     DeliveryOrderDetailsResponse getAssignedOrderDetailsForDelivery(Long orderId, String deliveryEmail);
+
+    /**
+     * Updates status for an order assigned to the authenticated delivery user.
+     * Delivery transitions are restricted to OUT_FOR_DELIVERY -> DELIVERED/RETURNED.
+     *
+     * @param orderId order ID assigned to the authenticated delivery user
+     * @param request validated status update payload
+     * @param deliveryEmail email extracted from JWT principal
+     * @return updated delivery-focused order details
+     */
+    DeliveryOrderDetailsResponse updateAssignedOrderStatusForDelivery(
+            Long orderId,
+            OrderStatusUpdateRequest request,
+            String deliveryEmail
+    );
 }
