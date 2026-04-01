@@ -4,13 +4,19 @@ import { formatAmount } from '../../utils/priceUtils';
  * Presentation Layer – Modal for reviewing complete admin order details.
  * Displays order metadata, customer info, item rows, pricing, payment, and status history.
  */
-export default function OrderReviewModal({ isOpen, loading, order, onClose }) {
+export default function OrderReviewModal({
+  isOpen,
+  loading,
+  order,
+  onClose,
+}) {
   if (!isOpen) {
     return null;
   }
 
   const orderItems = order?.items ?? [];
   const statusHistory = order?.statusHistory ?? [];
+  const resolvedDeliveryPersonName = order?.deliveryPersonName ?? order?.deliveryPerson?.name ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
@@ -49,6 +55,7 @@ export default function OrderReviewModal({ isOpen, loading, order, onClose }) {
                   <Field label="Order ID" value={`#${order.orderId}`} />
                   <Field label="Order Status" value={order.orderStatus} />
                   <Field label="Payment Status" value={order.paymentStatus} />
+                  <Field label="Delivery Person" value={resolvedDeliveryPersonName || 'Not assigned'} />
                   <Field label="Order Date" value={formatDateTime(order.orderDate)} />
                   <Field label="Last Updated" value={formatDateTime(order.lastUpdatedDate)} />
                 </div>

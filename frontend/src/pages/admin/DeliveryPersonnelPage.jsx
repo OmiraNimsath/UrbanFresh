@@ -1,49 +1,93 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import {
   createDeliveryPersonnel,
   getDeliveryPersonnelList,
   updateDeliveryPersonnelStatus,
 } from '../../services/deliveryPersonnelService';
+import { getAllOrders } from '../../services/orderService';
 import CreateDeliveryPersonnelModal from '../../components/admin/CreateDeliveryPersonnelModal';
+import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
+import DeliveryStatusBadge from '../../components/admin/delivery/DeliveryStatusBadge';
+import DeliveryStatusTimeline from '../../components/admin/delivery/DeliveryStatusTimeline';
+import DeliveryStatusConfirmModal from '../../components/admin/delivery/DeliveryStatusConfirmModal';
 
 /**
  * Presentation Layer – Admin page for delivery personnel account management.
- * Allows admin to:
- *   - Create new delivery personnel accounts with secure credentials
- *   - View paginated list of all delivery personnel
- *   - Activate/deactivate accounts to control access
- * Handles validation, error display, and success notifications.
  */
 export default function DeliveryPersonnelPage() {
-  const [personnel, setPersonnel] = useState([]);
+  const [allPersonnel, setAllPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [totalPages, setTotalPages] = useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDetailPanel, setShowDetailPanel] = useState(false);
+  const [assignedDeliveries, setAssignedDeliveries] = useState([]);
+  const [loadingAssignedDeliveries, setLoadingAssignedDeliveries] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 10;
 
-  // Fetch delivery personnel list on mount and page change
-  useEffect(() => {
-    fetchPersonnel();
-  }, [currentPage]);
-
-  /** Fetch paginated delivery personnel list from API. */
-  const fetchPersonnel = async () => {
+  const fetchPersonnel = useCallback(async () => {
     try {
       setLoading(true);
-      const { data } = await getDeliveryPersonnelList(currentPage, PAGE_SIZE);
-      setPersonnel(data.content);
-      setTotalPages(data.totalPages);
+      let page = 0;
+      let hasMore = true;
+      const merged = [];
+
+      while (hasMore) {
+        const { data } = await getDeliveryPersonnelList(page, 100);
+        merged.push(...(data.content || []));
+        hasMore = !data.last;
+        page += 1;
+      }
+
+      setAllPersonnel(merged);
     } catch (err) {
       const message = err.response?.data?.message || 'Failed to load delivery personnel';
       toast.error(message);
-      setPersonnel([]);
+      setAllPersonnel([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchPersonnel();
+  }, [fetchPersonnel]);
+
+  const filteredPersonnel = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return allPersonnel.filter((person) => {
+      const matchesSearch =
+        query.length === 0 ||
+        person.name?.toLowerCase().includes(query) ||
+        person.phone?.toLowerCase().includes(query);
+
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && person.isActive) ||
+        (statusFilter === 'inactive' && !person.isActive);
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [allPersonnel, searchTerm, statusFilter]);
+
+  const paginatedPersonnel = useMemo(() => {
+    const start = currentPage * PAGE_SIZE;
+    return filteredPersonnel.slice(start, start + PAGE_SIZE);
+  }, [filteredPersonnel, currentPage]);
+
+  useEffect(() => {
+    const pages = Math.max(1, Math.ceil(filteredPersonnel.length / PAGE_SIZE));
+    setTotalPages(pages);
+    setCurrentPage((prev) => Math.min(prev, pages - 1));
+  }, [filteredPersonnel]);
 
   /**
    * Handle creation of new delivery personnel account.
@@ -52,15 +96,24 @@ export default function DeliveryPersonnelPage() {
   const handleCreatePersonnel = async (formData) => {
     try {
       setIsSubmitting(true);
-      await createDeliveryPersonnel(formData);
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+      };
+
+      const { data: created } = await createDeliveryPersonnel(payload);
+      if (formData.isActive === false) {
+        await updateDeliveryPersonnelStatus(created.id, false);
+      }
       toast.success('Delivery personnel account created successfully');
       setShowCreateModal(false);
-      setCurrentPage(0); // Reset to first page to see new entry
       await fetchPersonnel();
+      setCurrentPage(0);
     } catch (err) {
       const errors = err.response?.data?.errors;
       if (errors) {
-        // Show field-level validation errors
         Object.values(errors).forEach((msg) => toast.error(msg));
       } else {
         const message = err.response?.data?.message || 'Failed to create delivery personnel account';
@@ -71,105 +124,383 @@ export default function DeliveryPersonnelPage() {
     }
   };
 
-  /**
-   * Toggle delivery personnel account activation status.
-   * When deactivated, they cannot log in (enforcement at login layer).
-   */
   const handleToggleStatus = async (id, currentStatus) => {
+    setIsSubmitting(true);
     try {
       const newStatus = !currentStatus;
       await updateDeliveryPersonnelStatus(id, newStatus);
       const action = newStatus ? 'activated' : 'deactivated';
       toast.success(`Delivery personnel account ${action}`);
-      await fetchPersonnel(); // Refresh list
+      await fetchPersonnel();
+      setShowDeactivateConfirm(false);
+      setShowEditModal(false);
     } catch (err) {
       const message = err.response?.data?.message || 'Failed to update delivery personnel status';
       toast.error(message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  const openDetails = async (person) => {
+    setSelectedPerson(person);
+    setShowDetailPanel(true);
+    setLoadingAssignedDeliveries(true);
+    setAssignedDeliveries([]);
+
+    try {
+      const deliveries = await getOrdersForDeliveryPerson(person.id);
+      setAssignedDeliveries(deliveries);
+    } catch {
+      toast.error('Failed to load assigned deliveries for this person.');
+    } finally {
+      setLoadingAssignedDeliveries(false);
+    }
+  };
+
+  const handleEditStatus = async (formData) => {
+    if (!selectedPerson) return;
+    setIsSubmitting(true);
+    try {
+      const nextStatus = formData.isActive;
+      await updateDeliveryPersonnelStatus(selectedPerson.id, nextStatus);
+      toast.success(`Delivery personnel ${nextStatus ? 'activated' : 'deactivated'} successfully`);
+      setShowEditModal(false);
+      await fetchPersonnel();
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to update delivery personnel status';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const timelineEntries = useMemo(() => {
+    if (!selectedPerson) return [];
+
+    const entries = [
+      {
+        label: 'Account created',
+        description: `${selectedPerson.name} joined the delivery team.`,
+        time: selectedPerson.createdAt,
+      },
+      ...assignedDeliveries.slice(0, 6).map((order) => ({
+        label: `Assigned order #${order.orderId}`,
+        description: order.deliveryPersonName ? `Assigned to ${order.deliveryPersonName}` : 'Delivery assignment updated',
+        time: order.orderDate,
+      })),
+    ];
+
+    return entries;
+  }, [selectedPerson, assignedDeliveries]);
+
+  const activeCount = allPersonnel.filter((person) => person.isActive).length;
+  const inactiveCount = allPersonnel.length - activeCount;
+
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Page Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Delivery Personnel Management</h1>
-            <p className="text-gray-600 mt-2">Create and manage delivery personnel accounts</p>
+    <AdminDeliveryLayout
+      title="Delivery Personnel"
+      breadcrumbCurrent="Delivery Personnel"
+      description="Manage delivery accounts, monitor availability, and review assignment activity."
+      actions={
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="inline-flex items-center justify-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700"
+        >
+          + Add Delivery Person
+        </button>
+      }
+    >
+      <DeliveryStatusConfirmModal
+        isOpen={showDeactivateConfirm}
+        title="Confirm Status Change"
+        message={`Are you sure you want to ${selectedPerson?.isActive ? 'deactivate' : 'activate'} ${selectedPerson?.name || 'this account'}?`}
+        confirmLabel={selectedPerson?.isActive ? 'Deactivate' : 'Activate'}
+        intent={selectedPerson?.isActive ? 'danger' : 'success'}
+        loading={isSubmitting}
+        onCancel={() => setShowDeactivateConfirm(false)}
+        onConfirm={() => {
+          if (selectedPerson) {
+            void handleToggleStatus(selectedPerson.id, selectedPerson.isActive);
+          }
+        }}
+      />
+
+      <DeliveryStatusConfirmModal
+        isOpen={showDeleteConfirm}
+        title="Delete Delivery Account"
+        message="Delete operations are not available from the current API. You can deactivate the account instead."
+        confirmLabel="Understood"
+        intent="primary"
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={() => setShowDeleteConfirm(false)}
+      />
+
+      {showCreateModal && (
+        <CreateDeliveryPersonnelModal
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreatePersonnel}
+          isSubmitting={isSubmitting}
+          mode="create"
+        />
+      )}
+
+      {showEditModal && selectedPerson && (
+        <CreateDeliveryPersonnelModal
+          onClose={() => setShowEditModal(false)}
+          onSubmit={handleEditStatus}
+          isSubmitting={isSubmitting}
+          mode="edit"
+          initialValues={{
+            name: selectedPerson.name,
+            email: selectedPerson.email,
+            phone: selectedPerson.phone,
+            isActive: selectedPerson.isActive,
+          }}
+        />
+      )}
+
+      {showDetailPanel && selectedPerson && (
+        <div className="fixed inset-0 z-40 flex items-start justify-end bg-slate-900/40 p-4" role="dialog" aria-modal="true">
+          <div className="h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">{selectedPerson.name}</h2>
+                <p className="text-sm text-slate-600">Delivery personnel details and assignment history</p>
+              </div>
+              <button
+                onClick={() => setShowDetailPanel(false)}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <InfoCard label="Email" value={selectedPerson.email} />
+              <InfoCard label="Phone" value={selectedPerson.phone || 'Not provided'} />
+              <InfoCard
+                label="Status"
+                value={
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${selectedPerson.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {selectedPerson.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                }
+              />
+              <InfoCard label="Created" value={formatDateTime(selectedPerson.createdAt)} />
+            </div>
+
+            <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Assigned Deliveries</h3>
+              {loadingAssignedDeliveries ? (
+                <div className="mt-3 space-y-2">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="h-10 animate-pulse rounded-lg bg-slate-200" />
+                  ))}
+                </div>
+              ) : assignedDeliveries.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500">No assigned deliveries found for this person.</p>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
+                      <tr>
+                        <th className={thClass}>Order</th>
+                        <th className={thClass}>Customer</th>
+                        <th className={thClass}>Delivery Status</th>
+                        <th className={thClass}>Order Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assignedDeliveries.map((order) => (
+                        <tr key={order.orderId} className="border-t border-slate-200">
+                          <td className={tdClass}>#{order.orderId}</td>
+                          <td className={tdClass}>{order.customerName || 'Unknown'}</td>
+                          <td className={tdClass}>
+                            <DeliveryStatusBadge status={order.orderStatus} />
+                          </td>
+                          <td className={tdClass}>{formatDateTime(order.orderDate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <div className="mt-6">
+              <DeliveryStatusTimeline entries={timelineEntries} />
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDetailPanel(false);
+                  setShowEditModal(true);
+                }}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDetailPanel(false);
+                  setShowDeactivateConfirm(true);
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${
+                  selectedPerson.isActive ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {selectedPerson.isActive ? 'Deactivate' : 'Activate'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDetailPanel(false);
+                  setShowDeleteConfirm(true);
+                }}
+                className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
+              >
+                Delete
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition"
-          >
-            + Create Delivery Personnel
-          </button>
+        </div>
+      )}
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-green-600">Admin Panel</p>
+            <h2 className="mt-1 text-2xl font-bold text-slate-900">Team Operations</h2>
+            <p className="mt-1 text-sm text-slate-600">Search and filter delivery personnel by status and contact details.</p>
+          </div>
+          <div className="grid w-full grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2">
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setCurrentPage(0);
+              }}
+              placeholder="Search by name or phone"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200"
+              aria-label="Search delivery personnel"
+            />
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setCurrentPage(0);
+              }}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200"
+              aria-label="Filter delivery personnel by status"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
         </div>
 
-        {/* Create Modal */}
-        {showCreateModal && (
-          <CreateDeliveryPersonnelModal
-            onClose={() => setShowCreateModal(false)}
-            onSubmit={handleCreatePersonnel}
-            isSubmitting={isSubmitting}
-          />
-        )}
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <MetricCard label="Total Personnel" value={allPersonnel.length} tone="slate" />
+          <MetricCard label="Active" value={activeCount} tone="green" />
+          <MetricCard label="Inactive" value={inactiveCount} tone="red" />
+        </div>
 
-        {/* Table Section */}
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
           {loading ? (
-            <div className="flex justify-center items-center h-40">
-              <p className="text-gray-500 text-lg">Loading delivery personnel...</p>
+            <div className="p-4">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="mb-2 h-12 animate-pulse rounded-lg bg-slate-200" />
+              ))}
             </div>
-          ) : personnel.length === 0 ? (
-            <div className="flex justify-center items-center h-40">
-              <p className="text-gray-500 text-lg">No delivery personnel found. Create one to get started.</p>
+          ) : filteredPersonnel.length === 0 ? (
+            <div className="p-10 text-center text-slate-500">
+              No delivery personnel match your current filters.
             </div>
           ) : (
             <>
-              {/* Personnel Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-700">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
                     <tr>
-                      <th className="px-6 py-4 font-semibold">Name</th>
-                      <th className="px-6 py-4 font-semibold">Email</th>
-                      <th className="px-6 py-4 font-semibold">Phone</th>
-                      <th className="px-6 py-4 font-semibold">Status</th>
-                      <th className="px-6 py-4 font-semibold">Created</th>
-                      <th className="px-6 py-4 font-semibold">Actions</th>
+                      <th className={thClass}>Name</th>
+                      <th className={thClass}>Email</th>
+                      <th className={thClass}>Phone</th>
+                      <th className={thClass}>Status</th>
+                      <th className={thClass}>Created</th>
+                      <th className={thClass}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {personnel.map((person) => (
-                      <tr key={person.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="px-6 py-4 font-semibold text-gray-900">{person.name}</td>
-                        <td className="px-6 py-4 text-gray-700">{person.email}</td>
-                        <td className="px-6 py-4 text-gray-700">{person.phone || '—'}</td>
-                        <td className="px-6 py-4">
+                    {paginatedPersonnel.map((person) => (
+                      <tr key={person.id} className="border-t border-slate-200 hover:bg-slate-50">
+                        <td className={tdClass}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void openDetails(person);
+                            }}
+                            className="font-semibold text-slate-900 hover:text-green-700"
+                          >
+                            {person.name}
+                          </button>
+                        </td>
+                        <td className={tdClass}>{person.email}</td>
+                        <td className={tdClass}>{person.phone || 'Not provided'}</td>
+                        <td className={tdClass}>
                           <span
-                            className={`inline-block px-4 py-1 rounded-full text-sm font-semibold ${
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                               person.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
                             }`}
                           >
                             {person.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-gray-700">
-                          {new Date(person.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <button
-                            onClick={() => handleToggleStatus(person.id, person.isActive)}
-                            className={`px-4 py-2 rounded font-semibold text-white transition ${
-                              person.isActive
-                                ? 'bg-red-600 hover:bg-red-700'
-                                : 'bg-green-600 hover:bg-green-700'
-                            }`}
-                          >
-                            {person.isActive ? 'Deactivate' : 'Activate'}
-                          </button>
+                        <td className={tdClass}>{formatDateTime(person.createdAt)}</td>
+                        <td className={tdClass}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPerson(person);
+                                void openDetails(person);
+                              }}
+                              className="inline-flex h-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                            >
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPerson(person);
+                                setShowEditModal(true);
+                              }}
+                              className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPerson(person);
+                                setShowDeactivateConfirm(true);
+                              }}
+                              className={`inline-flex h-8 items-center justify-center rounded-lg px-3 text-xs font-semibold text-white transition ${
+                                person.isActive
+                                  ? 'bg-red-600 hover:bg-red-700'
+                                  : 'bg-green-600 hover:bg-green-700'
+                              }`}
+                            >
+                              {person.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -177,23 +508,22 @@ export default function DeliveryPersonnelPage() {
                 </table>
               </div>
 
-              {/* Pagination */}
-              <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Page {currentPage + 1} of {totalPages}
+              <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-600">
+                  Page {currentPage + 1} of {totalPages} - {filteredPersonnel.length} result(s)
                 </p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
                     disabled={currentPage === 0}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded font-semibold disabled:opacity-50 hover:bg-gray-400 transition"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
                     disabled={currentPage === totalPages - 1}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded font-semibold disabled:opacity-50 hover:bg-gray-400 transition"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                   >
                     Next
                   </button>
@@ -203,6 +533,58 @@ export default function DeliveryPersonnelPage() {
           )}
         </div>
       </div>
+    </AdminDeliveryLayout>
+  );
+}
+
+async function getOrdersForDeliveryPerson(deliveryPersonId) {
+  let page = 0;
+  let hasMore = true;
+  const collected = [];
+
+  while (hasMore) {
+    const data = await getAllOrders(page, 100);
+    const filtered = (data.content || []).filter((order) => order.deliveryPersonId === deliveryPersonId);
+    collected.push(...filtered);
+    hasMore = !data.last;
+    page += 1;
+  }
+
+  return collected;
+}
+
+function MetricCard({ label, value, tone }) {
+  const colorByTone = {
+    slate: 'bg-slate-100 text-slate-800',
+    green: 'bg-green-50 text-green-700',
+    red: 'bg-red-50 text-red-700',
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 px-4 py-3">
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <p className={`mt-1 text-2xl font-bold ${colorByTone[tone] || colorByTone.slate}`}>{value}</p>
     </div>
   );
 }
+
+function InfoCard({ label, value }) {
+  return (
+    <div className="rounded-xl border border-slate-200 px-4 py-3">
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <div className="mt-1 text-sm text-slate-800">{value}</div>
+    </div>
+  );
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Time unavailable';
+  return new Date(value).toLocaleString('en-LK', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+const thClass = 'px-4 py-3 text-left';
+const tdClass = 'px-4 py-3 text-slate-700';

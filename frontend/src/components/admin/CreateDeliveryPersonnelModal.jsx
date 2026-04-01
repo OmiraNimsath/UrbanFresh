@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { toast } from 'react-hot-toast';
+import { useMemo, useState } from 'react';
 
 /**
  * Presentation Layer – Modal for creating new delivery personnel accounts.
@@ -7,13 +6,23 @@ import { toast } from 'react-hot-toast';
  * Provides real-time validation feedback and password strength indicator.
  * Parent component handles API submission and error display.
  */
-export default function CreateDeliveryPersonnelModal({ onClose, onSubmit, isSubmitting }) {
+export default function CreateDeliveryPersonnelModal({
+  onClose,
+  onSubmit,
+  isSubmitting,
+  mode = 'create',
+  initialValues = null,
+}) {
+  const isEditMode = mode === 'edit';
+  const isViewMode = mode === 'view';
+
   const [form, setForm] = useState({
-    name: '',
-    email: '',
+    name: initialValues?.name || '',
+    email: initialValues?.email || '',
     password: '',
     confirmPassword: '',
-    phone: '',
+    phone: initialValues?.phone || '',
+    status: initialValues?.isActive === false ? 'inactive' : 'active',
   });
   const [errors, setErrors] = useState({});
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -59,20 +68,26 @@ export default function CreateDeliveryPersonnelModal({ onClose, onSubmit, isSubm
       newErrors.email = 'Email must be a valid format';
     }
 
-    if (!form.password) {
-      newErrors.password = 'Password is required';
-    } else if (form.password.length < 8 || form.password.length > 64) {
-      newErrors.password = 'Password must be between 8 and 64 characters';
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])/.test(form.password)) {
-      newErrors.password = 'Password must contain uppercase, lowercase, digit, and special character';
-    }
+    if (!isEditMode) {
+      if (!form.password) {
+        newErrors.password = 'Password is required';
+      } else if (form.password.length < 8 || form.password.length > 64) {
+        newErrors.password = 'Password must be between 8 and 64 characters';
+      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])/.test(form.password)) {
+        newErrors.password = 'Password must contain uppercase, lowercase, digit, and special character';
+      }
 
-    if (form.password !== form.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      if (form.password !== form.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
     }
 
     if (form.phone && !/^\d{10,15}$/.test(form.phone)) {
       newErrors.phone = 'Phone must be 10–15 digits';
+    }
+
+    if (!['active', 'inactive'].includes(form.status)) {
+      newErrors.status = 'Status is required';
     }
 
     setErrors(newErrors);
@@ -86,12 +101,18 @@ export default function CreateDeliveryPersonnelModal({ onClose, onSubmit, isSubm
       return;
     }
 
+    if (isViewMode) {
+      onClose();
+      return;
+    }
+
     // Submit without confirmPassword (server doesn't expect it)
     onSubmit({
       name: form.name.trim(),
       email: form.email.trim(),
       password: form.password,
       phone: form.phone || null,
+      isActive: form.status === 'active',
     });
   };
 
@@ -105,20 +126,27 @@ export default function CreateDeliveryPersonnelModal({ onClose, onSubmit, isSubm
     return colors[passwordStrength] || 'bg-red-500';
   };
 
+  const title = useMemo(() => {
+    if (isViewMode) return 'Delivery Personnel Details';
+    if (isEditMode) return 'Edit Delivery Personnel';
+    return 'Create Delivery Personnel';
+  }, [isEditMode, isViewMode]);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-        {/* Modal Header */}
-        <div className="bg-blue-600 text-white px-6 py-4 rounded-t-lg">
-          <h2 className="text-2xl font-bold">Create Delivery Personnel</h2>
-          <p className="text-blue-100 text-sm">Add a new delivery personnel account</p>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-10 backdrop-blur-sm sm:pt-14">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-6 py-4">
+          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {isViewMode
+              ? 'View account information and operational metadata.'
+              : 'Capture account details and operational readiness settings.'}
+          </p>
         </div>
 
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-          {/* Name Field */}
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
           <div>
-            <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
+            <label htmlFor="name" className="mb-1 block text-sm font-medium text-slate-700">
               Name *
             </label>
             <input
@@ -127,19 +155,19 @@ export default function CreateDeliveryPersonnelModal({ onClose, onSubmit, isSubm
               name="name"
               value={form.name}
               onChange={handleChange}
+              disabled={isViewMode || isEditMode}
               placeholder="e.g. John Doe"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
                 errors.name
-                  ? 'border-red-500 focus:ring-red-400'
-                  : 'border-gray-300 focus:ring-blue-400'
+                  ? 'border-red-500 focus:ring-red-300'
+                  : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
               }`}
             />
-            {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
+            {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
           </div>
 
-          {/* Email Field */}
           <div>
-            <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
               Email *
             </label>
             <input
@@ -148,109 +176,136 @@ export default function CreateDeliveryPersonnelModal({ onClose, onSubmit, isSubm
               name="email"
               value={form.email}
               onChange={handleChange}
+              disabled={isViewMode || isEditMode}
               placeholder="e.g. john@delivery.com"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
                 errors.email
-                  ? 'border-red-500 focus:ring-red-400'
-                  : 'border-gray-300 focus:ring-blue-400'
+                  ? 'border-red-500 focus:ring-red-300'
+                  : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
               }`}
             />
-            {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
+            {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
           </div>
 
-          {/* Password Field */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-              Password * (min 8 chars, uppercase, lowercase, digit, special char)
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                errors.password
-                  ? 'border-red-500 focus:ring-red-400'
-                  : 'border-gray-300 focus:ring-blue-400'
-              }`}
-            />
-            {form.password && (
-              <div className="mt-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className={`h-2 w-16 rounded ${getPasswordStrengthColor()}`} />
-                  <span className="text-xs font-semibold text-gray-600">{getPasswordStrengthLabel()}</span>
-                </div>
+          {!isEditMode && !isViewMode && (
+            <>
+              <div>
+                <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  placeholder="At least 8 characters"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                    errors.password
+                      ? 'border-red-500 focus:ring-red-300'
+                      : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                  }`}
+                />
+                {form.password && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className={`h-2 w-16 rounded ${getPasswordStrengthColor()}`} />
+                    <span className="text-xs font-semibold text-slate-600">{getPasswordStrengthLabel()}</span>
+                  </div>
+                )}
+                {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
               </div>
-            )}
-            {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password}</p>}
+
+              <div>
+                <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-slate-700">
+                  Confirm Password *
+                </label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="Repeat password"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                    errors.confirmPassword
+                      ? 'border-red-500 focus:ring-red-300'
+                      : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                  }`}
+                />
+                {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
+              </div>
+            </>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="phone" className="mb-1 block text-sm font-medium text-slate-700">
+                Phone
+              </label>
+              <input
+                type="tel"
+                id="phone"
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                disabled={isViewMode || isEditMode}
+                placeholder="10-15 digits"
+                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                  errors.phone
+                    ? 'border-red-500 focus:ring-red-300'
+                    : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                }`}
+              />
+              {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
+            </div>
           </div>
 
-          {/* Confirm Password Field */}
           <div>
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-semibold text-gray-700 mb-2"
+            <label htmlFor="status" className="mb-1 block text-sm font-medium text-slate-700">
+              Status *
+            </label>
+            <select
+              id="status"
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              disabled={isViewMode}
+              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                errors.status
+                  ? 'border-red-500 focus:ring-red-300'
+                  : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+              }`}
             >
-              Confirm Password *
-            </label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              placeholder="••••••••"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                errors.confirmPassword
-                  ? 'border-red-500 focus:ring-red-400'
-                  : 'border-gray-300 focus:ring-blue-400'
-              }`}
-            />
-            {errors.confirmPassword && (
-              <p className="text-red-600 text-sm mt-1">{errors.confirmPassword}</p>
-            )}
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            {errors.status && <p className="mt-1 text-xs text-red-600">{errors.status}</p>}
           </div>
 
-          {/* Phone Field */}
-          <div>
-            <label htmlFor="phone" className="block text-sm font-semibold text-gray-700 mb-2">
-              Phone (optional)
-            </label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              placeholder="e.g. 07123456789"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                errors.phone
-                  ? 'border-red-500 focus:ring-red-400'
-                  : 'border-gray-300 focus:ring-blue-400'
-              }`}
-            />
-            {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
-          </div>
+          {isEditMode && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Core account fields are read-only because update APIs are not available yet. You can still update active or inactive status.
+            </div>
+          )}
         </form>
 
-        {/* Modal Footer */}
-        <div className="bg-gray-50 px-6 py-4 rounded-b-lg flex gap-3 justify-end border-t">
+        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4">
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 bg-gray-300 text-gray-700 rounded font-semibold hover:bg-gray-400 transition disabled:opacity-50"
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
           >
-            Cancel
+            {isViewMode ? 'Close' : 'Cancel'}
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? 'Creating...' : 'Create Account'}
-          </button>
+          {!isViewMode && (
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? 'Saving...' : isEditMode ? 'Update Status' : 'Create Account'}
+            </button>
+          )}
         </div>
       </div>
     </div>

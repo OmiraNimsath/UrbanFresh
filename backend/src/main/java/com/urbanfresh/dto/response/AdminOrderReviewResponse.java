@@ -18,6 +18,8 @@ public class AdminOrderReviewResponse {
     private Long orderId;
     private String orderStatus;
     private String paymentStatus;
+    private Long deliveryPersonId;
+    private String deliveryPersonName;
     private LocalDateTime orderDate;
     private LocalDateTime lastUpdatedDate;
     private CustomerInfo customer;

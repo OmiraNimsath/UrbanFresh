@@ -19,6 +19,8 @@ import com.urbanfresh.dto.request.OrderStatusUpdateRequest;
 import com.urbanfresh.dto.request.PlaceOrderRequest;
 import com.urbanfresh.dto.response.AdminOrderResponse;
 import com.urbanfresh.dto.response.AdminOrderReviewResponse;
+import com.urbanfresh.dto.response.DeliveryAssignedOrderResponse;
+import com.urbanfresh.dto.response.DeliveryOrderDetailsResponse;
 import com.urbanfresh.dto.response.OrderItemResponse;
 import com.urbanfresh.dto.response.OrderResponse;
 import com.urbanfresh.exception.InsufficientStockException;
@@ -32,6 +34,7 @@ import com.urbanfresh.model.OrderStatus;
 import com.urbanfresh.model.OrderStatusHistory;
 import com.urbanfresh.model.PaymentStatus;
 import com.urbanfresh.model.Product;
+import com.urbanfresh.model.Role;
 import com.urbanfresh.model.User;
 import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.OrderStatusHistoryRepository;
@@ -51,6 +54,7 @@ import lombok.RequiredArgsConstructor;
 public class OrderServiceImpl implements OrderService {
 
         private static final int MAX_PAGE_SIZE = 100;
+                private static final int DELIVERY_ITEMS_SUMMARY_LIMIT = 3;
 		private static final String ADMIN_ALLOWED_STATUS_LABELS = "PROCESSING, READY, CANCELLED";
 		private static final String FULL_STATUS_LABELS =
 				"PENDING, CONFIRMED, PROCESSING, READY, CANCELLED, OUT_FOR_DELIVERY, DELIVERED, RETURNED";
@@ -234,6 +238,68 @@ public class OrderServiceImpl implements OrderService {
     }
 
         /**
+         * Returns delivery details for an order assigned to the authenticated
+         * delivery person. Denies access when assignment does not match.
+         *
+         * @param orderId order ID requested by delivery personnel
+         * @param deliveryEmail email from JWT principal
+         * @return delivery-focused order details payload
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public DeliveryOrderDetailsResponse getAssignedOrderDetailsForDelivery(Long orderId, String deliveryEmail) {
+                User deliveryPerson = userRepository.findByEmailAndRoleAndIsActiveTrue(deliveryEmail, Role.DELIVERY)
+                                .orElseThrow(() -> new UserNotFoundException("Delivery personnel not found: " + deliveryEmail));
+
+                Order baseOrder = orderRepository.findById(orderId)
+                        .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+                User assignedDeliveryPerson = baseOrder.getAssignedDeliveryPerson();
+                if (assignedDeliveryPerson == null || !assignedDeliveryPerson.getId().equals(deliveryPerson.getId())) {
+                        throw new AccessDeniedException("You are not allowed to view this order.");
+                }
+
+                Order order = orderRepository
+                        .findDetailedByIdAndAssignedDeliveryPersonId(orderId, deliveryPerson.getId())
+                        .orElseThrow(() -> new AccessDeniedException("You are not allowed to view this order."));
+
+                return DeliveryOrderDetailsResponse.builder()
+                                .orderId(order.getId())
+                                .status(order.getStatus().name())
+                                .deliveryAddress(order.getDeliveryAddress())
+                                .items(toOrderItemResponses(order))
+                                .build();
+        }
+
+        /**
+         * Returns paginated orders assigned to the authenticated delivery user.
+         *
+         * @param deliveryEmail email from JWT principal
+         * @param page zero-based page index
+         * @param size requested page size
+         * @return page of delivery dashboard cards
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public Page<DeliveryAssignedOrderResponse> getAssignedOrdersForDelivery(String deliveryEmail, int page, int size) {
+                User deliveryPerson = userRepository.findByEmailAndRoleAndIsActiveTrue(deliveryEmail, Role.DELIVERY)
+                                .orElseThrow(() -> new UserNotFoundException("Delivery personnel not found: " + deliveryEmail));
+
+                int safePage = Math.max(0, page);
+                int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+
+                Pageable pageable = PageRequest.of(
+                                safePage,
+                                safeSize,
+                                Sort.by(Sort.Direction.DESC, "createdAt")
+                );
+
+                return orderRepository
+                                .findByAssignedDeliveryPersonIdOrderByCreatedAtDesc(deliveryPerson.getId(), pageable)
+                                .map(this::toDeliveryAssignedOrderResponse);
+        }
+
+        /**
          * Returns a paginated list of all orders for admin order operations.
          * Results are sorted newest first to prioritize operational visibility.
          *
@@ -387,15 +453,7 @@ public class OrderServiceImpl implements OrderService {
      * @return OrderResponse with all fields populated
      */
     private OrderResponse toOrderResponse(Order order) {
-        List<OrderItemResponse> itemResponses = order.getItems().stream()
-                .map(item -> OrderItemResponse.builder()
-                        .productId(item.getProduct() != null ? item.getProduct().getId() : null)
-                        .productName(item.getProductName())
-                        .unitPrice(item.getUnitPrice())
-                        .quantity(item.getQuantity())
-                        .lineTotal(item.getLineTotal())
-                        .build())
-                .toList();
+        List<OrderItemResponse> itemResponses = toOrderItemResponses(order);
 
         return OrderResponse.builder()
                 .orderId(order.getId())
@@ -407,6 +465,94 @@ public class OrderServiceImpl implements OrderService {
                 .items(itemResponses)
                 .build();
     }
+
+    /**
+     * Maps order items into immutable response rows.
+     *
+     * @param order source order entity
+     * @return list of response item DTOs
+     */
+    private List<OrderItemResponse> toOrderItemResponses(Order order) {
+        return order.getItems().stream()
+                .map(item -> OrderItemResponse.builder()
+                        .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                        .productName(item.getProductName())
+                        .unitPrice(item.getUnitPrice())
+                        .quantity(item.getQuantity())
+                        .lineTotal(item.getLineTotal())
+                        .build())
+                .toList();
+    }
+
+        /**
+         * Maps an assigned order to a delivery dashboard card DTO.
+         *
+         * @param order assigned order entity with customer and items preloaded
+         * @return compact delivery dashboard row
+         */
+        private DeliveryAssignedOrderResponse toDeliveryAssignedOrderResponse(Order order) {
+                String fullAddress = order.getDeliveryAddress();
+
+                return DeliveryAssignedOrderResponse.builder()
+                                .orderId(order.getId())
+                                .customerName(order.getCustomer() != null ? order.getCustomer().getName() : null)
+                                .shortDeliveryAddress(toShortAddress(fullAddress))
+                                .fullDeliveryAddress(fullAddress)
+                                .status(order.getStatus().name())
+                                .itemCount(order.getItems() != null ? order.getItems().size() : 0)
+                                .itemsSummary(toItemsSummary(order))
+                                .createdAt(order.getCreatedAt())
+                                .build();
+        }
+
+        /**
+         * Produces a concise address preview suitable for list cards.
+         *
+         * @param address full delivery address
+         * @return shortened preview or original value when already short
+         */
+        private String toShortAddress(String address) {
+                if (address == null) {
+                        return null;
+                }
+
+                String normalized = address.trim();
+                if (normalized.length() <= 48) {
+                        return normalized;
+                }
+
+                return normalized.substring(0, 48).trim() + "...";
+        }
+
+        /**
+         * Builds a compact item summary string for delivery dashboard cards.
+         *
+         * @param order source order entity with items
+         * @return summary such as "Rice, Milk +2 more"
+         */
+        private String toItemsSummary(Order order) {
+                List<OrderItem> items = order.getItems();
+                if (items == null || items.isEmpty()) {
+                        return "No items";
+                }
+
+                List<String> names = items.stream()
+                                .map(OrderItem::getProductName)
+                                .filter(name -> name != null && !name.isBlank())
+                                .limit(DELIVERY_ITEMS_SUMMARY_LIMIT)
+                                .toList();
+
+                if (names.isEmpty()) {
+                        return items.size() + " item(s)";
+                }
+
+                int hiddenCount = items.size() - names.size();
+                if (hiddenCount > 0) {
+                        return String.join(", ", names) + " +" + hiddenCount + " more";
+                }
+
+                return String.join(", ", names);
+        }
 
         /**
          * Maps an Order entity to the admin order table DTO.
@@ -436,6 +582,7 @@ public class OrderServiceImpl implements OrderService {
          * @return complete admin order review response
          */
         private AdminOrderReviewResponse toAdminOrderReviewResponse(Order order, List<OrderStatusHistory> historyRows) {
+                User deliveryPerson = order.getAssignedDeliveryPerson();
                 List<AdminOrderReviewResponse.OrderItemInfo> itemRows = order.getItems().stream()
                                 .map(item -> AdminOrderReviewResponse.OrderItemInfo.builder()
                                                 .productId(item.getProduct() != null ? item.getProduct().getId() : null)
@@ -471,6 +618,8 @@ public class OrderServiceImpl implements OrderService {
                                 .orderId(order.getId())
                                 .orderStatus(order.getStatus().name())
                                 .paymentStatus(resolvePersistedPaymentStatus(order))
+                                .deliveryPersonId(deliveryPerson != null ? deliveryPerson.getId() : null)
+                                .deliveryPersonName(deliveryPerson != null ? deliveryPerson.getName() : null)
                                 .orderDate(order.getCreatedAt())
                                 .lastUpdatedDate(resolveLastUpdatedDate(order, historyRows))
                                 .customer(AdminOrderReviewResponse.CustomerInfo.builder()
@@ -531,8 +680,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         /**
-         * Assigns an active delivery person to a READY order and transitions the
-         * status to OUT_FOR_DELIVERY. Records an audit history entry.
+         * Assigns or reassigns an active delivery person.
+         * READY orders are moved to OUT_FOR_DELIVERY, while OUT_FOR_DELIVERY
+         * orders keep the same status and only the assignee is updated.
          *
          * @param orderId          ID of the order to assign
          * @param deliveryPersonId ID of the active DELIVERY role user
@@ -545,9 +695,9 @@ public class OrderServiceImpl implements OrderService {
                 Order order = orderRepository.findById(orderId)
                                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-                if (order.getStatus() != OrderStatus.READY) {
+                if (order.getStatus() != OrderStatus.READY && order.getStatus() != OrderStatus.OUT_FOR_DELIVERY) {
                         throw new InvalidOrderStatusTransitionException(
-                                        "Delivery can only be assigned to orders in READY status. Current status: " + order.getStatus() + "."
+                                        "Delivery can only be assigned to orders in READY or OUT_FOR_DELIVERY status. Current status: " + order.getStatus() + "."
                         );
                 }
 
@@ -564,14 +714,17 @@ public class OrderServiceImpl implements OrderService {
                 User adminUser = userRepository.findByEmail(adminEmail)
                                 .orElseThrow(() -> new UserNotFoundException("Admin not found: " + adminEmail));
 
+                OrderStatus previousStatus = order.getStatus();
                 order.setAssignedDeliveryPerson(deliveryPerson);
-                order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+                if (previousStatus == OrderStatus.READY) {
+                        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+                }
                 Order updated = orderRepository.save(order);
 
                 orderStatusHistoryRepository.save(OrderStatusHistory.builder()
                                 .order(updated)
-                                .previousStatus(OrderStatus.READY)
-                                .newStatus(OrderStatus.OUT_FOR_DELIVERY)
+                                .previousStatus(previousStatus)
+                                .newStatus(updated.getStatus())
                                 .changedByAdmin(adminUser)
                                 .changeReason("Assigned to delivery personnel: " + deliveryPerson.getName())
                                 .build());

@@ -133,8 +133,40 @@ export const getOrderReview = (orderId) =>
 	api.get(`/api/admin/orders/${orderId}`).then((res) => res.data);
 
 /**
- * Assigns an active delivery person to a READY order.
- * Transitions the order status to OUT_FOR_DELIVERY.
+ * Fetch delivery details for an order assigned to the authenticated delivery user.
+ * GET /api/delivery/orders/{orderId}
+ *
+ * @param {number|string} orderId order ID
+ * @returns {Promise<Object>} delivery details payload with address, items, and status
+ */
+export const getDeliveryOrderById = (orderId) =>
+	api.get(`/api/delivery/orders/${orderId}`, {
+		headers: {
+			'Cache-Control': 'no-store',
+			Pragma: 'no-cache',
+		},
+	}).then((res) => res.data);
+
+/**
+ * Fetches paginated orders assigned to the authenticated delivery user.
+ * GET /api/delivery/orders?page={page}&size={size}
+ *
+ * @param {number} [page=0] zero-based page index
+ * @param {number} [size=20] page size
+ * @returns {Promise<{content: Array, totalElements: number, totalPages: number, number: number}>}
+ */
+export const getAssignedDeliveryOrders = (page = 0, size = 20) =>
+	api.get('/api/delivery/orders', {
+		params: { page, size },
+		headers: {
+			'Cache-Control': 'no-store',
+			Pragma: 'no-cache',
+		},
+	}).then((res) => res.data);
+
+/**
+ * Assigns or reassigns an active delivery person.
+ * READY orders transition to OUT_FOR_DELIVERY.
  * PUT /api/admin/orders/{orderId}/assign-delivery
  *
  * @param {number} orderId target order ID (must be READY)
