@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { getSupplierBrands, getSupplierProducts, getSupplierDashboard } from '../../services/supplierService';
 import { formatPrice } from '../../utils/priceUtils';
+import RequestProductModal from '../../components/supplier/RequestProductModal';
 
 /**
- * Presentation Layer – Supplier dashboard scoped by assigned brand ownership.
+ * Presentation Layer â€“ Supplier dashboard scoped by assigned brand ownership.
  */
 export default function SupplierDashboard() {
   const { user, logout } = useAuth();
@@ -14,6 +15,7 @@ export default function SupplierDashboard() {
   const [products, setProducts] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const loadSupplierData = async () => {
     setLoading(true);
@@ -87,12 +89,27 @@ export default function SupplierDashboard() {
               </div>
             </div>
 
-            <div className="mt-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Products You Can Manage</h2>
-              
-              {products.length === 0 ? (
-                <p className="text-sm text-gray-500">No products available for your assigned brand(s).</p>
-              ) : (
+            <div className="mt-6 flex justify-between items-center mb-3">
+              <h2 className="text-lg font-semibold text-gray-800">Products You Can Manage</h2>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg shadow"
+              >
+                + Request New Product
+              </button>
+            </div>
+
+            <RequestProductModal
+              isOpen={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              onSuccess={() => {
+                loadSupplierData(); // refresh products and dashboard numbers
+              }}
+            />
+
+            {products.length === 0 ? (
+              <p className="text-sm text-gray-500">No products available for your assigned brand(s).</p>
+            ) : (
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
@@ -102,16 +119,34 @@ export default function SupplierDashboard() {
                         <th className={th}>Category</th>
                         <th className={th}>Price</th>
                         <th className={th}>Stock</th>
+                        <th className={th}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {products.map((product) => (
                         <tr key={product.id} className="border-t border-gray-100">
                           <td className={td}>{product.name}</td>
-                          <td className={td}>{product.brandName || '—'}</td>
-                          <td className={td}>{product.category || '—'}</td>
+                          <td className={td}>{product.brandName || '—'}</td>  
+                          <td className={td}>{product.category || '—'}</td>   
                           <td className={td}>{formatPrice(product.price, product.unit)}</td>
-                          <td className={td}>{product.stockQuantity}</td>
+                          <td className={td}>{product.stockQuantity}</td>       
+                          <td className={td}>
+                            {product.approvalStatus === 'PENDING' && (
+                              <span className="px-2 py-1 text-xs font-semibold text-yellow-700 bg-yellow-100 rounded-full">
+                                Pending
+                              </span>
+                            )}
+                            {product.approvalStatus === 'APPROVED' && (
+                              <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">
+                                Approved
+                              </span>
+                            )}
+                            {product.approvalStatus === 'REJECTED' && (
+                              <span className="px-2 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded-full">
+                                Rejected
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

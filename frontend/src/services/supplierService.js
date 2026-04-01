@@ -27,3 +27,12 @@ export const getSupplierBrands = () =>
  */
 export const getSupplierProducts = () =>
   api.get('/api/supplier/products').then((res) => res.data);
+
+/**
+ * Submits a request for a new product for a specific brand.
+ *
+ * @param {Object} productData product details including brandId
+ * @returns {Promise<Object>} the created product with PENDING status
+ */
+export const requestNewProduct = (productData) =>
+  api.post('/api/supplier/products', productData).then((res) => res.data);
