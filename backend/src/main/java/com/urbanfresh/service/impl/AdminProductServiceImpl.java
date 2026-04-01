@@ -101,6 +101,8 @@ public class AdminProductServiceImpl implements AdminProductService {
         product.setFeatured(request.isFeatured());
         product.setExpiryDate(request.getExpiryDate());
         product.setStockQuantity(request.getStockQuantity());
+        // By default, full update implies approval by an admin unless otherwise specified
+        product.setApprovalStatus(com.urbanfresh.model.ApprovalStatus.APPROVED);
 
         return toAdminResponse(productRepository.save(product));
     }
@@ -156,6 +158,7 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .featured(product.isFeatured())
                 .expiryDate(product.getExpiryDate())
                 .stockQuantity(product.getStockQuantity())
+                .approvalStatus(product.getApprovalStatus() != null ? product.getApprovalStatus().name() : "APPROVED")
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();

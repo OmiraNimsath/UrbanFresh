@@ -40,6 +40,8 @@ public class AdminProductResponse {
     /** Raw warehouse count — visible to admins only to support inventory management. */
     private int stockQuantity;
 
+    private String approvalStatus;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
