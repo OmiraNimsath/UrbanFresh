@@ -165,6 +165,18 @@ export const getAssignedDeliveryOrders = (page = 0, size = 20) =>
 	}).then((res) => res.data);
 
 /**
+ * Updates the status of an order assigned to the authenticated delivery user.
+ * PATCH /api/delivery/orders/{orderId}/status
+ *
+ * @param {number|string} orderId order ID
+ * @param {string} status target status (DELIVERED or RETURNED)
+ * @param {string | null} [changeReason] optional change reason
+ * @returns {Promise<Object>} updated delivery order details payload
+ */
+export const updateAssignedDeliveryOrderStatus = (orderId, status, changeReason = null) =>
+	api.patch(`/api/delivery/orders/${orderId}/status`, { status, changeReason }).then((res) => res.data);
+
+/**
  * Assigns or reassigns an active delivery person.
  * READY orders transition to OUT_FOR_DELIVERY.
  * PUT /api/admin/orders/{orderId}/assign-delivery

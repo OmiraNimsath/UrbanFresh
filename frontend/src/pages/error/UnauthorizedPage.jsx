@@ -1,13 +1,6 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-
-/** Maps each role to its own dashboard path. */
-const ROLE_DASHBOARD = {
-  ADMIN: '/admin',
-  SUPPLIER: '/supplier',
-  DELIVERY: '/delivery',
-  CUSTOMER: '/dashboard',
-};
 
 /**
  * Presentation Layer – Shown when a user tries to access a page their role cannot reach.
@@ -15,14 +8,21 @@ const ROLE_DASHBOARD = {
  * to their own dashboard rather than the generic home page.
  */
 export default function UnauthorizedPage() {
+  const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
 
-  // Direct authenticated users to their own dashboard; guests to login
-  const backPath = isAuthenticated
-    ? (ROLE_DASHBOARD[user?.role] ?? '/')
-    : '/login';
+  useEffect(() => {
+    const redirectTimer = window.setTimeout(() => {
+      navigate('/', { replace: true });
+    }, 3000);
 
-  const backLabel = isAuthenticated ? 'Go to My Dashboard' : 'Go to Login';
+    return () => {
+      window.clearTimeout(redirectTimer);
+    };
+  }, [navigate]);
+
+  const backPath = '/';
+  const backLabel = 'Go to Homepage';
 
   return (
     <div className="min-h-screen bg-red-50 flex items-center justify-center px-4">
@@ -34,6 +34,9 @@ export default function UnauthorizedPage() {
           {isAuthenticated && user?.role && (
             <span> Your current role is <strong>{user.role}</strong>.</span>
           )}
+        </p>
+        <p className="text-gray-500 text-xs mb-5">
+          You will be redirected to the homepage in a few seconds.
         </p>
         <Link
           to={backPath}

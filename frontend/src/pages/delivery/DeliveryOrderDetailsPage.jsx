@@ -2,19 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
-import { getDeliveryOrderById } from '../../services/orderService';
-
-function formatStatusLabel(status) {
-  if (!status) {
-    return 'Pending';
-  }
-
-  return status
-    .toLowerCase()
-    .split('_')
-    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
-    .join(' ');
-}
+import DeliveryInfoTile from '../../components/delivery/DeliveryInfoTile';
+import DeliveryStatusConfirmModal from '../../components/admin/delivery/DeliveryStatusConfirmModal';
+import {
+  getDeliveryStatusBadgeClass,
+  getDeliveryStatusLabel,
+} from '../../components/admin/delivery/deliveryStatusUtils';
+import {
+  getDeliveryOrderById,
+  updateAssignedDeliveryOrderStatus,
+} from '../../services/orderService';
+import { formatAmount } from '../../utils/priceUtils';
 
 /**
  * Presentation Layer – Mobile-first delivery order details screen.
@@ -28,25 +26,13 @@ export default function DeliveryOrderDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [errorState, setErrorState] = useState(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
+  const [pendingStatusUpdate, setPendingStatusUpdate] = useState(null);
 
   const statusClassName = useMemo(() => {
-    const status = order?.status || '';
-
-    if (status === 'PENDING') {
-      return 'bg-slate-100 text-slate-700 border-slate-200';
-    }
-    if (status === 'OUT_FOR_DELIVERY') {
-      return 'bg-amber-100 text-amber-700 border-amber-200';
-    }
-    if (status === 'DELIVERED') {
-      return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    }
-    if (status === 'READY') {
-      return 'bg-blue-100 text-blue-700 border-blue-200';
-    }
-
-    return 'bg-gray-100 text-gray-700 border-gray-200';
+    return getDeliveryStatusBadgeClass(order?.status);
   }, [order?.status]);
+
+  const canUpdateStatus = order?.status === 'OUT_FOR_DELIVERY';
 
   const itemCount = useMemo(() => {
     if (!Array.isArray(order?.items)) {
@@ -93,6 +79,12 @@ export default function DeliveryOrderDetailsPage() {
     loadOrder();
   }, [loadOrder]);
 
+  useEffect(() => {
+    if (errorState === 'forbidden') {
+      navigate('/unauthorized', { replace: true });
+    }
+  }, [errorState, navigate]);
+
   const handleBack = () => {
     navigate('/delivery');
   };
@@ -128,8 +120,46 @@ export default function DeliveryOrderDetailsPage() {
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank', 'noopener,noreferrer');
   };
 
+  const requestStatusUpdate = (nextStatus) => {
+    setPendingStatusUpdate(nextStatus);
+  };
+
+  const handleConfirmStatusUpdate = async () => {
+    if (!pendingStatusUpdate) {
+      return;
+    }
+
+    setIsActionBusy(true);
+    try {
+      const updated = await updateAssignedDeliveryOrderStatus(orderId, pendingStatusUpdate);
+      setOrder(updated);
+      toast.success(`Order marked as ${getDeliveryStatusLabel(updated.status)}.`);
+    } catch (error) {
+      const message = error?.response?.data?.message || 'Failed to update delivery status.';
+      toast.error(message);
+    } finally {
+      setIsActionBusy(false);
+      setPendingStatusUpdate(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 pb-28">
+      <DeliveryStatusConfirmModal
+        isOpen={Boolean(pendingStatusUpdate)}
+        title={pendingStatusUpdate === 'RETURNED' ? 'Confirm Return' : 'Confirm Delivery'}
+        message={
+          pendingStatusUpdate === 'RETURNED'
+            ? 'Are you sure you want to mark this order as returned?'
+            : 'Are you sure you have successfully delivered this order?'
+        }
+        confirmLabel={pendingStatusUpdate === 'RETURNED' ? 'Mark Returned' : 'Mark Delivered'}
+        intent={pendingStatusUpdate === 'RETURNED' ? 'danger' : 'success'}
+        loading={isActionBusy}
+        onCancel={() => setPendingStatusUpdate(null)}
+        onConfirm={handleConfirmStatusUpdate}
+      />
+
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
           <button
@@ -152,22 +182,6 @@ export default function DeliveryOrderDetailsPage() {
             {[...Array(3)].map((_, index) => (
               <div key={index} className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-white" />
             ))}
-          </div>
-        )}
-
-        {!loading && errorState === 'forbidden' && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 shadow-sm sm:p-6">
-            <h2 className="text-base font-semibold">This order is not assigned to you.</h2>
-            <p className="mt-1 text-sm">
-              Access is restricted to the assigned delivery person only.
-            </p>
-            <button
-              type="button"
-              onClick={handleBack}
-              className="mt-4 h-11 rounded-xl border border-red-300 bg-white px-4 text-sm font-semibold text-red-700"
-            >
-              Back to Dashboard
-            </button>
           </div>
         )}
 
@@ -202,19 +216,23 @@ export default function DeliveryOrderDetailsPage() {
                   <p className="mt-1 text-sm text-slate-500">Track current progress for this assignment.</p>
                 </div>
                 <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${statusClassName}`}>
-                  {formatStatusLabel(order.status)}
+                  {getDeliveryStatusLabel(order.status)}
                 </span>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Items</p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">{itemCount}</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Order Value</p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">Rs. {orderValue.toFixed(2)}</p>
-                </div>
+                <DeliveryInfoTile label="Items" value={itemCount} />
+                <DeliveryInfoTile label="Total" value={formatAmount(order.totalAmount ?? orderValue)} />
+                <DeliveryInfoTile label="Payment" value={order.paymentMethod || 'ONLINE (STRIPE)'} />
+                <DeliveryInfoTile label="Pay Status" value={order.paymentStatus || 'PENDING'} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+              <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Customer Details</h2>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <DeliveryInfoTile label="Customer" value={order.customerName || 'Customer'} />
+                <DeliveryInfoTile label="Phone" value={order.customerPhone || 'Not available'} />
               </div>
             </section>
 
@@ -277,22 +295,45 @@ export default function DeliveryOrderDetailsPage() {
 
       {!loading && !errorState && order && (
         <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-          <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={isActionBusy}
-              className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isActionBusy ? 'Refreshing...' : 'Refresh Details'}
-            </button>
-            <button
-              type="button"
-              onClick={handleBack}
-              className="h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              Back to Dashboard
-            </button>
+          <div className="mx-auto w-full max-w-3xl space-y-2">
+            {canUpdateStatus && (
+              <div className="grid grid-cols-2 gap-2 sm:col-span-3">
+                <button
+                  type="button"
+                  disabled={isActionBusy}
+                  onClick={() => requestStatusUpdate('DELIVERED')}
+                  className="h-11 rounded-xl border border-emerald-300 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Mark Delivered
+                </button>
+                <button
+                  type="button"
+                  disabled={isActionBusy}
+                  onClick={() => requestStatusUpdate('RETURNED')}
+                  className="h-11 rounded-xl border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Mark Returned
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={isActionBusy}
+                className="h-11 min-w-40 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isActionBusy ? 'Refreshing...' : 'Refresh Details'}
+              </button>
+              <button
+                type="button"
+                onClick={handleBack}
+                className="h-11 min-w-40 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Back to Dashboard
+              </button>
+            </div>
           </div>
         </div>
       )}
