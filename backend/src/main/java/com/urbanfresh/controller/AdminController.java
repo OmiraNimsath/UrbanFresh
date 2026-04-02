@@ -167,6 +167,37 @@ public class AdminController {
     }
 
     /**
+     * Retrieves all pending product requests from suppliers.
+     * GET /api/admin/products/requests
+     */
+    @GetMapping("/products/requests")
+    public ResponseEntity<Page<AdminProductResponse>> getPendingProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        int safeSize = Math.max(1, Math.min(size, 100));
+        int safePage = Math.max(0, page);
+        return ResponseEntity.ok(adminProductService.getPendingProducts(safePage, safeSize));
+    }
+
+    /**
+     * Approves a product request.
+     * PATCH /api/admin/products/{id}/approve
+     */
+    @PatchMapping("/products/{id}/approve")
+    public ResponseEntity<AdminProductResponse> approveProduct(@PathVariable Long id) {
+        return ResponseEntity.ok(adminProductService.approveProduct(id));
+    }
+
+    /**
+     * Rejects a product request.
+     * PATCH /api/admin/products/{id}/reject
+     */
+    @PatchMapping("/products/{id}/reject")
+    public ResponseEntity<AdminProductResponse> rejectProduct(@PathVariable Long id) {
+        return ResponseEntity.ok(adminProductService.rejectProduct(id));
+    }
+
+    /**
      * Creates a new product and adds it to the catalogue immediately.
      * POST /api/admin/products
      *
@@ -176,16 +207,15 @@ public class AdminController {
     @PostMapping("/products")
     public ResponseEntity<AdminProductResponse> createProduct(
             @Valid @RequestBody ProductRequest request) {
-
-        AdminProductResponse created = adminProductService.createProduct(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(adminProductService.createProduct(request));
     }
 
     /**
-     * Replaces all editable fields of an existing product (full update).
+     * Updates an existing product.
      * PUT /api/admin/products/{id}
      *
-     * @param id      product ID to update
+     * @param id      product to update
      * @param request validated product payload with new values
      * @return 200 OK with updated AdminProductResponse; 404 if not found
      */

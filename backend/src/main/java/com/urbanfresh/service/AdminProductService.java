@@ -48,6 +48,21 @@ public interface AdminProductService {
     AdminProductResponse updateProduct(Long id, ProductRequest request);
 
     /**
+     * Retrieves all pending products.
+     */
+    Page<AdminProductResponse> getPendingProducts(int page, int size);
+
+    /**
+     * Approves a product, setting stock to 0.
+     */
+    AdminProductResponse approveProduct(Long id);
+
+    /**
+     * Rejects a product request.
+     */
+    AdminProductResponse rejectProduct(Long id);
+
+    /**
      * Permanently removes a product from the catalogue.
      *
      * @param id product ID to delete

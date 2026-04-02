@@ -97,6 +97,12 @@ public class Product {
     @Column(length = 150)
     private String inventoryUpdatedBy;
 
+    /** Indicates if the product listing is approved by an administrator. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private ApprovalStatus approvalStatus = ApprovalStatus.APPROVED;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

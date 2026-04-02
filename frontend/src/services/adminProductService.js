@@ -59,7 +59,26 @@ export const deleteProduct = (id) =>
   api.delete(`/api/admin/products/${id}`).then((res) => res.data);
 
 /**
+ * Retrieves pending products for admin approval.
+ */
+export const getPendingProducts = (page = 0, size = 20) =>
+  api.get('/api/admin/products/requests', { params: { page, size } }).then((res) => res.data);
+
+/**
+ * Approves a pending product.
+ */
+export const approveProduct = (id) =>
+  api.patch(`/api/admin/products/${id}/approve`).then((res) => res.data);
+
+/**
+ * Rejects a pending product.
+ */
+export const rejectProduct = (id) =>
+  api.patch(`/api/admin/products/${id}/reject`).then((res) => res.data);
+
+/**
  * Uploads a product image to the server.
+
  * Calls POST /api/admin/products/upload-image  (multipart/form-data)
  *
  * @param {File} file - image file (JPG, PNG, or WebP; max 5 MB)

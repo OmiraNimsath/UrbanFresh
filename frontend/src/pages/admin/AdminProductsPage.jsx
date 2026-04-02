@@ -6,6 +6,9 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  getPendingProducts,
+  approveProduct,
+  rejectProduct
 } from '../../services/adminProductService';
 import { getActiveBrands } from '../../services/adminBrandService';
 import ProductFormModal from '../../components/admin/ProductFormModal';
@@ -14,49 +17,56 @@ import { formatPrice } from '../../utils/priceUtils';
 /**
  * Presentation Layer – Admin product management page.
  * Displays a paginated table of all products with add, edit, and delete actions.
- * All mutations show a toast and refresh the table on success.
+ * Displays a second tab for new listing requests from suppliers.
  */
 export default function AdminProductsPage() {
   const navigate = useNavigate();
 
-  // ── Table state ──────────────────────────────────────────────────────────────
-  const [pageData, setPageData] = useState(null);   // Spring Page<AdminProductResponse>
+  // Tab state
+  const [activeTab, setActiveTab] = useState('catalog');
+
+  // Table state
+  const [pageData, setPageData] = useState(null);
+  const [pendingData, setPendingData] = useState(null);
+  
   const [currentPage, setCurrentPage] = useState(0);
+  const [currentPendingPage, setCurrentPendingPage] = useState(0);
+  
   const [loadingTable, setLoadingTable] = useState(false);
   const [tableError, setTableError] = useState(null);
   const [brands, setBrands] = useState([]);
 
-  // ── Modal state ──────────────────────────────────────────────────────────────
+  // Modal state
   const [modalOpen, setModalOpen] = useState(false);
-  const [editProduct, setEditProduct] = useState(null); // null = create mode
+  const [editProduct, setEditProduct] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // ── Delete confirmation state ────────────────────────────────────────────────
+  // Status/Delete state
   const [deletingId, setDeletingId] = useState(null);
+  const [processingId, setProcessingId] = useState(null);
 
-  // ── Fetch page ───────────────────────────────────────────────────────────────
-  const fetchPage = useCallback(async (page) => {
+  const fetchPage = useCallback(async () => {
     setLoadingTable(true);
     setTableError(null);
     try {
-      const [data, activeBrands] = await Promise.all([
-        getAdminProducts(page, 20),
+      const [data, pData, activeBrands] = await Promise.all([
+        getAdminProducts(currentPage, 20),
+        getPendingProducts(currentPendingPage, 20),
         getActiveBrands(),
       ]);
       setPageData(data);
+      setPendingData(pData);
       setBrands(activeBrands);
     } catch {
       setTableError('Failed to load products. Please try again.');
     } finally {
       setLoadingTable(false);
     }
-  }, []);
+  }, [currentPage, currentPendingPage]);
 
   useEffect(() => {
-    fetchPage(currentPage);
-  }, [currentPage, fetchPage]);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────────
+    fetchPage();
+  }, [fetchPage]);
 
   const openCreate = () => {
     setEditProduct(null);
@@ -84,9 +94,8 @@ export default function AdminProductsPage() {
         toast.success('Product created successfully');
       }
       closeModal();
-      fetchPage(currentPage);
+      fetchPage();
     } catch (err) {
-      // Surface validation errors from the backend if present
       const msg = err.response?.data?.message ?? 'Failed to save product';
       toast.error(msg);
     } finally {
@@ -99,10 +108,9 @@ export default function AdminProductsPage() {
     try {
       await deleteProduct(id);
       toast.success('Product deleted');
-      // If we deleted the last item on a page > 0, go back one page
       const isLastOnPage = pageData?.content?.length === 1 && currentPage > 0;
-      fetchPage(isLastOnPage ? currentPage - 1 : currentPage);
       if (isLastOnPage) setCurrentPage((p) => p - 1);
+      else fetchPage();
     } catch {
       toast.error('Failed to delete product');
     } finally {
@@ -110,10 +118,34 @@ export default function AdminProductsPage() {
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  const handleApprove = async (id) => {
+    setProcessingId(id);
+    try {
+      await approveProduct(id);
+      toast.success('Product approved! Stock set to 0. It remains hidden until stock is updated.');
+      fetchPage();
+    } catch {
+      toast.error('Failed to approve request');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (id) => {
+    setProcessingId(id);
+    try {
+      await rejectProduct(id);
+      toast.success('Product rejected.');
+      fetchPage();
+    } catch {
+      toast.error('Failed to reject request');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <button
@@ -126,20 +158,43 @@ export default function AdminProductsPage() {
         </div>
         <button
           onClick={openCreate}
-          className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg"
+          className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-sm"
         >
           + Add Product
         </button>
       </div>
 
-      {/* Error state */}
       {tableError && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-4 mb-4">
           {tableError}
         </div>
       )}
 
-      {/* Loading skeleton */}
+      {/* Tabs */}
+      <div className="flex space-x-4 mb-6 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('catalog')}
+          className={`pb-2 outline-none font-medium text-sm border-b-2 transition-colors ${
+            activeTab === 'catalog' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Product Management
+        </button>
+        <button
+          onClick={() => setActiveTab('pending')}
+          className={`pb-2 flex items-center gap-2 outline-none font-medium text-sm border-b-2 transition-colors ${
+            activeTab === 'pending' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          New Listing Requests
+          {pendingData?.totalElements > 0 && (
+            <span className="bg-yellow-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+              {pendingData.totalElements}
+            </span>
+          )}
+        </button>
+      </div>
+
       {loadingTable && (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
@@ -148,8 +203,8 @@ export default function AdminProductsPage() {
         </div>
       )}
 
-      {/* Table */}
-      {!loadingTable && pageData && (
+      {/* Catalog */}
+      {!loadingTable && activeTab === 'catalog' && pageData && (
         <>
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <table className="w-full text-sm">
@@ -159,9 +214,8 @@ export default function AdminProductsPage() {
                   <th className={th}>Category</th>
                   <th className={th}>Brand</th>
                   <th className={th}>Price</th>
-                  <th className={th}>Unit</th>
                   <th className={th}>Stock</th>
-                  <th className={th}>Featured</th>
+                  <th className={th}>Status</th>
                   <th className={th}>Expiry</th>
                   <th className={th}>Actions</th>
                 </tr>
@@ -169,53 +223,39 @@ export default function AdminProductsPage() {
               <tbody>
                 {pageData.content?.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-10 text-center text-gray-400">
-                      No products found. Add one to get started.
+                    <td colSpan={8} className="py-10 text-center text-gray-400">
+                      No products found.
                     </td>
                   </tr>
                 ) : (
                   pageData.content?.map((p) => (
                     <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className={td}>
-                        <span className="font-medium text-gray-800">{p.name}</span>
-                      </td>
+                      <td className={td}><span className="font-medium text-gray-800">{p.name}</span></td>
                       <td className={td}>{p.category ?? '—'}</td>
                       <td className={td}>{p.brandName ?? '—'}</td>
-                      <td className={td}>{formatPrice(p.price, p.unit)}</td>
-                      <td className={td}>{UNIT_DISPLAY[p.unit] ?? p.unit ?? '—'}</td>
+                      <td className={td}>{formatPrice(p.price, p.unit)}</td>    
                       <td className={td}>
-                        <span
-                          className={
-                            p.stockQuantity === 0
-                              ? 'text-red-500 font-medium'
-                              : 'text-gray-700'
-                          }
-                        >
+                        <span className={p.stockQuantity === 0 ? 'text-red-500 font-medium' : 'text-gray-700'}>
                           {p.stockQuantity}
                         </span>
                       </td>
                       <td className={td}>
-                        {p.featured ? (
-                          <span className="text-green-600 font-medium">Yes</span>
+                        {p.approvalStatus === 'APPROVED' ? (
+                          <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">Approved</span>
+                        ) : p.approvalStatus === 'PENDING' ? (
+                          <span className="px-2 py-1 text-xs font-semibold text-yellow-700 bg-yellow-100 rounded-full">Pending</span>
+                        ) : p.approvalStatus === 'REJECTED' ? (
+                          <span className="px-2 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded-full">Rejected</span>
                         ) : (
-                          <span className="text-gray-400">No</span>
+                          <span className="text-gray-500">N/A</span>
                         )}
                       </td>
                       <td className={td}>{p.expiryDate ?? '—'}</td>
                       <td className={td}>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openEdit(p)}
-                            className="text-blue-600 hover:underline text-xs font-medium"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(p.id)}
-                            disabled={deletingId === p.id}
-                            className="text-red-500 hover:underline text-xs font-medium disabled:opacity-50"
-                          >
-                            {deletingId === p.id ? 'Deleting…' : 'Delete'}
+                        <div className="flex gap-3">
+                          <button onClick={() => openEdit(p)} className="text-blue-600 hover:underline font-medium text-xs">Edit</button>
+                          <button onClick={() => handleDelete(p.id)} disabled={deletingId === p.id} className="text-red-500 hover:underline font-medium text-xs disabled:opacity-50">
+                            {deletingId === p.id ? 'Deleting...' : 'Delete'}    
                           </button>
                         </div>
                       </td>
@@ -225,36 +265,80 @@ export default function AdminProductsPage() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
           {pageData.totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-              <span>
-                Page {pageData.number + 1} of {pageData.totalPages} —{' '}
-                {pageData.totalElements} products total
-              </span>
+              <span>Page {pageData.number + 1} of {pageData.totalPages}</span>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage((p) => p - 1)}
-                  disabled={pageData.first}
-                  className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100"
-                >
-                  Prev
-                </button>
-                <button
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                  disabled={pageData.last}
-                  className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100"
-                >
-                  Next
-                </button>
+                <button onClick={() => setCurrentPage((p) => p - 1)} disabled={pageData.first} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100">Prev</button>
+                <button onClick={() => setCurrentPage((p) => p + 1)} disabled={pageData.last} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100">Next</button>
               </div>
             </div>
           )}
         </>
       )}
 
-      {/* Create / Edit modal */}
+      {/* Pending Listing Requests */}
+      {!loadingTable && activeTab === 'pending' && pendingData && (
+        <>
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className={th}>Name</th>
+                  <th className={th}>Category</th>
+                  <th className={th}>Brand</th>
+                  <th className={th}>Price</th>
+                  <th className={th}>Image</th>
+                  <th className={th}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingData.content?.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-10 text-center text-gray-400">
+                      No new listing requests at this time.
+                    </td>
+                  </tr>
+                ) : (
+                  pendingData.content?.map((p) => (
+                    <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className={td}><span className="font-medium text-gray-800">{p.name}</span></td>
+                      <td className={td}>{p.category ?? '—'}</td>
+                      <td className={td}>{p.brandName ?? '—'}</td>
+                      <td className={td}>{formatPrice(p.price, p.unit)}</td>    
+                      <td className={td}>
+                        {p.imageUrl ? (
+                          <img src={p.imageUrl} alt="prod" className="w-10 h-10 object-cover rounded border border-gray-200 shadow-sm" />
+                        ) : '—'}
+                      </td>
+                      <td className={td}>
+                        <div className="flex gap-2 items-center">
+                          <button onClick={() => handleApprove(p.id)} disabled={processingId === p.id} className="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded font-semibold disabled:opacity-50 transition-colors">
+                            Approve
+                          </button>
+                          <button onClick={() => handleReject(p.id)} disabled={processingId === p.id} className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded font-semibold disabled:opacity-50 transition-colors">
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {pendingData.totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+              <span>Page {pendingData.number + 1} of {pendingData.totalPages}</span>
+              <div className="flex gap-2">
+                <button onClick={() => setCurrentPendingPage((p) => p - 1)} disabled={pendingData.first} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100">Prev</button>
+                <button onClick={() => setCurrentPendingPage((p) => p + 1)} disabled={pendingData.last} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100">Next</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       {modalOpen && (
         <ProductFormModal
           product={editProduct}
