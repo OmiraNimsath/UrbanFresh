@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { getInventory, updateInventory } from '../../services/inventoryService';
+import { createPurchaseOrder } from '../../services/adminPurchaseOrderService';
 
 /**
  * Admin Inventory Management page.
@@ -19,6 +20,11 @@ export default function AdminInventoryPage() {
   const [editItem, setEditItem]       = useState(null);
   const [formValues, setFormValues]   = useState({ quantity: '', reorderThreshold: '' });
   const [saving, setSaving]           = useState(false);
+
+  // Order state
+  const [orderItem, setOrderItem]     = useState(null);
+  const [orderQuantity, setOrderQuantity] = useState('');
+  const [ordering, setOrdering]       = useState(false);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -63,6 +69,42 @@ export default function AdminInventoryPage() {
   const handleCancelEdit = () => {
     setEditItem(null);
     setFormValues({ quantity: '', reorderThreshold: '' });
+  };
+
+  /** Opens the inline ordering form */
+  const handleOrder = (item) => {
+    if (!item.brandId) {
+      toast.error('Cannot create order: missing brand data for product.');
+      return;
+    }
+    setOrderItem(item);
+    setOrderQuantity('');
+  };
+
+  /** Cancels formatting order */
+  const handleCancelOrder = () => {
+    setOrderItem(null);
+    setOrderQuantity('');
+  };
+
+  /** Creates purchase order for the row item */
+  const handleSaveOrder = async (e) => {
+    e.preventDefault();
+    if (!orderQuantity || isNaN(orderQuantity) || parseInt(orderQuantity, 10) <= 0) return;
+    setOrdering(true);
+    try {
+      await createPurchaseOrder({
+        brandId: orderItem.brandId,
+        items: [{ productId: orderItem.productId, quantity: parseInt(orderQuantity, 10) }]
+      });
+      toast.success(`Purchase order created for ${orderItem.productName}`);
+      setOrderItem(null);
+      fetchInventory();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to create order');
+    } finally {
+      setOrdering(false);
+    }
   };
 
   /**
@@ -131,13 +173,18 @@ export default function AdminInventoryPage() {
               View and update quantity and reorder thresholds for all products.
             </p>
           </div>
-          <button
-            onClick={fetchInventory}
-            disabled={loading}
-            className="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
-            ↻ Refresh
-          </button>
+          <div className="flex space-x-3">
+            <Link to="/admin/purchase-orders" className="text-sm bg-purple-600 text-white rounded-lg px-4 py-2 hover:bg-purple-700 transition-colors">
+              View POs Status
+            </Link>
+            <button
+              onClick={fetchInventory}
+              disabled={loading}
+              className="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors"       
+            >
+              ↻ Refresh
+            </button>
+          </div>
         </div>
 
         {/* ── Error banner ── */}
@@ -179,72 +226,132 @@ export default function AdminInventoryPage() {
 
               {/* Data rows */}
               {!loading &&
-                inventory.map((item) =>
-                  editItem?.productId === item.productId ? (
-                    /* ── Inline edit row ── */
-                    <tr key={item.productId} className="bg-amber-50">
-                      <td className="px-6 py-3 font-medium text-gray-900 whitespace-nowrap">
-                        {item.productName}
-                      </td>
-                      <td className="px-6 py-3 text-gray-500">{item.category || '—'}</td>
+                inventory.map((item) => {
+                  if (editItem?.productId === item.productId) {
+                    return (
+                      /* ── Inline edit row ── */
+                      <tr key={item.productId} className="bg-amber-50">
+                        <td className="px-6 py-3 font-medium text-gray-900 whitespace-nowrap">
+                          {item.productName}
+                        </td>
+                        <td className="px-6 py-3 text-gray-500">{item.category || '—'}</td>
 
-                      {/* Quantity input — form spans across shared form id */}
-                      <td className="px-6 py-3">
-                        <form id="inv-edit-form" onSubmit={handleSave} className="flex justify-end">
+                        {/* Quantity input — form spans across shared form id */}
+                        <td className="px-6 py-3">
+                          <form id={`inv-edit-form-${item.productId}`} onSubmit={handleSave} className="flex justify-end">
+                            <input
+                              type="number"
+                              min="0"
+                              value={formValues.quantity}
+                              onChange={(e) =>
+                                setFormValues((v) => ({ ...v, quantity: e.target.value }))
+                              }
+                              className="w-24 border border-gray-300 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              required
+                            />
+                          </form>
+                        </td>
+
+                        {/* Reorder threshold input */}
+                        <td className="px-6 py-3 text-right">
                           <input
                             type="number"
                             min="0"
-                            value={formValues.quantity}
+                            value={formValues.reorderThreshold}
                             onChange={(e) =>
-                              setFormValues((v) => ({ ...v, quantity: e.target.value }))
+                              setFormValues((v) => ({ ...v, reorderThreshold: e.target.value }))
                             }
+                            form={`inv-edit-form-${item.productId}`}
                             className="w-24 border border-gray-300 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                             required
                           />
-                        </form>
-                      </td>
+                        </td>
 
-                      {/* Reorder threshold input */}
-                      <td className="px-6 py-3 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          value={formValues.reorderThreshold}
-                          onChange={(e) =>
-                            setFormValues((v) => ({ ...v, reorderThreshold: e.target.value }))
-                          }
-                          form="inv-edit-form"
-                          className="w-24 border border-gray-300 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                          required
-                        />
-                      </td>
+                        {/* Spacer columns */}
+                        <td className="px-6 py-3" colSpan={3} />
 
-                      {/* Spacer columns */}
-                      <td className="px-6 py-3" colSpan={3} />
+                        {/* Save / Cancel actions */}
+                        <td className="px-6 py-3">
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              form={`inv-edit-form-${item.productId}`}
+                              disabled={saving}
+                              className="text-xs bg-green-600 text-white rounded px-3 py-1.5 hover:bg-green-700 disabled:opacity-50 transition-colors"
+                            >
+                              {saving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              disabled={saving}
+                              className="text-xs bg-white border border-gray-300 text-gray-600 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
 
-                      {/* Save / Cancel actions */}
-                      <td className="px-6 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            type="submit"
-                            form="inv-edit-form"
-                            disabled={saving}
-                            className="text-xs bg-green-600 text-white rounded px-3 py-1.5 hover:bg-green-700 disabled:opacity-50 transition-colors"
-                          >
-                            {saving ? 'Saving…' : 'Save'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCancelEdit}
-                            disabled={saving}
-                            className="text-xs bg-white border border-gray-300 text-gray-600 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
+                  if (orderItem?.productId === item.productId) {
+                    return (
+                      /* ── Inline order row ── */
+                      <tr key={item.productId} className="bg-purple-50">
+                        <td className="px-6 py-3 font-medium text-gray-900 whitespace-nowrap">
+                          {item.productName}
+                        </td>
+                        <td className="px-6 py-3 text-gray-500">{item.category || '—'}</td>
+
+                        {/* Quantity to order */}
+                        <td className="px-6 py-3">
+                          <form id={`inv-order-form-${item.productId}`} onSubmit={handleSaveOrder} className="flex justify-end gap-2 items-center">
+                            <span className="text-xs text-gray-600">Order Qty:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={orderQuantity}
+                              onChange={(e) => setOrderQuantity(e.target.value)}
+                              className="w-24 border border-gray-300 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              required
+                            />
+                          </form>
+                        </td>
+
+                        {/* Current Reorder Threshold / read only */}
+                        <td className="px-6 py-3 text-right text-gray-700">
+                          {item.reorderThreshold}
+                        </td>
+
+                        <td className="px-6 py-3" colSpan={3} />
+
+                        {/* Order / Cancel actions */}
+                        <td className="px-6 py-3">
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              form={`inv-order-form-${item.productId}`}
+                              disabled={ordering}
+                              className="text-xs bg-purple-600 text-white rounded px-3 py-1.5 hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                            >
+                              {ordering ? 'Sending…' : 'Send Order'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelOrder}
+                              disabled={ordering}
+                              className="text-xs bg-white border border-gray-300 text-gray-600 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return (
                     /* ── Read-only row ── */
                     <tr key={item.productId} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
@@ -289,16 +396,24 @@ export default function AdminInventoryPage() {
                       </td>
 
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleOrder(item)}
+                            className="text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors"
+                          >
+                            Order
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  )
-                )}
+                  );
+                })}
             </tbody>
           </table>
 
@@ -313,3 +428,4 @@ export default function AdminInventoryPage() {
     </div>
   );
 }
+

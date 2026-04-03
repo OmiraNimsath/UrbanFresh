@@ -81,6 +81,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .productId(product.getId())
                 .productName(product.getName())
                 .category(product.getCategory())
+                .brandId(product.getBrand() != null ? product.getBrand().getId() : null)
                 .quantity(product.getStockQuantity())
                 .reorderThreshold(product.getReorderThreshold())
                 .lowStock(product.getStockQuantity() <= product.getReorderThreshold())

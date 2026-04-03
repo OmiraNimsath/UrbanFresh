@@ -35,6 +35,8 @@ public class InventoryResponse {
     /** Minimum quantity before a restock alert is triggered. */
     private int reorderThreshold;
 
+    private Long brandId;
+
     /**
      * True when quantity is at or below the reorderThreshold.
      * Derived at mapping time — not stored in the database.

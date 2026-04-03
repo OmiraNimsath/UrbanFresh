@@ -108,7 +108,7 @@ public class SecurityConfig {
      */
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
-        var config = new org.springframework.web.cors.CorsConfiguration();
+        var config = new org.springframework.web.cors.CorsConfiguration();      
         config.addAllowedOrigin("http://localhost:5173");
         config.addAllowedMethod("*");
         config.addAllowedHeader("*");

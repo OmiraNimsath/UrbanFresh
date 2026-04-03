@@ -48,14 +48,21 @@ export default function SupplierDashboard() {
       <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-md p-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-green-700">UrbanFresh Supplier Dashboard</h1>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-red-500 hover:text-red-700 font-medium"
-          >
-            Logout
-          </button>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate('/supplier/purchase-orders')}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              View Purchase Orders
+            </button>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-red-500 hover:text-red-700 font-medium"     
+            >
+              Logout
+            </button>
+          </div>
         </div>
-        
         <p className="text-gray-600 mb-6">
           Welcome, <span className="font-semibold">{user?.name}</span>
         </p>

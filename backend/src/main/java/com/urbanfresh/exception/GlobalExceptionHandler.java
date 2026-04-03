@@ -255,6 +255,32 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle unauthorized access to a purchase order -> 403 Forbidden.
+     */
+    @ExceptionHandler(PurchaseOrderAccessException.class)
+    public ResponseEntity<ApiErrorResponse> handlePurchaseOrderAccess(PurchaseOrderAccessException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.FORBIDDEN.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    /**
+     * Handle purchase order not found -> 404 Not Found.
+     */
+    @ExceptionHandler(PurchaseOrderNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handlePurchaseOrderNotFound(PurchaseOrderNotFoundException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
      * Catch-all for unexpected errors → 500 Internal Server Error.
      * Logs the actual exception but returns a generic message to the client.
      */
