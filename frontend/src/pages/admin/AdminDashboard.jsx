@@ -197,8 +197,11 @@ const AdminDashboard = () => {
               </p>
             </div>
 
-            {/* Near Expiry Alert */}
-            <div className="bg-orange-50 border-l-4 border-orange-400 rounded-lg p-6">
+            {/* Near Expiry Alert — links to expiry dashboard */}
+            <Link
+              to="/admin/expiry"
+              className="bg-orange-50 border-l-4 border-orange-400 rounded-lg p-6 hover:bg-orange-100 transition-colors block"
+            >
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-2xl">🕐</span>
                 <p className="font-semibold text-gray-800">Near Expiry Items</p>
@@ -207,9 +210,9 @@ const AdminDashboard = () => {
                 {dashboardData?.nearExpiryItemsCount || 0}
               </p>
               <p className="text-sm text-gray-600">
-                Items expiring within 7 days
+                Items expiring within 7 days · <span className="underline">View details</span>
               </p>
-            </div>
+            </Link>
 
             {/* Waste Percentage Alert */}
             <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-6">
@@ -294,6 +297,17 @@ const AdminDashboard = () => {
               <div>
                 <p className="font-semibold text-gray-800">Manage Brands</p>
                 <p className="text-xs text-gray-400">Create, update, and deactivate brands</p>
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/expiry"
+              className="flex items-center gap-4 p-4 bg-white border border-orange-200 rounded-lg hover:border-orange-400 hover:bg-orange-50 transition-colors"
+            >
+              <span className="text-3xl">🕐</span>
+              <div>
+                <p className="font-semibold text-gray-800">Expiry Dashboard</p>
+                <p className="text-xs text-gray-400">Near-expiry products by urgency</p>
               </div>
             </Link>
           </div>

@@ -1,5 +1,6 @@
 package com.urbanfresh.service.impl;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -37,9 +38,10 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         response.setActiveSuppliersCount(userRepository.countByRoleAndIsActiveTrue(Role.SUPPLIER));
         response.setTotalProductsCount((int) productRepository.count());
         
-        // Alerts remain zero until inventory analytics features are enabled.
-        response.setLowStockItemsCount(0);
-        response.setNearExpiryItemsCount(0);
+        // Low stock: products at or below their reorder threshold
+        response.setLowStockItemsCount(countLowStockProducts());
+        // Near expiry: in-stock approved products expiring within 7 days
+        response.setNearExpiryItemsCount(countNearExpiryProducts());
         response.setWastePercentage(0.0);
         
         // Summary
@@ -62,5 +64,27 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                            "CONFIRMED".equals(order.getStatus().toString()))
             .mapToDouble(order -> order.getTotalAmount() != null ? order.getTotalAmount().doubleValue() : 0.0)
             .sum();
+    }
+
+    /**
+     * Counts in-stock approved products expiring within the next 7 days.
+     * Reuses the existing repository query used by the public near-expiry endpoint.
+     */
+    private int countNearExpiryProducts() {
+        LocalDate today = LocalDate.now();
+        LocalDate cutoff = today.plusDays(7);
+        return productRepository
+                .findByExpiryDateBetweenAndStockQuantityGreaterThanOrderByExpiryDateAsc(today, cutoff, 0)
+                .size();
+    }
+
+    /**
+     * Counts products whose current stock is at or below their reorder threshold.
+     * Uses a JPQL query to avoid loading all products into memory.
+     */
+    private int countLowStockProducts() {
+        return (int) productRepository.findAll().stream()
+                .filter(p -> p.getStockQuantity() <= p.getReorderThreshold())
+                .count();
     }
 }
