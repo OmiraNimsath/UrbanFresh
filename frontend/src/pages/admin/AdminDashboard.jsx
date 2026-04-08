@@ -310,6 +310,17 @@ const AdminDashboard = () => {
                 <p className="text-xs text-gray-400">Near-expiry products by urgency</p>
               </div>
             </Link>
+
+            <Link
+              to="/admin/waste-report"
+              className="flex items-center gap-4 p-4 bg-white border border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
+            >
+              <span className="text-3xl">♻️</span>
+              <div>
+                <p className="font-semibold text-gray-800">Waste Report</p>
+                <p className="text-xs text-gray-400">Expired stock waste analysis</p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>

@@ -140,4 +140,37 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      * Find products by approval status with pagination.
      */
     Page<Product> findByApprovalStatus(com.urbanfresh.model.ApprovalStatus status, Pageable pageable);
+
+    /**
+     * Returns all approved products whose expiry date is strictly before the given
+     * cutoff date AND that still have remaining stock.
+     * These are the "wasted" units — stock that was not sold before the product expired.
+     * Results are sorted by expiry date ascending so oldest waste appears first.
+     *
+     * @param cutoff     exclusive upper-bound for expiry (typically today's date — only truly
+     *                   expired products are included, not ones expiring today)
+     * @param minStock   minimum stock threshold; pass 0 to exclude zero-stock rows
+     * @return list of expired in-stock approved products, ordered by expiry date ASC
+     */
+    @Query("SELECT p FROM Product p " +
+           "WHERE p.approvalStatus = 'APPROVED' " +
+           "AND p.expiryDate < :cutoff " +
+           "AND p.stockQuantity > :minStock " +
+           "ORDER BY p.expiryDate ASC")
+    List<Product> findExpiredWithRemainingStock(
+            @Param("cutoff") LocalDate cutoff,
+            @Param("minStock") int minStock
+    );
+
+    /**
+     * Returns the total monetary value of all approved in-stock products.
+     * Used as the denominator when computing the overall waste percentage so
+     * the ratio reflects the share of active inventory that was lost to expiry.
+     *
+     * @return sum of (price × stockQuantity) across all approved in-stock products;
+     *         returns null when no matching rows exist — callers must handle null
+     */
+    @Query("SELECT SUM(p.price * p.stockQuantity) FROM Product p " +
+           "WHERE p.approvalStatus = 'APPROVED' AND p.stockQuantity > 0")
+    java.math.BigDecimal sumApprovedInventoryValue();
 }

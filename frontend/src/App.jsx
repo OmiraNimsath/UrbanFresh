@@ -23,6 +23,7 @@ import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
 import AdminBrandsPage from './pages/admin/AdminBrandsPage';
 import AdminPurchaseOrdersPage from './pages/admin/AdminPurchaseOrdersPage';
 import AdminExpiryPage from './pages/admin/AdminExpiryPage';
+import AdminWasteReportPage from './pages/admin/AdminWasteReportPage';
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
 import SupplierPurchaseOrdersPage from './pages/supplier/SupplierPurchaseOrdersPage';
 import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
@@ -181,6 +182,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminExpiryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/waste-report"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminWasteReportPage />
               </ProtectedRoute>
             }
           />
