@@ -6,10 +6,15 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.urbanfresh.dto.response.ApiErrorResponse;
 
@@ -37,6 +42,77 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * Handle malformed JSON bodies or unreadable payloads → 400 Bad Request.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnreadableMessage(HttpMessageNotReadableException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message("Malformed request body")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * Handle query/path parameter type mismatches → 400 Bad Request.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String paramName = ex.getName();
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message("Invalid value for parameter '" + paramName + "'.")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * Handle missing required query parameters → 400 Bad Request.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingRequestParameter(MissingServletRequestParameterException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message("Missing required parameter '" + ex.getParameterName() + "'.")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * Handle missing required headers → 400 Bad Request.
+     */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingRequestHeader(MissingRequestHeaderException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message("Missing required header '" + ex.getHeaderName() + "'.")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * Handle unsupported media types → 415 Unsupported Media Type.
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value())
+                .message("Unsupported media type")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(response);
     }
 
     /**
