@@ -9,6 +9,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
+import com.urbanfresh.dto.response.ApiErrorResponse;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -39,10 +41,15 @@ public class RoleAccessDeniedHandler implements AccessDeniedHandler {
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        // Build JSON manually — keeps this class dependency-free (no ObjectMapper needed)
+        ApiErrorResponse payload = ApiErrorResponse.builder()
+            .status(HttpStatus.FORBIDDEN.value())
+            .message("Access denied. You do not have permission to perform this action.")
+            .timestamp(LocalDateTime.now())
+            .build();
+
         String json = String.format(
-                "{\"status\":403,\"message\":\"Access denied. You do not have permission to perform this action.\",\"timestamp\":\"%s\"}",
-                LocalDateTime.now()
+            "{\"status\":%d,\"message\":\"%s\",\"timestamp\":\"%s\"}",
+            payload.getStatus(), payload.getMessage(), payload.getTimestamp()
         );
         response.getWriter().write(json);
     }

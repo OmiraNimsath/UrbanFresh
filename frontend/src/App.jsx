@@ -1,37 +1,40 @@
+import React, { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import CartPage from './pages/customer/CartPage';
-import CheckoutPage from './pages/customer/CheckoutPage';
 import ProtectedRoute from './components/ProtectedRoute';
-import LandingPage from './pages/landing/LandingPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import LoginPage from './pages/auth/LoginPage';
-import ProductListingPage from './pages/products/ProductListingPage';
-import ProductDetailPage from './pages/products/ProductDetailPage';
-import CustomerDashboard from './pages/customer/CustomerDashboard';
-import ProfilePage from './pages/customer/ProfilePage';
-import OrderSuccessPage from './pages/customer/OrderSuccessPage';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminProductsPage from './pages/admin/AdminProductsPage';
-import AdminInventoryPage from './pages/admin/AdminInventoryPage';
-import AdminOrdersPage from './pages/admin/AdminOrdersPage';
-import AdminProfilePage from './pages/admin/AdminProfilePage';
-import DeliveryPersonnelPage from './pages/admin/DeliveryPersonnelPage';
-import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
-import AdminBrandsPage from './pages/admin/AdminBrandsPage';
-import AdminPurchaseOrdersPage from './pages/admin/AdminPurchaseOrdersPage';
-import AdminExpiryPage from './pages/admin/AdminExpiryPage';
-import AdminWasteReportPage from './pages/admin/AdminWasteReportPage';
-import SupplierDashboard from './pages/supplier/SupplierDashboard';
-import SupplierPurchaseOrdersPage from './pages/supplier/SupplierPurchaseOrdersPage';
-import DeliveryDashboard from './pages/delivery/DeliveryDashboard';
-import DeliveryCurrentOrdersPage from './pages/delivery/DeliveryCurrentOrdersPage';
-import DeliveryOrderHistoryPage from './pages/delivery/DeliveryOrderHistoryPage';
-import DeliveryOrderDetailsPage from './pages/delivery/DeliveryOrderDetailsPage';
-import DeliveryProfilePage from './pages/delivery/DeliveryProfilePage';
-import UnauthorizedPage from './pages/error/UnauthorizedPage';
+
+// Lazy-loaded pages to enable code-splitting and smaller initial bundle
+const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
+const ProductListingPage = lazy(() => import('./pages/products/ProductListingPage'));
+const ProductDetailPage = lazy(() => import('./pages/products/ProductDetailPage'));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const CartPage = lazy(() => import('./pages/customer/CartPage'));
+const CheckoutPage = lazy(() => import('./pages/customer/CheckoutPage'));
+const CustomerDashboard = lazy(() => import('./pages/customer/CustomerDashboard'));
+const ProfilePage = lazy(() => import('./pages/customer/ProfilePage'));
+const OrderSuccessPage = lazy(() => import('./pages/customer/OrderSuccessPage'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminProductsPage = lazy(() => import('./pages/admin/AdminProductsPage'));
+const AdminInventoryPage = lazy(() => import('./pages/admin/AdminInventoryPage'));
+const AdminOrdersPage = lazy(() => import('./pages/admin/AdminOrdersPage'));
+const AdminProfilePage = lazy(() => import('./pages/admin/AdminProfilePage'));
+const DeliveryPersonnelPage = lazy(() => import('./pages/admin/DeliveryPersonnelPage'));
+const AdminSuppliersPage = lazy(() => import('./pages/admin/AdminSuppliersPage'));
+const AdminBrandsPage = lazy(() => import('./pages/admin/AdminBrandsPage'));
+const AdminPurchaseOrdersPage = lazy(() => import('./pages/admin/AdminPurchaseOrdersPage'));
+const AdminExpiryPage = lazy(() => import('./pages/admin/AdminExpiryPage'));
+const AdminWasteReportPage = lazy(() => import('./pages/admin/AdminWasteReportPage'));
+const SupplierDashboard = lazy(() => import('./pages/supplier/SupplierDashboard'));
+const SupplierPurchaseOrdersPage = lazy(() => import('./pages/supplier/SupplierPurchaseOrdersPage'));
+const DeliveryDashboard = lazy(() => import('./pages/delivery/DeliveryDashboard'));
+const DeliveryCurrentOrdersPage = lazy(() => import('./pages/delivery/DeliveryCurrentOrdersPage'));
+const DeliveryOrderHistoryPage = lazy(() => import('./pages/delivery/DeliveryOrderHistoryPage'));
+const DeliveryOrderDetailsPage = lazy(() => import('./pages/delivery/DeliveryOrderDetailsPage'));
+const DeliveryProfilePage = lazy(() => import('./pages/delivery/DeliveryProfilePage'));
+const UnauthorizedPage = lazy(() => import('./pages/error/UnauthorizedPage'));
 
 /**
  * App – Root component.
@@ -44,6 +47,7 @@ function App() {
     <AuthProvider>
       <CartProvider>
       <BrowserRouter>
+        <Suspense fallback={<div className="app-loading">Loading...</div>}>
         {/* Global toast notifications */}
         <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
         <Routes>
@@ -253,6 +257,7 @@ function App() {
           {/* Default redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
       </CartProvider>
     </AuthProvider>
