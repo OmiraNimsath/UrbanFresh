@@ -92,6 +92,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/orders/**").authenticated()
                         // Customer dashboard endpoints (order history + loyalty) — CUSTOMER only via @PreAuthorize
                         .requestMatchers("/api/customer/**").authenticated()
+                        // In-app notification endpoints — CUSTOMER only via @PreAuthorize
+                        .requestMatchers("/api/notifications/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
