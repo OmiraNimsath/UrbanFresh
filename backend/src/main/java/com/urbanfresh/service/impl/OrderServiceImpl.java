@@ -42,6 +42,7 @@ import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.OrderStatusHistoryRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
+import com.urbanfresh.service.LoyaltyService;
 import com.urbanfresh.service.NotificationService;
 import com.urbanfresh.service.OrderService;
 
@@ -108,6 +109,7 @@ public class OrderServiceImpl implements OrderService {
         private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final LoyaltyService loyaltyService;
     private final NotificationService notificationService;
 
     /**
@@ -184,11 +186,22 @@ public class OrderServiceImpl implements OrderService {
                     .build());
         }
 
+        // Apply loyalty points discount if the customer requested redemption.
+        BigDecimal discount = BigDecimal.ZERO;
+        int pointsRedeemed = 0;
+        if (request.getPointsToRedeem() > 0) {
+            discount = loyaltyService.redeemPoints(customer, request.getPointsToRedeem(), total);
+            pointsRedeemed = request.getPointsToRedeem();
+            total = total.subtract(discount);
+        }
+
         // Build the order header and link items to it
         Order order = Order.builder()
                 .customer(customer)
                 .deliveryAddress(request.getDeliveryAddress())
                 .totalAmount(total)
+                .discountAmount(discount)
+                .pointsRedeemed(pointsRedeemed)
                 .status(OrderStatus.PENDING)
                 .build();
 
@@ -565,6 +578,8 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(resolvePersistedPaymentStatus(order))
                 .deliveryAddress(order.getDeliveryAddress())
                 .totalAmount(order.getTotalAmount())
+                .discountAmount(order.getDiscountAmount())
+                .pointsRedeemed(order.getPointsRedeemed())
                 .createdAt(order.getCreatedAt())
                 .items(itemResponses)
                 .build();
