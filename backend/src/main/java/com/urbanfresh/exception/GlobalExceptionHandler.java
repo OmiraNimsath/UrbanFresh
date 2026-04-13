@@ -357,6 +357,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle notification not found or not owned by the requesting customer → 404 Not Found.
+     */
+    @ExceptionHandler(NotificationNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNotificationNotFound(NotificationNotFoundException ex) {
+        ApiErrorResponse response = ApiErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
      * Catch-all for unexpected errors → 500 Internal Server Error.
      * Logs the actual exception but returns a generic message to the client.
      */

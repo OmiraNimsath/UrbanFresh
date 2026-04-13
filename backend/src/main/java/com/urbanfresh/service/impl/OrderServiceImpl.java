@@ -42,6 +42,7 @@ import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.OrderStatusHistoryRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
+import com.urbanfresh.service.NotificationService;
 import com.urbanfresh.service.OrderService;
 
 import lombok.RequiredArgsConstructor;
@@ -107,6 +108,7 @@ public class OrderServiceImpl implements OrderService {
         private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     /**
      * Places an order for the authenticated customer.
@@ -351,6 +353,8 @@ public class OrderServiceImpl implements OrderService {
                                                 .changeReason(normalizeChangeReason(request.getChangeReason()))
                                                 .build());
 
+                                notificationService.createOrderStatusNotification(updated, targetStatus);
+
                                 Order detailedUpdatedOrder = orderRepository
                                                 .findDetailedByIdAndAssignedDeliveryPersonId(orderId, deliveryPerson.getId())
                                                 .orElse(updated);
@@ -507,6 +511,8 @@ public class OrderServiceImpl implements OrderService {
                                 .changedByAdmin(adminUser)
                                 .changeReason(normalizedReason)
                                 .build());
+
+                notificationService.createOrderStatusNotification(updated, targetStatus);
 
                 return toAdminOrderResponse(updated);
         }
@@ -920,6 +926,11 @@ public class OrderServiceImpl implements OrderService {
                                 .changedByAdmin(adminUser)
                                 .changeReason("Assigned to delivery personnel: " + deliveryPerson.getName())
                                 .build());
+
+                // Only notify when the status actually changed (READY → OUT_FOR_DELIVERY)
+                if (updated.getStatus() != previousStatus) {
+                        notificationService.createOrderStatusNotification(updated, updated.getStatus());
+                }
 
                 return toAdminOrderResponse(updated);
         }

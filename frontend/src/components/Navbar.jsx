@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import NotificationBell from './NotificationBell';
 
 /**
  * Presentation Layer – Shared auth-aware navigation bar.
@@ -53,6 +54,9 @@ export default function Navbar() {
               <span className="inline-flex items-center justify-center w-5 h-5 bg-green-100 rounded-full text-green-600 text-xs">✓</span>
               Welcome back, {user?.name}!
             </span>
+
+            {/* Notification bell — visible to CUSTOMER only */}
+            {user?.role === 'CUSTOMER' && <NotificationBell />}
 
             {/* Cart shortcut — visible to CUSTOMER only */}
             {user?.role === 'CUSTOMER' && (

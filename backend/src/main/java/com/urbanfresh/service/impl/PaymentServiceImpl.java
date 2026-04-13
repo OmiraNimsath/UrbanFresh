@@ -32,6 +32,7 @@ import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.PaymentRepository;
 import com.urbanfresh.repository.UserRepository;
 import com.urbanfresh.service.LoyaltyService;
+import com.urbanfresh.service.NotificationService;
 import com.urbanfresh.service.PaymentService;
 
 import lombok.RequiredArgsConstructor;
@@ -78,6 +79,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final LoyaltyService loyaltyService;
+    private final NotificationService notificationService;
 
     /**
      * Creates a Stripe PaymentIntent for a customer-owned order.
@@ -400,6 +402,8 @@ public class PaymentServiceImpl implements PaymentService {
         order.setStatus(OrderStatus.CONFIRMED);
         order.setPaymentStatus(PaymentStatus.PAID);
         orderRepository.save(order);
+
+        notificationService.createOrderStatusNotification(order, OrderStatus.CONFIRMED);
 
         // Award loyalty points only now — payment is confirmed and the order is CONFIRMED.
         // Awarding here prevents customers from earning points on failed/cancelled payments.

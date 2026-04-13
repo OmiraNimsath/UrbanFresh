@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getMyOrders, getLoyaltyPoints } from '../../services/orderService';
 import { formatAmount } from '../../utils/priceUtils';
 import PaymentModal from '../../components/PaymentModal';
+import useNotifications from '../../hooks/useNotifications';
 
 /**
  * Presentation Layer – Customer dashboard page.
@@ -23,6 +24,8 @@ export default function CustomerDashboard() {
   const [loading, setLoading] = useState(true);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
+
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
   /** Load orders and loyalty points in parallel on mount.
    * allSettled ensures partial success: if one call fails, the other section
@@ -95,6 +98,64 @@ export default function CustomerDashboard() {
               Logout
             </button>
           </div>
+        </div>
+
+        {/* ── Notifications Section ── */}
+        <div className="bg-white rounded-2xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800">
+              🔔 Notifications
+              {unreadCount > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full px-1">
+                  {unreadCount}
+                </span>
+              )}
+            </h2>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllRead}
+                className="text-xs text-green-600 hover:text-green-800 font-medium transition-colors"
+              >
+                Mark all as read
+              </button>
+            )}
+          </div>
+
+          {notifications.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No notifications yet</p>
+          ) : (
+            <div className="space-y-2">
+              {notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className={`flex items-start gap-3 rounded-xl px-4 py-3 ${
+                    n.read ? 'bg-gray-50' : 'bg-green-50 border border-green-100'
+                  }`}
+                >
+                  <span className="text-base mt-0.5" aria-hidden="true">
+                    {n.read ? '📭' : '📬'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-700 leading-snug">{n.message}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(n.createdAt).toLocaleString('en-LK', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })}
+                    </p>
+                  </div>
+                  {!n.read && (
+                    <button
+                      onClick={() => markRead(n.id)}
+                      className="text-xs text-green-600 hover:text-green-800 font-medium whitespace-nowrap mt-0.5 transition-colors"
+                    >
+                      Mark read
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Loyalty Points Section ── */}
