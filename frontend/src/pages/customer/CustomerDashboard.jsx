@@ -166,9 +166,11 @@ export default function CustomerDashboard() {
               <LoyaltyStat label="Available Balance" value={loyalty.totalPoints} highlight />
               <LoyaltyStat label="Total Earned" value={loyalty.earnedPoints} />
               <LoyaltyStat label="Redeemed" value={loyalty.redeemedPoints} />
-              {/* Placeholder tile for redemption — reserved for future sprint */}
-              <div className="bg-green-50 rounded-xl p-4 flex flex-col items-center justify-center border border-dashed border-green-300">
-                <p className="text-xs text-green-600 font-medium text-center">Redeem coming soon</p>
+              {/* Redemption tile — points can now be applied in the cart */}
+              <div className="bg-green-50 rounded-xl p-4 flex flex-col items-center justify-center border border-green-200">
+                <p className="text-2xl mb-1">🛒</p>
+                <p className="text-xs text-green-700 font-medium text-center leading-tight">Apply in Cart</p>
+                <p className="text-xs text-green-600 text-center mt-0.5">1 pt = Rs. 5 off</p>
               </div>
             </div>
             {/* Conversion rule displayed so customer understands how points accumulate */}
