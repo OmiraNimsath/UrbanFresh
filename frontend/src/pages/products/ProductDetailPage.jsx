@@ -5,7 +5,7 @@ import { getProductById } from '../../services/productService';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import Navbar from '../../components/Navbar';
-import { formatPrice } from '../../utils/priceUtils';
+import { formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
 
 /**
  * Page Layer – Public product detail page.
@@ -141,9 +141,23 @@ function ProductDetail({ product }) {
 
         <h1 className="text-2xl font-bold text-gray-800">{product.name}</h1>
 
-        <p className="text-3xl font-bold text-green-700">
-          {formatPrice(product.price, product.unit)}
-        </p>
+        {product.discountPercentage ? (
+          <div className="space-y-1">
+            <div className="text-lg text-red-600 line-through">
+              {formatPrice(product.price, product.unit)}
+            </div>
+            <p className="text-3xl font-bold text-green-700">
+              {formatPrice(calculateDiscountedPrice(product.price, product.discountPercentage), product.unit)}
+            </p>
+            <div className="inline-block bg-green-100 text-green-700 font-bold px-3 py-1 rounded-lg text-sm">
+              {product.discountPercentage}% OFF
+            </div>
+          </div>
+        ) : (
+          <p className="text-3xl font-bold text-green-700">
+            {formatPrice(product.price, product.unit)}
+          </p>
+        )}
 
         {/* Near-expiry notice — surfaces discount opportunity and urgency */}
         {isNearExpiry && (

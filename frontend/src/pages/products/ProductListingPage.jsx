@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories } from '../../services/productService';
 import Navbar from '../../components/Navbar';
 import SearchBar from '../../components/SearchBar';
-import { formatPrice } from '../../utils/priceUtils';
+import { formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
 
 /**
  * Page Layer – Public product listing page.
@@ -267,7 +267,23 @@ function ProductCard({ product }) {
 
         <div className="mt-auto space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-green-700 font-bold">{formatPrice(product.price, product.unit)}</span>
+            <div className="flex flex-col">
+              {product.discountPercentage ? (
+                <>
+                  <div className="text-xs text-red-600 line-through">
+                    {formatPrice(product.price, product.unit)}
+                  </div>
+                  <div className="text-green-700 font-bold">
+                    {formatPrice(calculateDiscountedPrice(product.price, product.discountPercentage), product.unit)}
+                  </div>
+                  <div className="text-xs font-semibold text-green-600 bg-green-50 px-1 rounded">
+                    {product.discountPercentage}% OFF
+                  </div>
+                </>
+              ) : (
+                <span className="text-green-700 font-bold">{formatPrice(product.price, product.unit)}</span>
+              )}
+            </div>
             {!product.inStock && (
               <span className="text-xs text-red-500 font-medium">Out of stock</span>
             )}
