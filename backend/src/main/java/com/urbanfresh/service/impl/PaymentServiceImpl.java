@@ -405,13 +405,19 @@ public class PaymentServiceImpl implements PaymentService {
 
         notificationService.createOrderStatusNotification(order, OrderStatus.CONFIRMED);
 
-        // Award loyalty points only now — payment is confirmed and the order is CONFIRMED.
-        // Awarding here prevents customers from earning points on failed/cancelled payments.
-        //
-        // Points are calculated from the product-discounted items subtotal (SCRUM-39 AC:
-        // "loyalty points calculate from discounted price"). The loyalty redemption discount
-        // must NOT reduce the earning base — customers should not be penalised for redeeming
-        // points. itemsSubtotal = totalAmount + discountAmount restores the pre-loyalty total.
+        // Deduct loyalty points NOW — payment is confirmed so it's safe to consume them.
+        // Points were validated (but NOT deducted) at order placement in OrderServiceImpl.
+        // This two-phase approach ensures a failed payment never permanently burns a
+        // customer's loyalty balance.
+        // The idempotency guard above (already CONFIRMED check) prevents double-deduction
+        // if both payment_intent.succeeded and charge.updated fire for the same payment.
+        if (order.getPointsRedeemed() > 0) {
+            loyaltyService.deductRedeemedPoints(order.getCustomer(), order.getPointsRedeemed());
+        }
+
+        // Award loyalty points based on the product-discounted items subtotal (SCRUM-39 AC:
+        // "loyalty points calculate from discounted price"). itemsSubtotal restores the
+        // pre-loyalty-redemption total so redeeming points doesn't reduce what you earn.
         java.math.BigDecimal itemsSubtotal = order.getTotalAmount().add(order.getDiscountAmount());
         loyaltyService.awardPoints(order.getCustomer(), itemsSubtotal);
 

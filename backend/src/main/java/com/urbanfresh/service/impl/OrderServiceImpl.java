@@ -199,11 +199,16 @@ public class OrderServiceImpl implements OrderService {
                     .build());
         }
 
-        // Apply loyalty points discount if the customer requested redemption.
+        // Validate loyalty points redemption and lock the discount into the order total.
+        // Points are validated here (balance check + max-discount guard) so the customer
+        // gets immediate feedback if their balance is insufficient, and the discounted total
+        // is persisted on the order. The actual ledger deduction is deferred to
+        // PaymentServiceImpl.applyPaidState() — points are only consumed after the Stripe
+        // payment is confirmed, so a failed payment never permanently burns a customer's points.
         BigDecimal discount = BigDecimal.ZERO;
         int pointsRedeemed = 0;
         if (request.getPointsToRedeem() > 0) {
-            discount = loyaltyService.redeemPoints(customer, request.getPointsToRedeem(), total);
+            discount = loyaltyService.validatePointsRedemption(customer, request.getPointsToRedeem(), total);
             pointsRedeemed = request.getPointsToRedeem();
             total = total.subtract(discount);
         }

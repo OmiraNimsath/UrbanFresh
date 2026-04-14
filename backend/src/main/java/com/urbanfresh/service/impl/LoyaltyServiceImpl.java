@@ -131,6 +131,63 @@ public class LoyaltyServiceImpl implements LoyaltyService {
         return discount;
     }
 
+    /**
+     * Validates a redemption request without touching the ledger.
+     * Performs the same balance and max-discount checks as redeemPoints, but returns
+     * the discount amount without updating redeemedPoints.
+     * Called at order placement so the discount is locked into the order total immediately.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal validatePointsRedemption(User customer, int pointsToRedeem, BigDecimal orderTotal) {
+        LoyaltyPoints ledger = loyaltyPointsRepository
+                .findByCustomerId(customer.getId())
+                .orElseThrow(() -> new InsufficientLoyaltyPointsException(
+                        "You have no loyalty points available to redeem."));
+
+        int available = ledger.getTotalPoints();
+        if (pointsToRedeem > available) {
+            throw new InsufficientLoyaltyPointsException(
+                    "Insufficient loyalty points. Available: " + available
+                    + ", requested: " + pointsToRedeem + ".");
+        }
+
+        BigDecimal discount = BigDecimal.valueOf((long) pointsToRedeem * LKR_PER_REDEMPTION_POINT);
+        if (discount.compareTo(orderTotal) > 0) {
+            int maxRedeemable = orderTotal
+                    .divide(BigDecimal.valueOf(LKR_PER_REDEMPTION_POINT), 0, RoundingMode.FLOOR)
+                    .intValue();
+            throw new InsufficientLoyaltyPointsException(
+                    "Redemption discount of Rs. " + discount.toPlainString()
+                    + " exceeds the order total. Maximum redeemable: " + maxRedeemable + " points.");
+        }
+
+        // No ledger mutation — discount amount is returned for baking into the order total
+        return discount;
+    }
+
+    /**
+     * Deducts already-validated points from the customer's ledger.
+     * Must be called only after payment is confirmed (PENDING → CONFIRMED) so points
+     * are never permanently consumed for an unpaid order.
+     * Uses a pessimistic write lock to prevent concurrent double-deduction.
+     */
+    @Override
+    @Transactional
+    public void deductRedeemedPoints(User customer, int pointsToDeduct) {
+        if (pointsToDeduct <= 0) {
+            return; // nothing to deduct
+        }
+
+        LoyaltyPoints ledger = loyaltyPointsRepository
+                .findByCustomerIdWithLock(customer.getId())
+                .orElseThrow(() -> new InsufficientLoyaltyPointsException(
+                        "Loyalty ledger not found for customer — cannot deduct points."));
+
+        ledger.setRedeemedPoints(ledger.getRedeemedPoints() + pointsToDeduct);
+        loyaltyPointsRepository.save(ledger);
+    }
+
     /** Build a zero-balance in-memory ledger for a customer with no orders yet (not persisted). */
     private LoyaltyPoints emptyLedger(User customer) {
         return LoyaltyPoints.builder()
