@@ -3,6 +3,7 @@ package com.urbanfresh.service.impl;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,6 +18,7 @@ import com.urbanfresh.dto.response.ProductSuggestionResponse;
 import com.urbanfresh.exception.ProductNotFoundException;
 import com.urbanfresh.model.Product;
 import com.urbanfresh.repository.ProductRepository;
+import com.urbanfresh.service.ProductBatchService;
 import com.urbanfresh.service.ProductService;
 
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductBatchService productBatchService;
 
     /**
      * Fetches all products with featured=true and maps them to ProductResponse DTOs.
@@ -161,6 +164,19 @@ public class ProductServiceImpl implements ProductService {
      * @return populated ProductResponse
      */
     private ProductResponse toResponse(Product product) {
+        Optional<LocalDate> earliestExpiry = productBatchService.getEarliestExpiryDate(product.getId());
+        int batchStock = productBatchService.getTotalAvailableQuantity(product.getId());
+
+        // A product is in-stock when it has allocatable batch stock.
+        // Fall back to legacy stockQuantity for products without batch records.
+        boolean inStock = batchStock > 0 || (batchStock == 0 && product.getStockQuantity() > 0
+                && !earliestExpiry.isPresent());
+
+        // Near-expiry: any allocatable batch expires within 7 days from today
+        boolean hasNearExpiryBatches = earliestExpiry
+                .map(d -> !d.isAfter(LocalDate.now().plusDays(7)))
+                .orElse(false);
+
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -172,8 +188,9 @@ public class ProductServiceImpl implements ProductService {
                 .featured(product.isFeatured())
                 .expiryDate(product.getExpiryDate())
                 .discountPercentage(product.getDiscountPercentage())
-                // expose availability only — raw quantity is internal warehouse data
-                .inStock(product.getStockQuantity() > 0)
+                .inStock(inStock)
+                .earliestExpiryDate(earliestExpiry.orElse(null))
+                .hasNearExpiryBatches(hasNearExpiryBatches)
                 .build();
     }
 }
