@@ -8,9 +8,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.urbanfresh.dto.request.InventoryUpdateRequest;
+import com.urbanfresh.dto.response.BatchResponse;
 import com.urbanfresh.dto.response.InventoryResponse;
 import com.urbanfresh.exception.ProductNotFoundException;
+import com.urbanfresh.model.BatchStatus;
 import com.urbanfresh.model.Product;
+import com.urbanfresh.model.ProductBatch;
+import com.urbanfresh.repository.ProductBatchRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.service.InventoryService;
 
@@ -27,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class InventoryServiceImpl implements InventoryService {
 
     private final ProductRepository productRepository;
+    private final ProductBatchRepository productBatchRepository;
 
     /**
      * Retrieves all products sorted alphabetically and maps each to an InventoryResponse.
@@ -67,6 +72,65 @@ public class InventoryServiceImpl implements InventoryService {
         return toInventoryResponse(saved);
     }
 
+    /**
+     * Returns all batches for a product ordered by expiry date ascending.
+     * Provides the admin with a full snapshot of batch composition per product.
+     *
+     * @param productId ID of the product
+     * @return list of BatchResponse ordered oldest-expiry-first
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<BatchResponse> getProductBatches(Long productId) {
+        if (!productRepository.existsById(productId)) {
+            throw new ProductNotFoundException(productId);
+        }
+        return productBatchRepository
+                .findByProductIdOrderByExpiryDateAsc(productId)
+                .stream()
+                .map(this::toBatchResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Sets a batch status to QUARANTINED so it is excluded from FIFO allocation.
+     * Also decrements the product's legacy stockQuantity by the batch's remaining
+     * available units, keeping the aggregate count consistent.
+     *
+     * @param productId ID of the owning product (cross-checked for integrity)
+     * @param batchId   ID of the batch to quarantine
+     * @return updated BatchResponse with QUARANTINED status
+     */
+    @Override
+    @Transactional
+    public BatchResponse quarantineBatch(Long productId, Long batchId) {
+        ProductBatch batch = productBatchRepository.findById(batchId)
+                .orElseThrow(() -> new IllegalArgumentException("Batch ID " + batchId + " not found."));
+
+        // Verify the batch actually belongs to the specified product
+        if (!batch.getProduct().getId().equals(productId)) {
+            throw new IllegalArgumentException(
+                    "Batch ID " + batchId + " does not belong to product ID " + productId + ".");
+        }
+
+        // Idempotent: already quarantined batches return as-is
+        if (batch.getStatus() == BatchStatus.QUARANTINED) {
+            return toBatchResponse(batch);
+        }
+
+        // Subtract the batch's remaining available units from legacy stockQuantity
+        Product product = batch.getProduct();
+        int toDeduct = batch.getAvailableQuantity();
+        if (toDeduct > 0) {
+            product.setStockQuantity(Math.max(0, product.getStockQuantity() - toDeduct));
+            productRepository.save(product);
+        }
+
+        batch.setStatus(BatchStatus.QUARANTINED);
+        batch.setAvailableQuantity(0);
+        return toBatchResponse(productBatchRepository.save(batch));
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /**
@@ -87,6 +151,27 @@ public class InventoryServiceImpl implements InventoryService {
                 .lowStock(product.getStockQuantity() <= product.getReorderThreshold())
                 .updatedAt(product.getUpdatedAt())
                 .updatedBy(product.getInventoryUpdatedBy())
+                .build();
+    }
+
+    /**
+     * Maps a ProductBatch entity to a BatchResponse DTO.
+     *
+     * @param batch source entity
+     * @return mapped BatchResponse
+     */
+    private BatchResponse toBatchResponse(ProductBatch batch) {
+        return BatchResponse.builder()
+                .id(batch.getId())
+                .batchNumber(batch.getBatchNumber())
+                .manufacturingDate(batch.getManufacturingDate())
+                .expiryDate(batch.getExpiryDate())
+                .receivedQuantity(batch.getReceivedQuantity())
+                .availableQuantity(batch.getAvailableQuantity())
+                .status(batch.getStatus())
+                .purchaseOrderItemId(batch.getPurchaseOrderItemId())
+                .notes(batch.getNotes())
+                .receivedAt(batch.getReceivedAt())
                 .build();
     }
 }
