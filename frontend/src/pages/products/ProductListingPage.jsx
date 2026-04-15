@@ -230,10 +230,14 @@ export default function ProductListingPage() {
  * @param {Object} product - ProductResponse from the API
  */
 function ProductCard({ product }) {
-  // A product is near-expiry when its expiryDate is within 7 days from today
-  const isNearExpiry = product.expiryDate
-    ? Math.ceil((new Date(product.expiryDate) - new Date()) / 86400000) <= 7
-    : false;
+  // Prefer the batch-aware flag from the API; fall back to the legacy single expiryDate
+  const isNearExpiry = product.hasNearExpiryBatches
+    ?? (product.expiryDate
+      ? Math.ceil((new Date(product.expiryDate) - new Date()) / 86400000) <= 7
+      : false);
+
+  // Show the earliest batch expiry date when available, otherwise the legacy field
+  const expiryLabel = product.earliestExpiryDate ?? product.expiryDate;
 
   return (
     <Link
@@ -291,7 +295,7 @@ function ProductCard({ product }) {
           {/* Near-expiry badge — highlights discount opportunity */}
           {isNearExpiry && (
             <div className="text-xs bg-amber-100 text-amber-700 rounded px-2 py-1 text-center font-medium">
-              🕐 Expires {product.expiryDate}
+              🕐 Expires {expiryLabel}
             </div>
           )}
         </div>

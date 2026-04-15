@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { getInventory, updateInventory } from '../../services/inventoryService';
+import { getInventory, updateInventory, getProductBatches, quarantineBatch } from '../../services/inventoryService';
 import { createPurchaseOrder } from '../../services/adminPurchaseOrderService';
 
 /**
@@ -25,6 +25,12 @@ export default function AdminInventoryPage() {
   const [orderItem, setOrderItem]     = useState(null);
   const [orderQuantity, setOrderQuantity] = useState('');
   const [ordering, setOrdering]       = useState(false);
+
+  // Batch drawer state
+  const [batchDrawerItem, setBatchDrawerItem]   = useState(null); // inventory row
+  const [batches, setBatches]                   = useState([]);
+  const [batchesLoading, setBatchesLoading]     = useState(false);
+  const [quarantining, setQuarantining]         = useState(null); // batchId being quarantined
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -85,6 +91,36 @@ export default function AdminInventoryPage() {
   const handleCancelOrder = () => {
     setOrderItem(null);
     setOrderQuantity('');
+  };
+
+  /** Opens the batch drawer for a product row and loads its batches. */
+  const handleViewBatches = async (item) => {
+    setBatchDrawerItem(item);
+    setBatches([]);
+    setBatchesLoading(true);
+    try {
+      const data = await getProductBatches(item.productId);
+      setBatches(data);
+    } catch {
+      toast.error('Failed to load batches.');
+    } finally {
+      setBatchesLoading(false);
+    }
+  };
+
+  /** Quarantines a single batch and refreshes the drawer list. */
+  const handleQuarantine = async (batchId) => {
+    setQuarantining(batchId);
+    try {
+      const updated = await quarantineBatch(batchDrawerItem.productId, batchId);
+      setBatches((prev) => prev.map((b) => (b.id === batchId ? updated : b)));
+      toast.success(`Batch ${updated.batchNumber} quarantined.`);
+      fetchInventory(); // refresh aggregate stock counts
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to quarantine batch.');
+    } finally {
+      setQuarantining(null);
+    }
   };
 
   /** Creates purchase order for the row item */
@@ -409,6 +445,12 @@ export default function AdminInventoryPage() {
                           >
                             Order
                           </button>
+                          <button
+                            onClick={() => handleViewBatches(item)}
+                            className="text-xs text-amber-600 hover:text-amber-800 font-medium transition-colors"
+                          >
+                            Batches
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -425,7 +467,121 @@ export default function AdminInventoryPage() {
           )}
         </div>
       </div>
+
+      {/* ── Batch drawer ── */}
+      {batchDrawerItem && (
+        <BatchDrawer
+          item={batchDrawerItem}
+          batches={batches}
+          loading={batchesLoading}
+          quarantining={quarantining}
+          onQuarantine={handleQuarantine}
+          onClose={() => setBatchDrawerItem(null)}
+        />
+      )}
     </div>
   );
 }
 
+/* ─────────────────────────────────────────────
+   BatchDrawer — slide-over panel listing all
+   batches for a product with quarantine action
+───────────────────────────────────────────── */
+
+const BATCH_STATUS_STYLES = {
+  RECEIVED:     'bg-blue-50 text-blue-700 border-blue-200',
+  ACTIVE:       'bg-green-50 text-green-700 border-green-200',
+  NEAR_EXPIRY:  'bg-amber-50 text-amber-700 border-amber-200',
+  QUARANTINED:  'bg-red-50 text-red-700 border-red-200',
+  EXPIRED:      'bg-gray-100 text-gray-500 border-gray-200',
+};
+
+function BatchDrawer({ item, batches, loading, quarantining, onQuarantine, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Panel */}
+      <div className="relative w-full max-w-lg bg-white shadow-xl flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 className="text-base font-bold text-gray-800">Batch Inventory</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{item.productName}</p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close batch drawer"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {loading && (
+            <div className="space-y-3 animate-pulse">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-16 bg-gray-100 rounded-lg" />
+              ))}
+            </div>
+          )}
+
+          {!loading && batches.length === 0 && (
+            <div className="text-center py-16 text-gray-400 text-sm">
+              No batch records found for this product.
+            </div>
+          )}
+
+          {!loading && batches.length > 0 && (
+            <div className="space-y-3">
+              {batches.map((batch) => (
+                <div
+                  key={batch.id}
+                  className="border border-gray-200 rounded-lg p-4 flex items-start justify-between gap-3"
+                >
+                  <div className="flex-1 min-w-0 space-y-1 text-sm">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-800">{batch.batchNumber}</span>
+                      <span className={`text-xs font-medium border rounded-full px-2 py-0.5 ${BATCH_STATUS_STYLES[batch.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                        {batch.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-0.5">
+                      {batch.expiryDate && <span>Expires: <span className="text-gray-700">{batch.expiryDate}</span></span>}
+                      {batch.manufacturingDate && <span>Mfg: <span className="text-gray-700">{batch.manufacturingDate}</span></span>}
+                      <span>Received: <span className="text-gray-700">{batch.receivedQuantity}</span></span>
+                      <span>Available: <span className={batch.availableQuantity === 0 ? 'text-red-500 font-medium' : 'text-gray-700'}>{batch.availableQuantity}</span></span>
+                    </div>
+                    {batch.notes && (
+                      <p className="text-xs text-gray-400 italic">{batch.notes}</p>
+                    )}
+                  </div>
+
+                  {/* Quarantine action — only for non-quarantined, non-expired batches */}
+                  {batch.status !== 'QUARANTINED' && batch.status !== 'EXPIRED' && (
+                    <button
+                      onClick={() => onQuarantine(batch.id)}
+                      disabled={quarantining === batch.id}
+                      className="shrink-0 text-xs text-red-600 hover:text-red-800 border border-red-200 hover:border-red-400 rounded px-2.5 py-1 font-medium transition-colors disabled:opacity-50"
+                    >
+                      {quarantining === batch.id ? 'Quarantining…' : 'Quarantine'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

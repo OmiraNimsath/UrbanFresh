@@ -219,8 +219,20 @@ export default function SupplierPurchaseOrdersPage() {
                   <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-800 font-medium">#{order.id}</td>
                     <td className="px-4 py-3 text-gray-700">{order.brandName || "Unknown"}</td>
-                    <td className="px-4 py-3 text-gray-700 max-w-xs truncate">
-                      {order.items.map((i) => `${i.quantity}x ${i.productName}`).join(', ')}
+                    <td className="px-4 py-3 text-gray-700 max-w-xs">
+                      <div className="space-y-1">
+                        {order.items.map((item, idx) => (
+                          <div key={idx} className="text-xs">
+                            <span className="font-medium text-gray-800">{item.quantity}× {item.productName}</span>
+                            {(item.batchNumber || item.supplierExpiryDate) && (
+                              <div className="text-gray-400 mt-0.5 flex flex-wrap gap-x-2">
+                                {item.batchNumber && <span>Batch: {item.batchNumber}</span>}
+                                {item.supplierExpiryDate && <span>Exp: {item.supplierExpiryDate}</span>}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-gray-700">
                       {order.status === 'COMPLETED' 

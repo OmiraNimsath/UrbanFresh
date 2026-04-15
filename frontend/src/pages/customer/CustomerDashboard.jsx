@@ -417,30 +417,50 @@ function OrderCard({ order, onRetryPayment }) {
                   item.productDiscountPercentage > 0;
 
                 return (
-                  <tr key={idx} className="border-t border-gray-50">
-                    <td className="py-1">
-                      {item.productName}
-                      {hasProductDiscount && (
-                        <span className="ml-1 text-green-600 font-medium">
-                          ({item.productDiscountPercentage}% OFF)
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-right py-1">{item.quantity}</td>
-                    <td className="text-right py-1">
-                      {hasProductDiscount ? (
-                        <span>
-                          <span className="line-through text-gray-400 mr-1">
-                            {formatAmount(item.unitPrice)}
+                  <>
+                    <tr key={idx} className="border-t border-gray-50">
+                      <td className="py-1">
+                        {item.productName}
+                        {hasProductDiscount && (
+                          <span className="ml-1 text-green-600 font-medium">
+                            ({item.productDiscountPercentage}% OFF)
                           </span>
-                          <span className="text-green-700">{formatAmount(effectiveUnitPrice)}</span>
-                        </span>
-                      ) : (
-                        formatAmount(item.unitPrice)
-                      )}
-                    </td>
-                    <td className="text-right py-1">{formatAmount(item.lineTotal)}</td>
-                  </tr>
+                        )}
+                      </td>
+                      <td className="text-right py-1">{item.quantity}</td>
+                      <td className="text-right py-1">
+                        {hasProductDiscount ? (
+                          <span>
+                            <span className="line-through text-gray-400 mr-1">
+                              {formatAmount(item.unitPrice)}
+                            </span>
+                            <span className="text-green-700">{formatAmount(effectiveUnitPrice)}</span>
+                          </span>
+                        ) : (
+                          formatAmount(item.unitPrice)
+                        )}
+                      </td>
+                      <td className="text-right py-1">{formatAmount(item.lineTotal)}</td>
+                    </tr>
+                    {item.batchAllocations?.length > 0 && (
+                      <tr key={`${idx}-batches`} className="border-t border-gray-50 bg-gray-50">
+                        <td colSpan={4} className="py-1 px-2">
+                          <div className="flex flex-wrap gap-2">
+                            {item.batchAllocations.map((alloc, ai) => (
+                              <span
+                                key={ai}
+                                className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5 text-gray-500"
+                              >
+                                <span className="font-medium text-gray-700">{alloc.batchNumber}</span>
+                                {alloc.expiryDate && <span>· exp {alloc.expiryDate}</span>}
+                                <span>· qty {alloc.allocatedQuantity}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 );
               })}
             </tbody>
