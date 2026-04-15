@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { getExpiryBuckets } from '../../services/adminExpiryService';
-import { updateProduct } from '../../services/adminProductService';
+import { applyProductDiscount } from '../../services/adminProductService';
 
 /**
  * Admin Expiry Dashboard page.
@@ -88,20 +88,10 @@ export default function AdminExpiryPage() {
 
     setApplyingProductId(product.id);
     try {
-      // Build full product update payload
-      const updatePayload = {
-        name: product.name,
-        price: product.price,
-        category: product.category,
-        brandId: null, // Keep as-is
-        unit: product.unit,
-        featured: false,
-        expiryDate: product.expiryDate,
-        stockQuantity: product.stockQuantity,
-        discountPercentage: discountValue,
-      };
-
-      await updateProduct(product.id, updatePayload);
+      // Surgical PATCH — sends only discountPercentage to PATCH /api/admin/products/{id}/discount.
+      // Using the dedicated endpoint instead of the full PUT prevents overwriting brand linkage,
+      // description, imageUrl, featured status, and other unrelated product metadata.
+      await applyProductDiscount(product.id, discountValue);
       
       // Update local state to reflect change immediately
       setBuckets(prev => ({
