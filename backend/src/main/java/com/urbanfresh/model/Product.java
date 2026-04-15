@@ -4,6 +4,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,6 +18,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -101,6 +106,14 @@ public class Product {
     /** Email of the admin who last updated inventory fields (stockQuantity / reorderThreshold). */
     @Column(length = 150)
     private String inventoryUpdatedBy;
+
+    /**
+     * All shipment batches for this product. Used for FIFO allocation and batch-level admin views.
+     * CascadeType.ALL so batches are deleted when a product is removed.
+     */
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<ProductBatch> batches = new ArrayList<>();
 
     /** Indicates if the product listing is approved by an administrator. */
     @Enumerated(EnumType.STRING)
