@@ -84,6 +84,11 @@ public class Product {
     /** Expiry date used to surface near-expiry offers; null if the product does not expire. */
     private LocalDate expiryDate;
 
+    /** Discount percentage (0-100) applied to this product; null or 0 means no discount. */
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer discountPercentage = 0;
+
     @Column(nullable = false)
     @Builder.Default
     private int stockQuantity = 0;

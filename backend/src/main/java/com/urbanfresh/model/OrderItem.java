@@ -57,10 +57,15 @@ public class OrderItem {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
 
+    /** Snapshot of discount percentage at purchase time (0-100); preserves historical calculations. */
+    @Column(nullable = false)
+    @lombok.Builder.Default
+    private Integer productDiscountPercentage = 0;
+
     @Column(nullable = false)
     private int quantity;
 
-    /** Derived total for this line: unitPrice × quantity. */
+    /** Derived total for this line: discountedUnitPrice × quantity. */
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;
 }

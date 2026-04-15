@@ -34,6 +34,9 @@ public class ProductResponse {
     /** Null when the product has no expiry (non-perishable). */
     private LocalDate expiryDate;
 
+    /** Discount percentage (0-100) applied to this product; 0 means no discount. */
+    private Integer discountPercentage;
+
     /**
      * Derived availability flag — true when stockQuantity > 0.
      * Lets the frontend show/hide "Add to Cart" without exposing raw inventory numbers.

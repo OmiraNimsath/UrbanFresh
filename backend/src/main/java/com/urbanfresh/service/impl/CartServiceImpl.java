@@ -180,14 +180,28 @@ public class CartServiceImpl implements CartService {
 
     private CartItemResponse toCartItemResponse(CartItem item) {
         Product p = item.getProduct();
-        BigDecimal lineTotal = p.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+        
+        // Apply product discount if present, then calculate line total from discounted unit price
+        BigDecimal unitPrice = p.getPrice();
+        Integer discountPercentage = p.getDiscountPercentage() != null ? p.getDiscountPercentage() : 0;
+        BigDecimal discountedUnitPrice = unitPrice;
+        
+        if (discountPercentage > 0) {
+            // discountedUnitPrice = unitPrice * (1 - discount% / 100)
+            discountedUnitPrice = unitPrice.multiply(
+                BigDecimal.valueOf(100 - discountPercentage)
+            ).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+        }
+
+        BigDecimal lineTotal = discountedUnitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
 
         return CartItemResponse.builder()
                 .cartItemId(item.getId())
                 .productId(p.getId())
                 .productName(p.getName())
                 .imageUrl(p.getImageUrl())
-                .unitPrice(p.getPrice())
+                .unitPrice(unitPrice)
+                .productDiscountPercentage(discountPercentage)
                 .unit(p.getUnit().name())
                 .quantity(item.getQuantity())
                 .lineTotal(lineTotal)

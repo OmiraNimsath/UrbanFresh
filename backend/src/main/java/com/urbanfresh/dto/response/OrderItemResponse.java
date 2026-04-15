@@ -17,6 +17,7 @@ public class OrderItemResponse {
     private Long productId;
     private String productName;
     private BigDecimal unitPrice;
+    private Integer productDiscountPercentage;
     private int quantity;
     private BigDecimal lineTotal;
 }

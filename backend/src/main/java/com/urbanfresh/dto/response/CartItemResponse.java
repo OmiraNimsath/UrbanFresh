@@ -21,6 +21,9 @@ public class CartItemResponse {
     private String imageUrl;
     private BigDecimal unitPrice;
 
+    /** Discount percentage (0-100) currently applied to this product; 0 means no discount. */
+    private Integer productDiscountPercentage;
+
     /** Human-readable pricing unit (e.g. "PER_KG", "PER_ITEM"). */
     private String unit;
 

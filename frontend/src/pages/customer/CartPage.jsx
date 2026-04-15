@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCart } from '../../context/CartContext';
 import Navbar from '../../components/Navbar';
-import { formatAmount, formatPrice } from '../../utils/priceUtils';
+import { formatAmount, formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
 import { getLoyaltyPoints } from '../../services/orderService';
 
 /**
@@ -150,7 +150,19 @@ function CartItemRow({ item, onUpdate, onRemove }) {
           <div>
             <p className="font-semibold text-gray-800 truncate">{item.productName}</p>
             <p className="text-sm text-gray-500 mt-0.5">
-              {formatPrice(item.unitPrice, item.unit)}
+              {item.productDiscountPercentage ? (
+                <>
+                  <span className="line-through">{formatPrice(item.unitPrice, item.unit)}</span>
+                  {' '}
+                  <span className="text-green-600 font-semibold">
+                    {formatPrice(calculateDiscountedPrice(item.unitPrice, item.productDiscountPercentage), item.unit)}
+                    {' '}
+                    <span className="text-xs bg-green-50 px-1 rounded">({item.productDiscountPercentage}% OFF)</span>
+                  </span>
+                </>
+              ) : (
+                formatPrice(item.unitPrice, item.unit)
+              )}
             </p>
             {/* Flag out-of-stock items so the customer knows before checkout */}
             {!item.inStock && (
@@ -256,9 +268,10 @@ function OrderSummary({ cart, navigate }) {
   const discount     = appliedPoints * LKR_PER_POINT;
   const payableTotal = cart.totalAmount - discount;
 
-  // Disable checkout for out-of-stock items or below the minimum order amount
+  // Disable checkout for out-of-stock items or below the minimum order amount.
+  // Minimum threshold is checked BEFORE applying loyalty discount per business rule.
   const hasOutOfStockItem = cart.items.some((item) => !item.inStock);
-  const isBelowMinimum    = payableTotal < MIN_ORDER_LKR;
+  const isBelowMinimum    = cart.totalAmount < MIN_ORDER_LKR;
   const cannotCheckout    = hasOutOfStockItem || isBelowMinimum;
 
   return (
@@ -288,54 +301,58 @@ function OrderSummary({ cart, navigate }) {
           <span className="text-green-700">{formatAmount(payableTotal)}</span>
         </div>
 
-        {/* ── Loyalty points widget ── */}
-        {availablePoints > 0 && (
-          <div className="border border-green-200 rounded-xl bg-green-50 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-green-800">🎁 Loyalty Points</p>
-              <span className="text-xs bg-green-100 text-green-700 font-medium px-2 py-0.5 rounded-full">
-                {availablePoints} pts available
-              </span>
-            </div>
-            <p className="text-xs text-green-700">1 point = Rs. 5 discount</p>
-
-            {appliedPoints > 0 ? (
-              <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-green-200">
-                <span className="text-sm text-green-800 font-medium">
-                  {appliedPoints} pts → − {formatAmount(discount)}
-                </span>
-                <button
-                  onClick={handleRemovePoints}
-                  className="text-xs text-red-400 hover:text-red-600 underline ml-2"
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={Math.min(availablePoints, maxRedeemable)}
-                  value={pointsInput}
-                  onChange={(e) => { setPointsInput(e.target.value); setApplyError(''); }}
-                  placeholder="Points to apply"
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400"
-                />
-                <button
-                  onClick={handleApplyPoints}
-                  className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Apply
-                </button>
-              </div>
-            )}
-
-            {applyError && (
-              <p className="text-xs text-red-500">{applyError}</p>
-            )}
+        {/* ── Loyalty points widget – always visible for discoverability ── */}
+        <div className="border border-green-200 rounded-xl bg-green-50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-green-800">🎁 Loyalty Points</p>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+              availablePoints > 0
+                ? 'bg-green-100 text-green-700'
+                : 'bg-gray-100 text-gray-600'
+            }`}>
+              {availablePoints} pts available
+            </span>
           </div>
-        )}
+          <p className="text-xs text-green-700">1 point = Rs. 5 discount</p>
+
+          {appliedPoints > 0 ? (
+            <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-green-200">
+              <span className="text-sm text-green-800 font-medium">
+                {appliedPoints} pts → − {formatAmount(discount)}
+              </span>
+              <button
+                onClick={handleRemovePoints}
+                className="text-xs text-red-400 hover:text-red-600 underline ml-2"
+              >
+                Remove
+              </button>
+            </div>
+          ) : availablePoints > 0 ? (
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                max={Math.min(availablePoints, maxRedeemable)}
+                value={pointsInput}
+                onChange={(e) => { setPointsInput(e.target.value); setApplyError(''); }}
+                placeholder="Points to apply"
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              <button
+                onClick={handleApplyPoints}
+                className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">Earn points with every purchase and redeem them for discounts.</p>
+          )}
+
+          {applyError && (
+            <p className="text-xs text-red-500">{applyError}</p>
+          )}
+        </div>
 
         {/* Minimum order notice */}
         {isBelowMinimum && (

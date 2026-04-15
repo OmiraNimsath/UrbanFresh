@@ -328,18 +328,44 @@ function OrderSummary({ order }) {
         <p className="text-sm text-gray-500">No line items available.</p>
       ) : (
         <ul className="space-y-3">
-          {items.map((item, index) => (
-            <li key={`${item.productName}-${index}`} className="border border-gray-100 rounded-xl p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-gray-800">{item.productName || 'Unnamed item'}</p>
-                <p className="text-sm font-bold text-green-700">{formatAmount(item.lineTotal ?? 0)}</p>
-              </div>
-              <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-                <span>Qty: {item.quantity ?? 0}</span>
-                <span>Unit: {formatAmount(item.unitPrice ?? 0)}</span>
-              </div>
-            </li>
-          ))}
+          {items.map((item, index) => {
+            // lineTotal is always the discounted total (effectiveUnitPrice × qty).
+            // Derive effective unit price to avoid unitPrice × qty ≠ lineTotal confusion.
+            const effectiveUnitPrice =
+              item.quantity > 0
+                ? Number(item.lineTotal) / item.quantity
+                : Number(item.unitPrice);
+            const hasProductDiscount = (item.productDiscountPercentage ?? 0) > 0;
+
+            return (
+              <li key={`${item.productName}-${index}`} className="border border-gray-100 rounded-xl p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-gray-800">{item.productName || 'Unnamed item'}</p>
+                    {hasProductDiscount && (
+                      <span className="text-xs bg-green-50 text-green-700 font-semibold px-1.5 py-0.5 rounded">
+                        {item.productDiscountPercentage}% OFF
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-bold text-green-700">{formatAmount(item.lineTotal ?? 0)}</p>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+                  <span>Qty: {item.quantity ?? 0}</span>
+                  <span>
+                    {hasProductDiscount ? (
+                      <>
+                        <span className="line-through text-gray-400 mr-1">{formatAmount(item.unitPrice ?? 0)}</span>
+                        <span className="text-green-700 font-medium">{formatAmount(effectiveUnitPrice)}</span>
+                      </>
+                    ) : (
+                      <span>Unit: {formatAmount(item.unitPrice ?? 0)}</span>
+                    )}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 

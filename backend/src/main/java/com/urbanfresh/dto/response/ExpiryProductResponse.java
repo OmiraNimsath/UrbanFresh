@@ -29,4 +29,7 @@ public class ExpiryProductResponse {
 
     /** Days from today until this product expires; 0 means expires today. */
     private long daysUntilExpiry;
+
+    /** Discount percentage (0-100) applied to this product; 0 means no discount. */
+    private Integer discountPercentage;
 }

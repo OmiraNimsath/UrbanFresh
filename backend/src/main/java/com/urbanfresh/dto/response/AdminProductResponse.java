@@ -37,6 +37,9 @@ public class AdminProductResponse {
     private boolean featured;
     private LocalDate expiryDate;
 
+    /** Discount percentage (0-100) applied to this product; 0 means no discount. */
+    private Integer discountPercentage;
+
     /** Raw warehouse count — visible to admins only to support inventory management. */
     private int stockQuantity;
 

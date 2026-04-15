@@ -42,4 +42,29 @@ public interface LoyaltyService {
      * @throws InsufficientLoyaltyPointsException if balance is insufficient or discount exceeds order total
      */
     BigDecimal redeemPoints(User customer, int pointsToRedeem, BigDecimal orderTotal);
+
+    /**
+     * Validates that the customer has enough loyalty points to redeem and that the
+     * computed discount does not exceed the order total — WITHOUT deducting from the ledger.
+     * Call this at order placement so the amount is baked into the order total immediately,
+     * then call {@link #deductRedeemedPoints(User, int)} after payment is confirmed to
+     * actually update the ledger.
+     *
+     * @param customer       the customer attempting to redeem
+     * @param pointsToRedeem number of points to validate (must be &gt; 0)
+     * @param orderTotal     pre-discount order total; discount must not exceed this
+     * @return the discount amount (pointsToRedeem × Rs. 5) that will be applied
+     * @throws InsufficientLoyaltyPointsException if balance is insufficient or discount exceeds order total
+     */
+    BigDecimal validatePointsRedemption(User customer, int pointsToRedeem, BigDecimal orderTotal);
+
+    /**
+     * Deducts redeemed points from the customer's ledger.
+     * Must only be called AFTER payment is confirmed (order status → CONFIRMED).
+     * Uses a pessimistic write lock to prevent concurrent double-deduction.
+     *
+     * @param customer       the customer whose ledger to debit
+     * @param pointsToDeduct number of points to deduct (as stored on the order)
+     */
+    void deductRedeemedPoints(User customer, int pointsToDeduct);
 }

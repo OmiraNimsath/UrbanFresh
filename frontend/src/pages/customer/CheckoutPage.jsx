@@ -157,6 +157,7 @@ export default function CheckoutPage() {
             cart={cart}
             orderTotal={orderTotal}
             orderDiscount={orderDiscount}
+            orderSnapshot={orderSnapshot}
             pointsToRedeem={pointsToRedeem}
             orderItemsSnapshot={orderItemsSnapshot}
             deliveryAddress={deliveryAddress}
@@ -394,7 +395,7 @@ function buildOrderSuccessPath(orderId, paymentStatus) {
 // Order summary panel (right sidebar — mirrors CartPage layout)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OrderSummaryPanel({ cart, orderTotal, orderDiscount, pointsToRedeem, orderItemsSnapshot, deliveryAddress, showAddress }) {
+function OrderSummaryPanel({ cart, orderTotal, orderDiscount, orderSnapshot, pointsToRedeem, orderItemsSnapshot, deliveryAddress, showAddress }) {
   const LKR_PER_POINT = 5;
 
   // Use orderTotal snapshot (set at order placement) so the total stays correct
@@ -407,8 +408,8 @@ function OrderSummaryPanel({ cart, orderTotal, orderDiscount, pointsToRedeem, or
     ? pointsToRedeem * LKR_PER_POINT
     : 0;
   const displayDiscount   = orderDiscount > 0 ? orderDiscount : pendingDiscount;
-  const subtotalBeforeDiscount = rawTotal + displayDiscount;
-  const displayTotal      = rawTotal; // rawTotal already reflects the confirmed discount post-placement
+  const subtotalBeforeDiscount = orderTotal > 0 ? orderTotal + displayDiscount : cart.totalAmount;
+  const displayTotal      = orderTotal > 0 ? orderTotal : Math.max(0, cart.totalAmount - displayDiscount); // rawTotal already reflects the confirmed discount post-placement
 
   // Use snapshot items if available (during payment step), else cart items
   const displayItems = (orderItemsSnapshot && orderItemsSnapshot.length > 0)
@@ -441,7 +442,7 @@ function OrderSummaryPanel({ cart, orderTotal, orderDiscount, pointsToRedeem, or
               <span>{formatAmount(subtotalBeforeDiscount)}</span>
             </div>
             <div className="flex justify-between text-green-700 font-medium">
-              <span>🎁 Loyalty discount{pointsToRedeem > 0 && orderDiscount <= 0 ? ` (${pointsToRedeem} pts)` : ''}</span>
+              <span>🎁 Loyalty discount ({orderDiscount > 0 ? (orderSnapshot?.pointsRedeemed ?? pointsToRedeem) : pointsToRedeem} pts)</span>
               <span>− {formatAmount(displayDiscount)}</span>
             </div>
           </div>

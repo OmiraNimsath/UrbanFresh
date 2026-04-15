@@ -173,24 +173,42 @@ public class OrderServiceImpl implements OrderService {
             // Deduct inventory
             product.setStockQuantity(product.getStockQuantity() - itemRequest.getQuantity());
 
-            BigDecimal lineTotal = product.getPrice()
+            // Apply product discount if present, then calculate line total from discounted unit price
+            BigDecimal unitPrice = product.getPrice();
+            Integer discountPercentage = product.getDiscountPercentage() != null ? product.getDiscountPercentage() : 0;
+            BigDecimal discountedUnitPrice = unitPrice;
+            
+            if (discountPercentage > 0) {
+                // discountedUnitPrice = unitPrice * (1 - discount% / 100)
+                discountedUnitPrice = unitPrice.multiply(
+                    BigDecimal.valueOf(100 - discountPercentage)
+                ).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+            }
+
+            BigDecimal lineTotal = discountedUnitPrice
                     .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             total = total.add(lineTotal);
 
             orderItems.add(OrderItem.builder()
                     .product(product)
                     .productName(product.getName())       // snapshot — survives product edits
-                    .unitPrice(product.getPrice())         // snapshot — survives price changes
+                    .unitPrice(unitPrice)                  // snapshot of original price — survives edits
+                    .productDiscountPercentage(discountPercentage)  // snapshot of discount — preserves calcs
                     .quantity(itemRequest.getQuantity())
                     .lineTotal(lineTotal)
                     .build());
         }
 
-        // Apply loyalty points discount if the customer requested redemption.
+        // Validate loyalty points redemption and lock the discount into the order total.
+        // Points are validated here (balance check + max-discount guard) so the customer
+        // gets immediate feedback if their balance is insufficient, and the discounted total
+        // is persisted on the order. The actual ledger deduction is deferred to
+        // PaymentServiceImpl.applyPaidState() — points are only consumed after the Stripe
+        // payment is confirmed, so a failed payment never permanently burns a customer's points.
         BigDecimal discount = BigDecimal.ZERO;
         int pointsRedeemed = 0;
         if (request.getPointsToRedeem() > 0) {
-            discount = loyaltyService.redeemPoints(customer, request.getPointsToRedeem(), total);
+            discount = loyaltyService.validatePointsRedemption(customer, request.getPointsToRedeem(), total);
             pointsRedeemed = request.getPointsToRedeem();
             total = total.subtract(discount);
         }
@@ -597,6 +615,7 @@ public class OrderServiceImpl implements OrderService {
                         .productId(item.getProduct() != null ? item.getProduct().getId() : null)
                         .productName(item.getProductName())
                         .unitPrice(item.getUnitPrice())
+                        .productDiscountPercentage(item.getProductDiscountPercentage())
                         .quantity(item.getQuantity())
                         .lineTotal(item.getLineTotal())
                         .build())
@@ -625,6 +644,8 @@ public class OrderServiceImpl implements OrderService {
                                 .itemCount(order.getItems() != null ? order.getItems().size() : 0)
                                 .itemsSummary(toItemsSummary(order))
                                 .totalAmount(order.getTotalAmount())
+                                .discountAmount(order.getDiscountAmount())
+                                .pointsRedeemed(order.getPointsRedeemed())
                                 .paymentStatus(resolvePersistedPaymentStatus(order))
                                 .paymentMethod(resolveDeliveryPaymentMethod())
                                 .createdAt(order.getCreatedAt())
@@ -734,6 +755,8 @@ public class OrderServiceImpl implements OrderService {
                                 .orderStatus(order.getStatus().name())
                                 .paymentStatus(resolvePersistedPaymentStatus(order))
                                 .totalAmount(order.getTotalAmount())
+                                .discountAmount(order.getDiscountAmount())
+                                .pointsRedeemed(order.getPointsRedeemed())
                                 .orderDate(order.getCreatedAt())
                                 .deliveryPersonId(deliveryPerson != null ? deliveryPerson.getId() : null)
                                 .deliveryPersonName(deliveryPerson != null ? deliveryPerson.getName() : null)
@@ -766,7 +789,7 @@ public class OrderServiceImpl implements OrderService {
 
                 // Payment/tax modules are not integrated yet; keep explicit zero values
                 // so the review response remains schema-stable for current frontend screens.
-                BigDecimal discounts = BigDecimal.ZERO;
+                BigDecimal discounts = order.getDiscountAmount();
                 BigDecimal taxes = BigDecimal.ZERO;
                 BigDecimal shippingCost = BigDecimal.ZERO;
 
@@ -787,6 +810,7 @@ public class OrderServiceImpl implements OrderService {
                                 .deliveryPersonId(deliveryPerson != null ? deliveryPerson.getId() : null)
                                 .deliveryPersonName(deliveryPerson != null ? deliveryPerson.getName() : null)
                                 .orderDate(order.getCreatedAt())
+                                .pointsRedeemed(order.getPointsRedeemed())
                                 .lastUpdatedDate(resolveLastUpdatedDate(order, historyRows))
                                 .customer(AdminOrderReviewResponse.CustomerInfo.builder()
                                                 .customerName(order.getCustomer().getName())
@@ -877,6 +901,8 @@ public class OrderServiceImpl implements OrderService {
                                                 .customerPhone(order.getCustomer() != null ? order.getCustomer().getPhone() : null)
                                                 .deliveryAddress(order.getDeliveryAddress())
                                                 .totalAmount(order.getTotalAmount())
+                                                .discountAmount(order.getDiscountAmount())
+                                                .pointsRedeemed(order.getPointsRedeemed())
                                                 .paymentStatus(resolvePersistedPaymentStatus(order))
                                                 .paymentMethod(resolveDeliveryPaymentMethod())
                                                 .items(toOrderItemResponses(order))

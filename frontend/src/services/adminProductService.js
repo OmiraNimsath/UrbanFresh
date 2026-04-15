@@ -49,6 +49,25 @@ export const updateProduct = (id, data) =>
   api.put(`/api/admin/products/${id}`, data).then((res) => res.data);
 
 /**
+ * Applies or removes a near-expiry discount on a single product.
+ * Calls PATCH /api/admin/products/{id}/discount
+ *
+ * Surgical update: only discountPercentage is written on the server.
+ * All other product attributes (name, price, brand, description, imageUrl,
+ * featured, unit, category, expiryDate, stockQuantity) are left untouched.
+ * Use this from the Expiry Dashboard instead of updateProduct() to avoid
+ * the full-replacement overwrite risk.
+ *
+ * @param {number} id                 - product ID
+ * @param {number} discountPercentage - new discount value (0 = no discount, 1–100 = active)
+ * @returns {Promise<Object>}         - AdminProductResponse with updated discountPercentage
+ */
+export const applyProductDiscount = (id, discountPercentage) =>
+  api
+    .patch(`/api/admin/products/${id}/discount`, { discountPercentage })
+    .then((res) => res.data);
+
+/**
  * Permanently deletes a product from the catalogue.
  * Calls DELETE /api/admin/products/{id}
  *

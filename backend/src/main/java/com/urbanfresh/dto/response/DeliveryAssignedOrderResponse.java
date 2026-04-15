@@ -22,6 +22,10 @@ public class DeliveryAssignedOrderResponse {
     private Integer itemCount;
     private String itemsSummary;
     private java.math.BigDecimal totalAmount;
+    /** Discount applied via loyalty point redemption. Zero when no points were used. */
+    private java.math.BigDecimal discountAmount;
+    /** Number of loyalty points redeemed on this order. Zero when no points were used. */
+    private int pointsRedeemed;
     private String paymentStatus;
     private String paymentMethod;
     private LocalDateTime createdAt;

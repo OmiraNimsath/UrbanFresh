@@ -171,6 +171,7 @@ public class ProductServiceImpl implements ProductService {
                 .imageUrl(product.getImageUrl())
                 .featured(product.isFeatured())
                 .expiryDate(product.getExpiryDate())
+                .discountPercentage(product.getDiscountPercentage())
                 // expose availability only — raw quantity is internal warehouse data
                 .inStock(product.getStockQuantity() > 0)
                 .build();

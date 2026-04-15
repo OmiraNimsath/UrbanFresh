@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { getExpiryBuckets } from '../../services/adminExpiryService';
+import { applyProductDiscount } from '../../services/adminProductService';
 
 /**
  * Admin Expiry Dashboard page.
@@ -21,6 +22,11 @@ export default function AdminExpiryPage() {
   const [buckets, setBuckets]   = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
+
+  // Discount editing state
+  const [editingProductId, setEditingProductId]     = useState(null);
+  const [editingDiscount, setEditingDiscount]       = useState('');
+  const [applyingProductId, setApplyingProductId]   = useState(null);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -45,6 +51,68 @@ export default function AdminExpiryPage() {
   useEffect(() => {
     fetchBuckets();
   }, []);
+
+  // ── Suggested discount calculation ─────────────────────────────────────────
+
+  /**
+   * Determines the suggested discount percentage based on days until expiry.
+   * Critical (0-1d): 15%, Urgent (2-7d): 10%, Warning (8-30d): 5%
+   */
+  const getSuggestedDiscount = (daysUntilExpiry) => {
+    if (daysUntilExpiry <= 1) return 15;
+    if (daysUntilExpiry <= 7) return 10;
+    return 5;
+  };
+
+  /**
+   * Handler to apply/update discount for a product.
+   * Calls backend API to update the product with new discountPercentage.
+   */
+  const handleApplyDiscount = async (product, directValue = null) => {
+    let discountValue;
+    
+    if (directValue !== null) {
+      discountValue = parseInt(directValue, 10);
+    } else {
+      if (!editingDiscount && editingDiscount !== '0') {
+        toast.error('Please enter a discount percentage');
+        return;
+      }
+      discountValue = parseInt(editingDiscount, 10);
+    }
+
+    if (isNaN(discountValue) || discountValue < 0 || discountValue > 100) {
+      toast.error('Discount must be between 0 and 100');
+      return;
+    }
+
+    setApplyingProductId(product.id);
+    try {
+      // Surgical PATCH — sends only discountPercentage to PATCH /api/admin/products/{id}/discount.
+      // Using the dedicated endpoint instead of the full PUT prevents overwriting brand linkage,
+      // description, imageUrl, featured status, and other unrelated product metadata.
+      await applyProductDiscount(product.id, discountValue);
+      
+      // Update local state to reflect change immediately
+      setBuckets(prev => ({
+        ...prev,
+        within1Day: prev.within1Day.map(p => p.id === product.id ? { ...p, discountPercentage: discountValue } : p),
+        within7Days: prev.within7Days.map(p => p.id === product.id ? { ...p, discountPercentage: discountValue } : p),
+        within30Days: prev.within30Days.map(p => p.id === product.id ? { ...p, discountPercentage: discountValue } : p),
+      }));
+
+      toast.success(`Discount applied successfully`);
+      if (directValue === null) {
+        setEditingProductId(null);
+        setEditingDiscount('');
+      }
+    } catch (err) {
+      console.error('Failed to apply discount:', err);
+      toast.error('Failed to apply discount. Please try again.');
+    } finally {
+      setApplyingProductId(null);
+    }
+  };
 
   // ── Sub-components ─────────────────────────────────────────────────────────
 
@@ -89,6 +157,8 @@ export default function AdminExpiryPage() {
                 <th className="px-6 py-3 text-center">Stock</th>
                 <th className="px-6 py-3 text-center">Expiry Date</th>
                 <th className="px-6 py-3 text-center">Days Left</th>
+                <th className="px-6 py-3 text-center">Discount</th>
+                <th className="px-6 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -97,6 +167,20 @@ export default function AdminExpiryPage() {
                   key={product.id}
                   product={product}
                   accentText={accent.textColor}
+                  isEditing={editingProductId === product.id}
+                  editingDiscount={editingDiscount}
+                  isApplying={applyingProductId === product.id}
+                  suggestedDiscount={getSuggestedDiscount(product.daysUntilExpiry)}
+                  onEditStart={() => {
+                    setEditingProductId(product.id);
+                    setEditingDiscount(product.discountPercentage || '');
+                  }}
+                  onDiscountChange={(value) => setEditingDiscount(value)}
+                  onApply={(val) => handleApplyDiscount(product, val)}
+                  onCancel={() => {
+                    setEditingProductId(null);
+                    setEditingDiscount('');
+                  }}
                 />
               ))}
             </tbody>
@@ -107,13 +191,32 @@ export default function AdminExpiryPage() {
   );
 
   /**
-   * Renders one product row inside a bucket table.
+   * Renders one product row inside a bucket table with discount controls.
    *
    * @param {object} props
-   * @param {object} props.product     – ExpiryProductResponse from the API
-   * @param {string} props.accentText  – Tailwind text-colour class for the days-left badge
+   * @param {object} props.product            – ExpiryProductResponse from the API
+   * @param {string} props.accentText         – Tailwind text-colour class for the days-left badge
+   * @param {boolean} props.isEditing         – Whether this product is in edit mode
+   * @param {string|number} props.editingDiscount – Current input value when editing
+   * @param {boolean} props.isApplying        – Whether applying this product's discount (loading)
+   * @param {number} props.suggestedDiscount  – Suggested discount % for this product
+   * @param {function} props.onEditStart      – Called to enter edit mode
+   * @param {function} props.onDiscountChange – Called when discount input changes
+   * @param {function} props.onApply          – Called to save discount
+   * @param {function} props.onCancel         – Called to exit edit mode
    */
-  const ProductRow = ({ product, accentText }) => (
+  const ProductRow = ({ 
+    product, 
+    accentText, 
+    isEditing, 
+    editingDiscount, 
+    isApplying,
+    suggestedDiscount,
+    onEditStart, 
+    onDiscountChange, 
+    onApply, 
+    onCancel 
+  }) => (
     <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-6 py-3 font-medium text-gray-800">{product.name}</td>
       <td className="px-6 py-3 text-gray-500">{product.category || '—'}</td>
@@ -130,6 +233,66 @@ export default function AdminExpiryPage() {
             ? 'Today'
             : `${product.daysUntilExpiry}d`}
         </span>
+      </td>
+      <td className="px-6 py-3 text-center">
+        {isEditing ? (
+          <div className="flex items-center justify-center gap-2">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={editingDiscount}
+              onChange={(e) => onDiscountChange(e.target.value)}
+              className="w-16 px-2 py-1 border border-green-300 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="0"
+            />
+            <span className="text-xs text-gray-500">%</span>
+            <span className="text-xs text-gray-400">
+              (suggest: {suggestedDiscount}%)
+            </span>
+          </div>
+        ) : (
+          <span className={product.discountPercentage ? 'font-semibold text-green-600' : 'text-gray-500'}>
+            {product.discountPercentage ? `${product.discountPercentage}%` : '—'}
+          </span>
+        )}
+      </td>
+      <td className="px-6 py-3 text-center">
+        {isEditing ? (
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => onApply(null)}
+              disabled={isApplying}
+              className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-medium py-1 px-3 rounded transition-colors"
+            >
+              {isApplying ? 'Saving...' : 'Apply'}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={isApplying}
+              className="bg-gray-300 hover:bg-gray-400 disabled:opacity-50 text-gray-800 text-xs font-medium py-1 px-3 rounded transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={onEditStart}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-3 rounded transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onApply(suggestedDiscount)}
+              disabled={isApplying}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-medium py-1 px-3 rounded transition-colors whitespace-nowrap"
+              title={`Apply suggested discount of ${suggestedDiscount}%`}
+            >
+              {isApplying ? 'Applying...' : `1-Click Apply ${suggestedDiscount}%`}
+            </button>
+          </div>
+        )}
       </td>
     </tr>
   );

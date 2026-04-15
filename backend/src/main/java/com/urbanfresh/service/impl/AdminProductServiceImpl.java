@@ -74,6 +74,7 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .featured(request.isFeatured())
                 .expiryDate(request.getExpiryDate())
                 .stockQuantity(request.getStockQuantity())
+                .discountPercentage(request.getDiscountPercentage() != null ? request.getDiscountPercentage() : 0)
                 .build();
 
         return toAdminResponse(productRepository.save(product));
@@ -101,6 +102,13 @@ public class AdminProductServiceImpl implements AdminProductService {
         product.setFeatured(request.isFeatured());
         product.setExpiryDate(request.getExpiryDate());
         product.setStockQuantity(request.getStockQuantity());
+        
+        if (request.getDiscountPercentage() != null) {
+            product.setDiscountPercentage(request.getDiscountPercentage());
+        } else {
+            product.setDiscountPercentage(0);
+        }
+
         // By default, full update implies approval by an admin unless otherwise specified
         product.setApprovalStatus(com.urbanfresh.model.ApprovalStatus.APPROVED);
 
@@ -144,6 +152,27 @@ public class AdminProductServiceImpl implements AdminProductService {
         return response;
     }
 
+    /**
+     * Surgical discount PATCH — updates ONLY the discountPercentage field.
+     * Every other product attribute (name, price, brand, description, imageUrl,
+     * featured, unit, category, expiryDate, stockQuantity, approvalStatus) is
+     * left completely unchanged. This prevents the expiry-dashboard discount
+     * action from accidentally overwriting unrelated product metadata.
+     *
+     * @param id                 product to update
+     * @param discountPercentage new discount value (0–100)
+     */
+    @Override
+    public AdminProductResponse applyDiscount(Long id, int discountPercentage) {
+        if (discountPercentage < 0 || discountPercentage > 100) {
+            throw new IllegalArgumentException(
+                    "Discount percentage must be between 0 and 100, got: " + discountPercentage);
+        }
+        Product product = findOrThrow(id);
+        product.setDiscountPercentage(discountPercentage);   // the ONLY mutation
+        return toAdminResponse(productRepository.save(product));
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     /** Fetch product by ID or throw a typed 404 exception. */
@@ -183,6 +212,7 @@ public class AdminProductServiceImpl implements AdminProductService {
                 .featured(product.isFeatured())
                 .expiryDate(product.getExpiryDate())
                 .stockQuantity(product.getStockQuantity())
+                .discountPercentage(product.getDiscountPercentage())
                 .approvalStatus(product.getApprovalStatus() != null ? product.getApprovalStatus().name() : "APPROVED")
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())

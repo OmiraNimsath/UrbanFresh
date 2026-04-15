@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import com.urbanfresh.model.PricingUnit;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -55,6 +56,11 @@ public class ProductRequest {
 
     /** Null for non-perishable products; must not be in the past when provided. */
     private LocalDate expiryDate;
+
+    /** Discount percentage (0-100) to apply to this product; 0 or null means no discount. */
+    @Min(value = 0, message = "Discount percentage must be at least 0")
+    @Max(value = 100, message = "Discount percentage must not exceed 100")
+    private Integer discountPercentage;
 
     @NotNull(message = "Stock quantity is required")
     @Min(value = 0, message = "Stock quantity cannot be negative")

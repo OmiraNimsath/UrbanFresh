@@ -405,14 +405,44 @@ function OrderCard({ order, onRetryPayment }) {
               </tr>
             </thead>
             <tbody>
-              {order.items.map((item, idx) => (
-                <tr key={idx} className="border-t border-gray-50">
-                  <td className="py-1">{item.productName}</td>
-                  <td className="text-right py-1">{item.quantity}</td>
-                  <td className="text-right py-1">{formatAmount(item.unitPrice)}</td>
-                  <td className="text-right py-1">{formatAmount(item.lineTotal)}</td>
-                </tr>
-              ))}
+              {order.items.map((item, idx) => {
+                // Derive the effective (discounted) unit price from the line total.
+                // unitPrice is the original snapshot; lineTotal already reflects the
+                // product discount, so effectiveUnitPrice = lineTotal / qty.
+                const effectiveUnitPrice =
+                  item.quantity > 0
+                    ? Number(item.lineTotal) / item.quantity
+                    : Number(item.unitPrice);
+                const hasProductDiscount =
+                  item.productDiscountPercentage > 0;
+
+                return (
+                  <tr key={idx} className="border-t border-gray-50">
+                    <td className="py-1">
+                      {item.productName}
+                      {hasProductDiscount && (
+                        <span className="ml-1 text-green-600 font-medium">
+                          ({item.productDiscountPercentage}% OFF)
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-right py-1">{item.quantity}</td>
+                    <td className="text-right py-1">
+                      {hasProductDiscount ? (
+                        <span>
+                          <span className="line-through text-gray-400 mr-1">
+                            {formatAmount(item.unitPrice)}
+                          </span>
+                          <span className="text-green-700">{formatAmount(effectiveUnitPrice)}</span>
+                        </span>
+                      ) : (
+                        formatAmount(item.unitPrice)
+                      )}
+                    </td>
+                    <td className="text-right py-1">{formatAmount(item.lineTotal)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
