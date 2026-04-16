@@ -8,8 +8,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.urbanfresh.dto.response.RecommendationResponse;
 import com.urbanfresh.model.Order;
 import com.urbanfresh.model.OrderStatus;
 
@@ -89,4 +92,40 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * @return list of stale orders needing cancellation
      */
     List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, LocalDateTime cutoff);
+
+    /**
+     * Returns the top N products most frequently ordered by a customer.
+     * Ranks by SUM of quantity units purchased across the given statuses.
+     * Hidden products and out-of-stock products are excluded.
+     * Use {@code Pageable.ofSize(5)} to limit to the top 5 recommendations.
+     *
+     * @param customerId ID of the authenticated customer
+     * @param statuses   order statuses representing confirmed purchases
+     * @param pageable   controls the result limit (offset + page size)
+     * @return ranked list of RecommendationResponse DTOs
+     */
+    @Query("""
+            SELECT new com.urbanfresh.dto.response.RecommendationResponse(
+                oi.product.id,
+                oi.product.name,
+                oi.product.imageUrl,
+                oi.product.price,
+                oi.product.stockQuantity,
+                SUM(oi.quantity))
+            FROM OrderItem oi
+            JOIN oi.order o
+            WHERE o.customer.id = :customerId
+              AND o.status IN :statuses
+              AND oi.product IS NOT NULL
+              AND oi.product.hidden = false
+              AND oi.product.stockQuantity > 0
+            GROUP BY oi.product.id, oi.product.name, oi.product.imageUrl,
+                     oi.product.price, oi.product.stockQuantity
+            ORDER BY SUM(oi.quantity) DESC
+            """)
+    List<RecommendationResponse> findTopProductsByCustomer(
+            @Param("customerId") Long customerId,
+            @Param("statuses") List<OrderStatus> statuses,
+            Pageable pageable
+    );
 }
