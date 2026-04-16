@@ -19,6 +19,7 @@ import com.urbanfresh.model.ApprovalStatus;
 import com.urbanfresh.model.PricingUnit;
 import com.urbanfresh.model.Product;
 import com.urbanfresh.repository.ProductRepository;
+import com.urbanfresh.repository.ProductBatchRepository;
 import com.urbanfresh.service.impl.ExpiryServiceImpl;
 
 /**
@@ -31,6 +32,9 @@ class ExpiryServiceImplTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private ProductBatchRepository productBatchRepository;
 
     @InjectMocks
     private ExpiryServiceImpl expiryService;

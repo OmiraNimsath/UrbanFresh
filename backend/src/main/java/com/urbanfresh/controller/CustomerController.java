@@ -13,17 +13,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.urbanfresh.dto.response.LoyaltyPointsResponse;
 import com.urbanfresh.dto.response.OrderResponse;
+import com.urbanfresh.dto.response.RecommendationResponse;
 import com.urbanfresh.service.LoyaltyService;
 import com.urbanfresh.service.OrderService;
+import com.urbanfresh.service.RecommendationService;
 
 import lombok.RequiredArgsConstructor;
 
 /**
  * Controller Layer – Exposes read-only customer dashboard endpoints.
  * Routes:
- *   GET /api/customer/orders  — authenticated customer's order history
+ *   GET /api/customer/orders           — authenticated customer's order history
  *   GET /api/customer/orders/{orderId} — authenticated customer's single order
- *   GET /api/customer/loyalty — authenticated customer's loyalty points summary
+ *   GET /api/customer/loyalty          — authenticated customer's loyalty points summary
+ *   GET /api/customer/recommendations  — top-5 "Buy Again" recommendations
  * Access: ROLE_CUSTOMER only (enforced via @PreAuthorize on each method).
  */
 @RestController
@@ -33,6 +36,7 @@ public class CustomerController {
 
     private final OrderService orderService;
     private final LoyaltyService loyaltyService;
+    private final RecommendationService recommendationService;
 
     /**
      * Returns the order history for the authenticated customer, newest first.
@@ -85,5 +89,21 @@ public class CustomerController {
         String customerEmail = authentication.getName();
         LoyaltyPointsResponse loyalty = loyaltyService.getLoyaltyPoints(customerEmail);
         return ResponseEntity.ok(loyalty);
+    }
+
+    /**
+     * Returns up to 5 "Buy Again" product recommendations ranked by purchase frequency.
+     * Only in-stock, visible products from confirmed orders are included.
+     * Returns an empty list (HTTP 200) when the customer has no confirmed order history.
+     *
+     * @param authentication Spring Security principal — email extracted from JWT
+     * @return 200 OK with list of RecommendationResponse (up to 5 items)
+     */
+    @GetMapping("/recommendations")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<List<RecommendationResponse>> getRecommendations(Authentication authentication) {
+        String customerEmail = authentication.getName();
+        List<RecommendationResponse> recommendations = recommendationService.getRecommendations(customerEmail);
+        return ResponseEntity.ok(recommendations);
     }
 }

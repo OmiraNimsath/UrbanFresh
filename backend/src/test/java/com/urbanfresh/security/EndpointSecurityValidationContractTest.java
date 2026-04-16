@@ -50,6 +50,7 @@ import com.urbanfresh.service.OrderService;
 import com.urbanfresh.service.PaymentService;
 import com.urbanfresh.service.ProductService;
 import com.urbanfresh.service.ProfileService;
+import com.urbanfresh.service.RecommendationService;
 import com.urbanfresh.service.SupplierService;
 
 /**
@@ -101,6 +102,9 @@ class EndpointSecurityValidationContractTest {
 
     @MockitoBean
     private ProductService productService;
+
+    @MockitoBean
+    private RecommendationService recommendationService;
 
     @MockitoBean
     private JwtUtil jwtUtil;

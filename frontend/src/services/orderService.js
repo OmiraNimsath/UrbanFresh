@@ -26,6 +26,15 @@ export const placeOrder = (deliveryAddress, items, pointsToRedeem = 0) =>
 export const getMyOrders = () => api.get('/api/customer/orders');
 
 /**
+ * Fetch up to 5 "Buy Again" product recommendations for the authenticated customer.
+ * Ranked by purchase frequency; excludes hidden and out-of-stock products.
+ * GET /api/customer/recommendations
+ *
+ * @returns {Promise<RecommendationResponse[]>} ordered recommendation list (empty when no history)
+ */
+export const getRecommendations = () => api.get('/api/customer/recommendations');
+
+/**
  * Fetch one authenticated customer's order by ID.
  * Primary path for order-success page rehydration after refresh.
  *
