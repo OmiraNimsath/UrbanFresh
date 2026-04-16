@@ -214,17 +214,17 @@ const AdminDashboard = () => {
               </p>
             </Link>
 
-            {/* Waste Percentage Alert */}
+            {/* Wasted Value This Month */}
             <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-6">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-2xl">♻️</span>
-                <p className="font-semibold text-gray-800">Waste Percentage</p>
+                <p className="font-semibold text-gray-800">Wasted Value This Month</p>
               </div>
               <p className="text-2xl font-bold text-red-700 mb-2">
-                {(dashboardData?.wastePercentage || 0).toFixed(2)}%
+                Rs. {Number(dashboardData?.wastedValueThisMonth || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <p className="text-sm text-gray-600">
-                Goods wasted this period
+                Expired stock loss this month
               </p>
             </div>
           </div>

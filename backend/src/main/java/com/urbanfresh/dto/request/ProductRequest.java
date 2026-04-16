@@ -54,7 +54,8 @@ public class ProductRequest {
      */
     private PricingUnit unit = PricingUnit.PER_ITEM;
 
-    /** Null for non-perishable products; must not be in the past when provided. */
+    /** Expiry date is required so an initial batch can be created on product creation. */
+    @NotNull(message = "Expiry date is required")
     private LocalDate expiryDate;
 
     /** Discount percentage (0-100) to apply to this product; 0 or null means no discount. */

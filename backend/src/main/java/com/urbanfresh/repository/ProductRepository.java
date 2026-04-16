@@ -34,10 +34,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      * @param pageable sort and pagination instructions from the controller
      * @return page of matching products
      */
-    @Query("SELECT p FROM Product p WHERE p.approvalStatus = 'APPROVED' AND p.stockQuantity > 0 " +
+    @Query("SELECT p FROM Product p WHERE p.approvalStatus = 'APPROVED' AND p.hidden = false AND p.stockQuantity > 0 " +
            "AND (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "  OR LOWER(p.description) LIKE LOWER(CONCAT('%', :search, '%'))) " +
-           "AND (:category IS NULL OR LOWER(p.category) = LOWER(:category))")
+           "AND (:category IS NULL OR LOWER(p.category) = LOWER(:category)) " +
+           "AND (NOT EXISTS (SELECT b FROM ProductBatch b WHERE b.product = p) " +
+           "  OR EXISTS (SELECT b FROM ProductBatch b WHERE b.product = p AND b.expiryDate >= CURRENT_DATE))")
     Page<Product> searchProducts(
             @Param("search") String search,
             @Param("category") String category,
@@ -49,7 +51,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      *
      * @return list of unique category strings
      */
-    @Query("SELECT DISTINCT p.category FROM Product p WHERE p.category IS NOT NULL AND p.approvalStatus = 'APPROVED' AND p.stockQuantity > 0 ORDER BY p.category ASC")
+    @Query("SELECT DISTINCT p.category FROM Product p WHERE p.category IS NOT NULL AND p.approvalStatus = 'APPROVED' AND p.hidden = false AND p.stockQuantity > 0 " +
+           "AND (NOT EXISTS (SELECT b FROM ProductBatch b WHERE b.product = p) " +
+           "  OR EXISTS (SELECT b FROM ProductBatch b WHERE b.product = p AND b.expiryDate >= CURRENT_DATE)) " +
+           "ORDER BY p.category ASC")
     List<String> findAllCategories();
 
     /**
@@ -65,7 +70,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT NEW com.urbanfresh.dto.response.ProductSuggestionResponse(" +
            "p.id, p.name, p.imageUrl, p.price, p.unit) " +
            "FROM Product p " +
-           "WHERE p.approvalStatus = 'APPROVED' AND p.stockQuantity > 0 AND LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "WHERE p.approvalStatus = 'APPROVED' AND p.hidden = false AND p.stockQuantity > 0 AND LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "AND (NOT EXISTS (SELECT b FROM ProductBatch b WHERE b.product = p) " +
+           "  OR EXISTS (SELECT b FROM ProductBatch b WHERE b.product = p AND b.expiryDate >= CURRENT_DATE)) " +
            "ORDER BY p.name ASC")
     List<com.urbanfresh.dto.response.ProductSuggestionResponse> findNameSuggestions(
             @Param("query") String query, Pageable pageable);
@@ -88,19 +95,32 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      *
      * @return list of featured products, empty list when none exist
      */
-    @Query("SELECT p FROM Product p WHERE p.featured = true AND p.approvalStatus = 'APPROVED' AND p.stockQuantity > 0")
+    @Query("SELECT p FROM Product p WHERE p.featured = true AND p.approvalStatus = 'APPROVED' AND p.hidden = false AND p.stockQuantity > 0 " +
+           "AND (NOT EXISTS (SELECT b FROM ProductBatch b WHERE b.product = p) " +
+           "  OR EXISTS (SELECT b FROM ProductBatch b WHERE b.product = p AND b.expiryDate >= CURRENT_DATE))")
     List<Product> findByFeaturedTrue();
 
     /**
-     * Retrieves in-stock approved products whose expiry date falls within [today, cutoff].
-     * Ordered by earliest expiry so the most urgent offers appear first.       
+     * Retrieves in-stock approved products that have at least one batch expiring within [today, cutoff].
+     * Uses batch expiry dates (not the entity-level expiryDate) so depleted batches are excluded.
+     * A product only appears when it has an allocatable batch (available > 0, status ACTIVE/NEAR_EXPIRY)
+     * whose expiry falls within the window.
+     * Ordered by earliest such batch expiry so the most urgent offers appear first.
      *
      * @param today   the current date (inclusive start of window)
-     * @param cutoff  the last acceptable expiry date (e.g. today + 7 days)     
+     * @param cutoff  the last acceptable expiry date (e.g. today + 7 days)
      * @param minStock minimum stock threshold (pass 0 to exclude zero-stock items)
      * @return list of near-expiry, in-stock products
      */
-    @Query("SELECT p FROM Product p WHERE p.expiryDate BETWEEN :today AND :cutoff AND p.stockQuantity > :minStock AND p.approvalStatus = 'APPROVED' ORDER BY p.expiryDate ASC")
+    @Query("SELECT DISTINCT p FROM Product p " +
+           "WHERE p.stockQuantity > :minStock AND p.approvalStatus = 'APPROVED' " +
+           "AND EXISTS (" +
+           "  SELECT b FROM ProductBatch b WHERE b.product = p " +
+           "  AND b.expiryDate BETWEEN :today AND :cutoff " +
+           "  AND b.status IN ('ACTIVE', 'NEAR_EXPIRY') " +
+           "  AND b.availableQuantity > 0) " +
+           "ORDER BY (SELECT MIN(b2.expiryDate) FROM ProductBatch b2 WHERE b2.product = p " +
+           "  AND b2.status IN ('ACTIVE', 'NEAR_EXPIRY') AND b2.availableQuantity > 0) ASC")
     List<Product> findByExpiryDateBetweenAndStockQuantityGreaterThanOrderByExpiryDateAsc(
             @Param("today") LocalDate today,
             @Param("cutoff") LocalDate cutoff,

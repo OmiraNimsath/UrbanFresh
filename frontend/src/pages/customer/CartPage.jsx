@@ -20,10 +20,10 @@ export default function CartPage() {
   if (loading) return <CartLoadingScreen />;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      <div className="max-w-5xl mx-auto px-4 py-10">
+      <div className="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
         {/* ── Header ── */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Your Cart</h1>
@@ -82,7 +82,7 @@ export default function CartPage() {
         )}
       </div>
 
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
+      <footer className="bg-gray-100 border-t border-gray-200 text-gray-500 text-center py-6 text-sm">
         © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
       </footer>
     </div>
@@ -193,7 +193,7 @@ function CartItemRow({ item, onUpdate, onRemove }) {
             </span>
             <button
               onClick={() => handleQuantityChange(item.quantity + 1)}
-              disabled={busy}
+              disabled={busy || item.quantity >= item.stockQuantity}
               className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               aria-label="Increase quantity"
             >

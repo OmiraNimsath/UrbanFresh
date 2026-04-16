@@ -267,6 +267,19 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Toggles the hidden flag on a product.
+     * When hidden, the product is excluded from customer-facing catalogue endpoints.
+     * PATCH /api/admin/products/{id}/hide
+     *
+     * @param id product ID to toggle
+     * @return 200 OK with updated AdminProductResponse
+     */
+    @PatchMapping("/products/{id}/hide")
+    public ResponseEntity<AdminProductResponse> toggleHidden(@PathVariable Long id) {
+        return ResponseEntity.ok(adminProductService.toggleHidden(id));
+    }
+
     // ── Delivery Personnel Management ──────────────────────────────────────
 
     /**

@@ -1,6 +1,7 @@
 package com.urbanfresh.service.impl;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,15 +34,18 @@ import com.urbanfresh.exception.ProductNotFoundException;
 import com.urbanfresh.exception.UserNotFoundException;
 import com.urbanfresh.model.Order;
 import com.urbanfresh.model.OrderItem;
+import com.urbanfresh.model.OrderItemBatchAllocation;
 import com.urbanfresh.model.OrderStatus;
 import com.urbanfresh.model.OrderStatusHistory;
 import com.urbanfresh.model.PaymentStatus;
 import com.urbanfresh.model.Product;
+import com.urbanfresh.model.ProductBatch;
 import com.urbanfresh.model.Role;
 import com.urbanfresh.model.User;
 import com.urbanfresh.repository.OrderItemBatchAllocationRepository;
 import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.OrderStatusHistoryRepository;
+import com.urbanfresh.repository.ProductBatchRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
 import com.urbanfresh.service.LoyaltyService;
@@ -50,12 +54,14 @@ import com.urbanfresh.service.OrderService;
 import com.urbanfresh.service.ProductBatchService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Service Layer – Implements order placement with transactional stock validation
  * and deduction. Uses pessimistic locking on Product rows to prevent overselling
  * when two customers compete for the last unit.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -71,8 +77,7 @@ public class OrderServiceImpl implements OrderService {
 		private static final Set<OrderStatus> ADMIN_MANAGEABLE_CURRENT_STATUSES = Set.of(
 				OrderStatus.CONFIRMED,   // admin can advance a paid order to PROCESSING
 				OrderStatus.PROCESSING,
-				OrderStatus.READY,
-				OrderStatus.CANCELLED
+				OrderStatus.READY
 		);
 
 		private static final Set<OrderStatus> ADMIN_ALLOWED_TARGET_STATUSES = Set.of(
@@ -93,8 +98,7 @@ public class OrderServiceImpl implements OrderService {
 		private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_ADMIN_TRANSITIONS = Map.of(
 				OrderStatus.CONFIRMED,  Set.of(OrderStatus.PROCESSING, OrderStatus.CANCELLED),
 				OrderStatus.PROCESSING, Set.of(OrderStatus.READY, OrderStatus.CANCELLED),
-				OrderStatus.READY, Set.of(OrderStatus.PROCESSING),
-				OrderStatus.CANCELLED, Set.of(OrderStatus.PROCESSING)
+				OrderStatus.READY, Set.of(OrderStatus.PROCESSING)
 		);
 
         		private static final Map<OrderStatus, Integer> ORDER_STATUS_PROGRESS_INDEX = Map.of(
@@ -115,6 +119,7 @@ public class OrderServiceImpl implements OrderService {
     private final LoyaltyService loyaltyService;
     private final NotificationService notificationService;
     private final ProductBatchService productBatchService;
+    private final ProductBatchRepository productBatchRepository;
     private final OrderItemBatchAllocationRepository allocationRepository;
 
     /**
@@ -551,6 +556,10 @@ public class OrderServiceImpl implements OrderService {
                 }
 
                 order.setStatus(targetStatus);
+                // When an order is cancelled, return the allocated stock back to its batches
+                if (targetStatus == OrderStatus.CANCELLED) {
+                        restoreStockForOrder(order);
+                }
                 Order updated = orderRepository.save(order);
 
                 orderStatusHistoryRepository.save(OrderStatusHistory.builder()
@@ -564,6 +573,69 @@ public class OrderServiceImpl implements OrderService {
                 notificationService.createOrderStatusNotification(updated, targetStatus);
 
                 return toAdminOrderResponse(updated);
+        }
+
+        /**
+         * Restores batch availableQuantity and product stockQuantity for every allocation
+         * belonging to a cancelled order. Batches already EXPIRED are skipped — their stock
+         * was written off by the expiry scheduler and a WasteRecord was already created.
+         *
+         * @param order the order whose allocations should be reversed
+         */
+        private void restoreStockForOrder(Order order) {
+                for (OrderItem item : order.getItems()) {
+                        List<OrderItemBatchAllocation> allocations =
+                                allocationRepository.findByOrderItemId(item.getId());
+                        for (OrderItemBatchAllocation alloc : allocations) {
+                                ProductBatch batch = alloc.getBatch();
+                                // Skip batches that have actually expired by date — the scheduler
+                                // already zeroed their stock and wrote a WasteRecord for them.
+                                if (batch.getExpiryDate() != null &&
+                                        batch.getExpiryDate().isBefore(java.time.LocalDate.now())) {
+                                        continue;
+                                }
+                                int qty = alloc.getAllocatedQuantity();
+                                batch.setAvailableQuantity(batch.getAvailableQuantity() + qty);
+                                productBatchRepository.save(batch);
+                                Product product = batch.getProduct();
+                                product.setStockQuantity(product.getStockQuantity() + qty);
+                                productRepository.save(product);
+                        }
+                }
+        }
+
+        /**
+         * Finds all PENDING orders older than 24 hours and cancels them, restoring stock.
+         * PENDING orders are those where payment was never confirmed (abandoned or failed).
+         * Called by the scheduler every hour.
+         */
+        @Override
+        @Transactional
+        public void cancelStalePendingOrders() {
+                LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
+                List<Order> staleOrders = orderRepository.findByStatusAndCreatedAtBefore(
+                        OrderStatus.PENDING, cutoff);
+
+                for (Order order : staleOrders) {
+                        restoreStockForOrder(order);
+                        order.setStatus(OrderStatus.CANCELLED);
+                        Order saved = orderRepository.save(order);
+
+                        orderStatusHistoryRepository.save(OrderStatusHistory.builder()
+                                .order(saved)
+                                .previousStatus(OrderStatus.PENDING)
+                                .newStatus(OrderStatus.CANCELLED)
+                                .changedByAdmin(null)
+                                .changeReason("Automatically cancelled after 24 hours — payment was not completed.")
+                                .build());
+
+                        notificationService.createOrderStatusNotification(saved, OrderStatus.CANCELLED);
+                        log.info("[OrderService] Auto-cancelled stale PENDING order id={}", saved.getId());
+                }
+
+                if (!staleOrders.isEmpty()) {
+                        log.info("[OrderService] Auto-cancelled {} stale PENDING order(s).", staleOrders.size());
+                }
         }
 
         /**

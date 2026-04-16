@@ -97,7 +97,10 @@ export default function LoginPage() {
 
         {/* Header */}
         <div className="mb-6 text-center">
-          <h1 className="text-3xl font-bold text-green-700">UrbanFresh</h1>
+          <div className="flex items-center justify-center gap-0 mb-1">
+            <img src="/logo.svg" alt="UrbanFresh logo" className="h-10 w-10" />
+            <h1 className="text-3xl font-bold text-green-600">UrbanFresh</h1>
+          </div>
           <p className="text-gray-500 text-sm mt-1">Sign in to your account</p>
         </div>
 

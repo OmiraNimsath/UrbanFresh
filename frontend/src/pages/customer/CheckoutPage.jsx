@@ -105,7 +105,7 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="min-h-screen bg-green-50">
+    <div className="min-h-screen bg-green-50 flex flex-col">
       <Navbar />
 
       <div className="max-w-5xl mx-auto px-4 py-10">
@@ -167,7 +167,7 @@ export default function CheckoutPage() {
       </div>
 
 
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
+      <footer className="bg-gray-100 border-t border-gray-200 text-gray-500 text-center py-6 text-sm mt-auto">
         © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
       </footer>
     </div>

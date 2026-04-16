@@ -117,4 +117,11 @@ public interface OrderService {
             OrderStatusUpdateRequest request,
             String deliveryEmail
     );
+
+    /**
+     * Finds all PENDING orders older than 24 hours and cancels them automatically,
+     * restoring allocated stock back to the respective product batches.
+     * Called by the scheduler to clean up abandoned payment sessions.
+     */
+    void cancelStalePendingOrders();
 }

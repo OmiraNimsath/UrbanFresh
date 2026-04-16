@@ -1,6 +1,7 @@
 package com.urbanfresh.service;
 
 import java.util.List;
+import com.urbanfresh.dto.request.ConfirmDeliveryRequest;
 import com.urbanfresh.dto.request.CreatePurchaseOrderRequest;
 import com.urbanfresh.dto.response.PurchaseOrderDto;
 
@@ -28,5 +29,5 @@ public interface AdminPurchaseOrderService {
      * @param adminUsername the username of the admin performing the action.
      * @return updated purchase order DTO.
      */
-    PurchaseOrderDto confirmDeliveryAndStock(Long orderId, String adminUsername);
+    PurchaseOrderDto confirmDeliveryAndStock(Long orderId, String adminUsername, ConfirmDeliveryRequest request);
 }

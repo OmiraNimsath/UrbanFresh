@@ -120,7 +120,7 @@ export default function AdminWasteReportPage() {
         )}
 
         {/* ── KPI cards ───────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <KpiCard
             icon="♻️"
             label="Total Waste Value"
@@ -132,12 +132,6 @@ export default function AdminWasteReportPage() {
             label="Total Wasted Units"
             value={totalWastedUnits.toLocaleString()}
             accent="orange"
-          />
-          <KpiCard
-            icon="📊"
-            label="Overall Waste %"
-            value={`${Number(overallWastePercentage).toFixed(2)}%`}
-            accent="yellow"
           />
         </div>
 

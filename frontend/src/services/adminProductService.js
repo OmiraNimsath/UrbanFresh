@@ -78,6 +78,17 @@ export const deleteProduct = (id) =>
   api.delete(`/api/admin/products/${id}`).then((res) => res.data);
 
 /**
+ * Toggles the hidden flag on a product.
+ * When hidden, the product is excluded from the customer catalogue.
+ * Calls PATCH /api/admin/products/{id}/hide
+ *
+ * @param {number} id - product ID
+ * @returns {Promise<object>} updated AdminProductResponse
+ */
+export const toggleHideProduct = (id) =>
+  api.patch(`/api/admin/products/${id}/hide`).then((res) => res.data);
+
+/**
  * Retrieves pending products for admin approval.
  */
 export const getPendingProducts = (page = 0, size = 20) =>

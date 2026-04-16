@@ -37,7 +37,7 @@ export default function LandingPage() {
   const heroDashboard = { CUSTOMER: '/dashboard', ADMIN: '/admin', SUPPLIER: '/supplier', DELIVERY: '/delivery' }[user?.role] || '/dashboard';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* ── Navigation (auth-aware via shared Navbar) ── */}
       <Navbar />
 
@@ -88,20 +88,22 @@ export default function LandingPage() {
       </section>
 
       {/* ── Featured Products ── */}
-      <section className="max-w-6xl mx-auto px-4 py-14">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">⭐ Featured Products</h2>
-        {loadingFeatured && <ProductGridSkeleton />}
-        {errorFeatured && <ErrorMessage message={errorFeatured} />}
-        {!loadingFeatured && !errorFeatured && featured.length === 0 && (
-          <EmptyState message="No featured products at the moment. Check back soon!" />
-        )}
-        {!loadingFeatured && !errorFeatured && featured.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {featured.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
+      <section className="py-14">
+        <div className="max-w-6xl mx-auto px-4">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">⭐ Featured Products</h2>
+          {loadingFeatured && <ProductGridSkeleton />}
+          {errorFeatured && <ErrorMessage message={errorFeatured} />}
+          {!loadingFeatured && !errorFeatured && featured.length === 0 && (
+            <EmptyState message="No featured products at the moment. Check back soon!" />
+          )}
+          {!loadingFeatured && !errorFeatured && featured.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {featured.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── Near-Expiry Offers ── */}
@@ -127,7 +129,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm">
+      <footer className="bg-gray-100 border-t border-gray-200 text-gray-500 text-center py-6 text-sm mt-auto">
         © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
       </footer>
     </div>

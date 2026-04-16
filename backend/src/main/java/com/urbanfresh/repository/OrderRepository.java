@@ -1,5 +1,6 @@
 package com.urbanfresh.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -10,6 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import com.urbanfresh.model.Order;
+import com.urbanfresh.model.OrderStatus;
 
 /**
  * Repository Layer – Spring Data JPA repository for Order entities.
@@ -77,4 +79,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @EntityGraph(attributePaths = {"customer", "items", "assignedDeliveryPerson"})
     Page<Order> findByAssignedDeliveryPersonIdOrderByCreatedAtDesc(Long assignedDeliveryPersonId, Pageable pageable);
+
+    /**
+     * Finds stale PENDING orders older than the given cutoff time.
+     * Used by the scheduler to auto-cancel orders where payment was never confirmed.
+     *
+     * @param status  order status to filter on (PENDING)
+     * @param cutoff  datetime threshold — orders created before this are considered stale
+     * @return list of stale orders needing cancellation
+     */
+    List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, LocalDateTime cutoff);
 }

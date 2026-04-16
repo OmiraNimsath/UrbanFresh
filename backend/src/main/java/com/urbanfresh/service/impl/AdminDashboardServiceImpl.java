@@ -1,5 +1,6 @@
 package com.urbanfresh.service.impl;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -11,6 +12,7 @@ import com.urbanfresh.model.Role;
 import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
+import com.urbanfresh.repository.WasteRecordRepository;
 import com.urbanfresh.service.AdminDashboardService;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final WasteRecordRepository wasteRecordRepository;
     
     @Override
     public AdminDashboardResponse getDashboardMetrics() {
@@ -42,7 +45,12 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         response.setLowStockItemsCount(countLowStockProducts());
         // Near expiry: in-stock approved products expiring within 7 days
         response.setNearExpiryItemsCount(countNearExpiryProducts());
-        response.setWastePercentage(0.0);
+        // Wasted value this calendar month from the waste_records audit table
+        LocalDate now = LocalDate.now();
+        BigDecimal wastedThisMonth =
+                wasteRecordRepository.sumWastedValueByMonth(now.getYear(), now.getMonthValue());
+        response.setWastedValueThisMonth(
+                wastedThisMonth != null ? wastedThisMonth : BigDecimal.ZERO);
         
         // Summary
         AdminDashboardResponse.DashboardSummary summary = new AdminDashboardResponse.DashboardSummary();

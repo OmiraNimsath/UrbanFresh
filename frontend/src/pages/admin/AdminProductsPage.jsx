@@ -5,7 +5,7 @@ import {
   getAdminProducts,
   createProduct,
   updateProduct,
-  deleteProduct,
+  toggleHideProduct,
   getPendingProducts,
   approveProduct,
   rejectProduct
@@ -41,8 +41,8 @@ export default function AdminProductsPage() {
   const [editProduct, setEditProduct] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // Status/Delete state
-  const [deletingId, setDeletingId] = useState(null);
+  // Status/Hide state
+  const [hidingId, setHidingId] = useState(null);
   const [processingId, setProcessingId] = useState(null);
 
   const fetchPage = useCallback(async () => {
@@ -103,18 +103,20 @@ export default function AdminProductsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    setDeletingId(id);
+  const handleToggleHide = async (product) => {
+    setHidingId(product.id);
     try {
-      await deleteProduct(id);
-      toast.success('Product deleted');
-      const isLastOnPage = pageData?.content?.length === 1 && currentPage > 0;
-      if (isLastOnPage) setCurrentPage((p) => p - 1);
-      else fetchPage();
+      const updated = await toggleHideProduct(product.id);
+      toast.success(updated.hidden ? 'Product hidden from store' : 'Product visible in store');
+      setPageData((prev) =>
+        prev
+          ? { ...prev, content: prev.content.map((p) => (p.id === updated.id ? updated : p)) }
+          : prev
+      );
     } catch {
-      toast.error('Failed to delete product');
+      toast.error('Failed to update product visibility');
     } finally {
-      setDeletingId(null);
+      setHidingId(null);
     }
   };
 
@@ -250,12 +252,12 @@ export default function AdminProductsPage() {
                           <span className="text-gray-500">N/A</span>
                         )}
                       </td>
-                      <td className={td}>{p.expiryDate ?? '—'}</td>
+                      <td className={td}>{p.earliestExpiryDate ?? p.expiryDate ?? '—'}</td>
                       <td className={td}>
                         <div className="flex gap-3">
                           <button onClick={() => openEdit(p)} className="text-blue-600 hover:underline font-medium text-xs">Edit</button>
-                          <button onClick={() => handleDelete(p.id)} disabled={deletingId === p.id} className="text-red-500 hover:underline font-medium text-xs disabled:opacity-50">
-                            {deletingId === p.id ? 'Deleting...' : 'Delete'}    
+                          <button onClick={() => handleToggleHide(p)} disabled={hidingId === p.id} className={`font-medium text-xs disabled:opacity-50 hover:underline ${p.hidden ? 'text-green-600' : 'text-gray-500'}`}>
+                            {hidingId === p.id ? '...' : p.hidden ? 'Show' : 'Hide'}
                           </button>
                         </div>
                       </td>

@@ -84,7 +84,7 @@ export default function SupplierDashboard() {
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
                 <h3 className="text-sm font-medium text-blue-800 mb-1">Total Sales</h3>
                 <p className="text-xl font-bold text-blue-900">
-                  ${dashboardData?.totalSales?.toFixed(2) || '0.00'}
+                  {formatPrice(dashboardData?.totalSales ?? 0)}
                 </p>
               </div>
 

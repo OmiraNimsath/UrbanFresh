@@ -32,4 +32,7 @@ public class CartItemResponse {
 
     /** True when at least 1 unit is in stock. Used to flag out-of-stock items in the cart UI. */
     private boolean inStock;
+
+    /** Available stock count — used by the cart UI to cap the quantity stepper. */
+    private int stockQuantity;
 }

@@ -1,11 +1,14 @@
 package com.urbanfresh.service.impl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.urbanfresh.dto.request.ConfirmDeliveryRequest;
+import com.urbanfresh.dto.request.ConfirmDeliveryRequest.ItemBatchOverride;
 import com.urbanfresh.dto.request.CreatePurchaseOrderRequest;
 import com.urbanfresh.dto.response.PurchaseOrderDto;
 import com.urbanfresh.dto.response.PurchaseOrderItemDto;
@@ -18,6 +21,7 @@ import com.urbanfresh.model.PurchaseOrder;
 import com.urbanfresh.model.PurchaseOrderItem;
 import com.urbanfresh.model.PurchaseOrderStatus;
 import com.urbanfresh.repository.BrandRepository;
+import com.urbanfresh.repository.ProductBatchRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.PurchaseOrderRepository;
 import com.urbanfresh.service.AdminPurchaseOrderService;
@@ -37,6 +41,7 @@ public class AdminPurchaseOrderServiceImpl implements AdminPurchaseOrderService 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
+    private final ProductBatchRepository productBatchRepository;
     private final ProductBatchService productBatchService;
 
     @Override
@@ -87,7 +92,7 @@ public class AdminPurchaseOrderServiceImpl implements AdminPurchaseOrderService 
     }
     @Override
     @Transactional
-    public PurchaseOrderDto confirmDeliveryAndStock(Long orderId, String adminUsername) {
+    public PurchaseOrderDto confirmDeliveryAndStock(Long orderId, String adminUsername, ConfirmDeliveryRequest request) {
         PurchaseOrder order = purchaseOrderRepository.findById(orderId)
                 .orElseThrow(() -> new PurchaseOrderNotFoundException("Purchase Order ID " + orderId + " not found."));
 
@@ -95,16 +100,36 @@ public class AdminPurchaseOrderServiceImpl implements AdminPurchaseOrderService 
             throw new IllegalStateException("Only DELIVERED orders can be marked as COMPLETED by admin.");
         }
 
+        // Build a lookup map from itemId → override (if any were provided)
+        Map<Long, ItemBatchOverride> overrideMap = (request != null && request.getItems() != null)
+                ? request.getItems().stream()
+                        .filter(o -> o.getItemId() != null)
+                        .collect(Collectors.toMap(ItemBatchOverride::getItemId, o -> o))
+                : Map.of();
+
         // Create a ProductBatch per item and increment legacy stockQuantity
         for (PurchaseOrderItem item : order.getItems()) {
             Product product = item.getProduct();
             product.setInventoryUpdatedBy(adminUsername);
             productRepository.save(product);
 
-            // Use batch number from PO item if provided; otherwise generate one from PO/item IDs
-            String batchNumber = (item.getBatchNumber() != null && !item.getBatchNumber().isBlank())
-                    ? item.getBatchNumber()
-                    : String.format("PO-%d-ITEM-%d", order.getId(), item.getId());
+            // Merge override fields onto the PO item (override wins over stored value)
+            ItemBatchOverride override = overrideMap.get(item.getId());
+            if (override != null) {
+                if (override.getBatchNumber() != null && !override.getBatchNumber().isBlank()) {
+                    item.setBatchNumber(override.getBatchNumber());
+                }
+                if (override.getManufacturingDate() != null) {
+                    item.setManufacturingDate(override.getManufacturingDate());
+                }
+                if (override.getSupplierExpiryDate() != null) {
+                    item.setSupplierExpiryDate(override.getSupplierExpiryDate());
+                }
+            }
+
+            // Use batch number from PO item if provided; otherwise auto-generate using incrementing index
+            long existingBatchCount = productBatchRepository.countByProductId(product.getId());
+            String batchNumber = String.format("BATCH-%d-%03d", product.getId(), existingBatchCount + 1);
 
             // Expiry date is required to create a batch; skip batch creation if not provided
             if (item.getSupplierExpiryDate() != null) {

@@ -191,7 +191,7 @@ export default function OrderSuccessPage() {
   };
 
   return (
-    <div className={`min-h-screen ${tone.pageBg}`}>
+    <div className={`min-h-screen flex flex-col ${tone.pageBg}`}>
       <Navbar />
 
       <main className="max-w-5xl mx-auto px-4 py-10 sm:py-14" aria-live="polite">
@@ -289,7 +289,7 @@ export default function OrderSuccessPage() {
         )}
       </main>
 
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
+      <footer className="bg-gray-100 border-t border-gray-200 text-gray-500 text-center py-6 text-sm mt-auto">
         © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
       </footer>
     </div>

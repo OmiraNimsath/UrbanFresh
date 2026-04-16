@@ -3,7 +3,6 @@ package com.urbanfresh.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,6 +66,14 @@ public class Product {
     /** URL to the product image (CDN path or relative asset path). */
     @Column(length = 500)
     private String imageUrl;
+
+    /**
+     * When true the product is hidden from the customer-facing store.
+     * Admins can toggle this to remove a product from the catalogue without deleting it.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean hidden = false;
 
     /**
      * When true the product appears in the "Featured Products" section on the landing page.

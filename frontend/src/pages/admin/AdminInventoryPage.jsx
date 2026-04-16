@@ -551,9 +551,6 @@ function BatchDrawer({ item, batches, loading, quarantining, onQuarantine, onClo
                   <div className="flex-1 min-w-0 space-y-1 text-sm">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-gray-800">{batch.batchNumber}</span>
-                      <span className={`text-xs font-medium border rounded-full px-2 py-0.5 ${BATCH_STATUS_STYLES[batch.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                        {batch.status}
-                      </span>
                     </div>
                     <div className="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-0.5">
                       {batch.expiryDate && <span>Expires: <span className="text-gray-700">{batch.expiryDate}</span></span>}
@@ -566,16 +563,6 @@ function BatchDrawer({ item, batches, loading, quarantining, onQuarantine, onClo
                     )}
                   </div>
 
-                  {/* Quarantine action — only for non-quarantined, non-expired batches */}
-                  {batch.status !== 'QUARANTINED' && batch.status !== 'EXPIRED' && (
-                    <button
-                      onClick={() => onQuarantine(batch.id)}
-                      disabled={quarantining === batch.id}
-                      className="shrink-0 text-xs text-red-600 hover:text-red-800 border border-red-200 hover:border-red-400 rounded px-2.5 py-1 font-medium transition-colors disabled:opacity-50"
-                    >
-                      {quarantining === batch.id ? 'Quarantining…' : 'Quarantine'}
-                    </button>
-                  )}
                 </div>
               ))}
             </div>

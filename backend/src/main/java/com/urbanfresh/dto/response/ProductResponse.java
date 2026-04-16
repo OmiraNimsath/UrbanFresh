@@ -43,10 +43,15 @@ public class ProductResponse {
     private Integer discountPercentage;
 
     /**
-     * Derived availability flag — true when any allocatable batch has stock.
-     * Falls back to stockQuantity > 0 for legacy (non-batch) products.
+     * True when at least 1 unit is in stock. Used to flag out-of-stock items in the cart UI.
      */
     private boolean inStock;
+
+    /**
+     * Available stock count shown to customers on listing and detail pages.
+     * Derived from batch stock (or legacy stockQuantity for non-batch products).
+     */
+    private int stockQuantity;
 
     /**
      * Earliest expiry date across all allocatable batches for this product.

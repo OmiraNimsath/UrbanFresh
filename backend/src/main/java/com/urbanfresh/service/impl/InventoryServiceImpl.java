@@ -68,6 +68,22 @@ public class InventoryServiceImpl implements InventoryService {
         // Record the admin email so changes can be traced in the admin table.
         product.setInventoryUpdatedBy(updatedBy);
 
+        // Sync active batch availableQuantity so that batch-aware display (toResponse)
+        // reflects the manually corrected stock. Distribute new total across active
+        // batches oldest-first, capping each at its original receivedQuantity.
+        List<ProductBatch> activeBatches =
+                productBatchRepository.findAllocatableBatchesByProductId(productId);
+        int remaining = request.getQuantity();
+        for (ProductBatch batch : activeBatches) {
+            int newQty = Math.min(remaining, batch.getReceivedQuantity());
+            batch.setAvailableQuantity(newQty);
+            if (newQty == 0) {
+                batch.setStatus(BatchStatus.EXPIRED);
+            }
+            productBatchRepository.save(batch);
+            remaining = Math.max(0, remaining - newQty);
+        }
+
         Product saved = productRepository.save(product);
         return toInventoryResponse(saved);
     }

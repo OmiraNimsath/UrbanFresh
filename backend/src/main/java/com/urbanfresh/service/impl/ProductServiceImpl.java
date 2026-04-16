@@ -189,6 +189,7 @@ public class ProductServiceImpl implements ProductService {
                 .expiryDate(product.getExpiryDate())
                 .discountPercentage(product.getDiscountPercentage())
                 .inStock(inStock)
+                .stockQuantity(batchStock > 0 ? batchStock : product.getStockQuantity())
                 .earliestExpiryDate(earliestExpiry.orElse(null))
                 .hasNearExpiryBatches(hasNearExpiryBatches)
                 .build();

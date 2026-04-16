@@ -17,8 +17,9 @@ import com.urbanfresh.dto.response.WasteMonthSummaryResponse;
 import com.urbanfresh.dto.response.WasteReportResponse;
 import com.urbanfresh.dto.response.WastedProductResponse;
 import com.urbanfresh.model.Brand;
-import com.urbanfresh.model.Product;
+import com.urbanfresh.model.WasteRecord;
 import com.urbanfresh.repository.ProductRepository;
+import com.urbanfresh.repository.WasteRecordRepository;
 import com.urbanfresh.service.WasteReportService;
 
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,7 @@ public class WasteReportServiceImpl implements WasteReportService {
             DateTimeFormatter.ofPattern("MMM yyyy");
 
     private final ProductRepository productRepository;
+    private final WasteRecordRepository wasteRecordRepository;
 
     /**
      * Builds the full waste report.
@@ -65,13 +67,11 @@ public class WasteReportServiceImpl implements WasteReportService {
     @Override
     @Transactional(readOnly = true)
     public WasteReportResponse getWasteReport() {
-        LocalDate today = LocalDate.now();
+        // Read from the waste_records audit table — written by BatchExpiryScheduler
+        // at the moment each batch is expired, so stock quantity is irrelevant here.
+        List<WasteRecord> records = wasteRecordRepository.findAllByOrderByExpiryDateAsc();
 
-        // Single query: expired, approved, in-stock products
-        List<Product> expiredProducts =
-                productRepository.findExpiredWithRemainingStock(today, 0);
-
-        List<WastedProductResponse> wastedProducts = expiredProducts.stream()
+        List<WastedProductResponse> wastedProducts = records.stream()
                 .map(this::toWastedProductResponse)
                 .collect(Collectors.toList());
 
@@ -105,28 +105,23 @@ public class WasteReportServiceImpl implements WasteReportService {
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
-    /**
-     * Maps a Product entity to a WastedProductResponse.
-     * wastedValue = price × stockQuantity (residual units lost to expiry).
-     */
-    private WastedProductResponse toWastedProductResponse(Product product) {
-        Brand brand = product.getBrand();
-        BigDecimal wastedValue = product.getPrice()
-                .multiply(BigDecimal.valueOf(product.getStockQuantity()))
+    /** Maps a WasteRecord to WastedProductResponse using the snapshotted waste data. */
+    private WastedProductResponse toWastedProductResponse(WasteRecord record) {
+        Brand brand = record.getProduct().getBrand();
+        String monthYear = record.getExpiryDate().format(MONTH_KEY_FMT);
+        BigDecimal wastedValue = record.getWastedValue()
                 .setScale(SCALE, RoundingMode.HALF_UP);
 
-        String monthYear = product.getExpiryDate().format(MONTH_KEY_FMT);
-
         return new WastedProductResponse(
-                product.getId(),
-                product.getName(),
-                product.getCategory(),
+                record.getProduct().getId(),
+                record.getProduct().getName(),
+                record.getProduct().getCategory(),
                 brand != null ? brand.getName() : null,
-                product.getPrice(),
-                product.getUnit(),
-                product.getStockQuantity(),
+                record.getPricePerUnit(),
+                record.getProduct().getUnit(),
+                record.getWastedQuantity(),
                 wastedValue,
-                product.getExpiryDate(),
+                record.getExpiryDate(),
                 monthYear
         );
     }

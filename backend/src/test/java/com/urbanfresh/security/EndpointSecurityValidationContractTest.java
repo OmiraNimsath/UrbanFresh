@@ -111,7 +111,7 @@ class EndpointSecurityValidationContractTest {
     @BeforeEach
     void setUp() {
         when(adminDashboardService.getDashboardMetrics())
-                .thenReturn(new AdminDashboardResponse(0, 0.0, 0, 0, 0, 0, 0.0, null));
+                .thenReturn(new AdminDashboardResponse(0, 0.0, 0, 0, 0, 0, BigDecimal.ZERO, null));
 
         when(supplierService.getDashboardData(anyString()))
                 .thenReturn(SupplierDashboardResponse.builder()

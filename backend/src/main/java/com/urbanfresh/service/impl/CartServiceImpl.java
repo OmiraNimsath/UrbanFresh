@@ -23,6 +23,7 @@ import com.urbanfresh.repository.CartRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
 import com.urbanfresh.service.CartService;
+import com.urbanfresh.service.ProductBatchService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -40,6 +41,7 @@ public class CartServiceImpl implements CartService {
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final ProductBatchService productBatchService;
 
     /**
      * Returns the customer's cart, or an empty cart response if none exists yet.
@@ -206,6 +208,9 @@ public class CartServiceImpl implements CartService {
                 .quantity(item.getQuantity())
                 .lineTotal(lineTotal)
                 .inStock(p.getStockQuantity() > 0)
+                .stockQuantity(productBatchService.getTotalAvailableQuantity(p.getId()) > 0
+                        ? productBatchService.getTotalAvailableQuantity(p.getId())
+                        : p.getStockQuantity())
                 .build();
     }
 

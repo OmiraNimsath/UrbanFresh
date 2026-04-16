@@ -42,7 +42,7 @@ export default function ProductDetailPage() {
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 py-10">
@@ -85,7 +85,7 @@ export default function ProductDetailPage() {
         {!loading && product && <ProductDetail product={product} />}
       </div>
 
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
+      <footer className="bg-gray-100 border-t border-gray-200 text-gray-500 text-center py-6 text-sm mt-auto">
         © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
       </footer>
     </div>
@@ -108,9 +108,13 @@ function ProductDetail({ product }) {
   const navigate = useNavigate();
   const [adding, setAdding]     = useState(false);
   const [quantity, setQuantity] = useState(1);
+  // Use the earliest available batch expiry — falls back to the entity-level field
+  // for legacy products with no batch records.
+  const displayExpiry = product.earliestExpiryDate ?? product.expiryDate;
+
   // Days until expiry — drives the near-expiry banner display
-  const daysUntilExpiry = product.expiryDate
-    ? Math.ceil((new Date(product.expiryDate) - new Date()) / 86_400_000)
+  const daysUntilExpiry = displayExpiry
+    ? Math.ceil((new Date(displayExpiry) - new Date()) / 86_400_000)
     : null;
 
   // Mirror the 7-day near-expiry threshold used on the landing page
@@ -163,7 +167,7 @@ function ProductDetail({ product }) {
         {isNearExpiry && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
             🕐 <span className="font-semibold">Near-Expiry Offer</span> — expires on{' '}
-            <span className="font-medium">{product.expiryDate}</span>
+            <span className="font-medium">{displayExpiry}</span>
             {daysUntilExpiry === 0
               ? ' (today!)'
               : daysUntilExpiry === 1
@@ -177,15 +181,18 @@ function ProductDetail({ product }) {
         )}
 
         {/* Show expiry date even outside the near-expiry window for transparency */}
-        {product.expiryDate && !isNearExpiry && (
-          <p className="text-xs text-gray-400">Best before: {product.expiryDate}</p>
+        {displayExpiry && !isNearExpiry && (
+          <p className="text-xs text-gray-400">Best before: {displayExpiry}</p>
         )}
 
         {/* Stock status + Quantity selector + Add to Cart */}
         <div className="mt-auto pt-4 border-t border-gray-100">
           {product.inStock ? (
             <div className="flex flex-col gap-3">
-              <span className="text-xs text-green-600 font-medium">✓ In Stock</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-green-600 font-medium">✓ In Stock</span>
+                <span className="text-xs text-gray-400">({product.stockQuantity} available)</span>
+              </div>
 
               {/* Quantity stepper */}
               <div className="flex items-center gap-3">
@@ -203,8 +210,9 @@ function ProductDetail({ product }) {
                   </span>
                   <button
                     aria-label="Increase quantity"
-                    onClick={() => setQuantity((q) => Math.min(99, q + 1))}
-                    className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors text-lg font-bold"
+                    onClick={() => setQuantity((q) => Math.min(product.stockQuantity, q + 1))}
+                    disabled={quantity >= product.stockQuantity}
+                    className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors text-lg font-bold disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     +
                   </button>

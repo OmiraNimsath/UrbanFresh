@@ -83,4 +83,13 @@ public interface AdminProductService {
      * @throws com.urbanfresh.exception.ProductNotFoundException if no product with that ID exists
      */
     void deleteProduct(Long id);
+
+    /**
+     * Toggles the hidden flag on a product.
+     * When hidden=true the product is excluded from all customer-facing queries.
+     *
+     * @param id product ID to toggle
+     * @return updated AdminProductResponse with the new hidden state
+     */
+    AdminProductResponse toggleHidden(Long id);
 }

@@ -93,11 +93,6 @@ public class ProductBatchServiceImpl implements ProductBatchService {
             int fromThisBatch = Math.min(batch.getAvailableQuantity(), remaining);
             batch.setAvailableQuantity(batch.getAvailableQuantity() - fromThisBatch);
 
-            // Fully depleted batches are no longer allocatable — mark them expired
-            if (batch.getAvailableQuantity() == 0) {
-                batch.setStatus(BatchStatus.EXPIRED);
-            }
-
             productBatchRepository.save(batch);
 
             allocationRepository.save(OrderItemBatchAllocation.builder()

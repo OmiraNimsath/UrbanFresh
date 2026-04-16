@@ -64,6 +64,12 @@ public interface ProductBatchRepository extends JpaRepository<ProductBatch, Long
     Optional<LocalDate> findEarliestExpiryDateByProductId(@Param("productId") Long productId);
 
     /**
+     * Counts all batches for a product regardless of status.
+     * Used to generate an incrementing batch number on delivery confirmation.
+     */
+    long countByProductId(Long productId);
+
+    /**
      * Finds active batches whose expiry falls between today and the cutoff date.
      * Used by the batch status scheduler to transition ACTIVE → NEAR_EXPIRY.
      */

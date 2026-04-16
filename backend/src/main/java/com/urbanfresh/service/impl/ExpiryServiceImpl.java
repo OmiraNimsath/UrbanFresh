@@ -11,6 +11,7 @@ import com.urbanfresh.dto.response.ExpiryBucketResponse;
 import com.urbanfresh.dto.response.ExpiryProductResponse;
 import com.urbanfresh.model.Brand;
 import com.urbanfresh.model.Product;
+import com.urbanfresh.repository.ProductBatchRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.service.ExpiryService;
 
@@ -37,6 +38,7 @@ public class ExpiryServiceImpl implements ExpiryService {
     private static final int CRITICAL_THRESHOLD_DAYS = 1;
 
     private final ProductRepository productRepository;
+    private final ProductBatchRepository productBatchRepository;
 
     /**
      * Returns expiry buckets for the admin expiry dashboard.
@@ -78,11 +80,20 @@ public class ExpiryServiceImpl implements ExpiryService {
         return new ExpiryBucketResponse(within1Day, within7Days, within30Days, total);
     }
 
-    /** Calculates days from today to the product's expiry date (0 = expires today).
-     *  Uses ChronoUnit.DAYS for exact elapsed days — Period.getDays() only returns
-     *  the days component and produces 0 for cross-month boundaries (e.g. April 5 → May 5). */
+    /**
+     * Returns the effective expiry date for a product — the earliest active batch
+     * with available stock. Falls back to the entity-level expiryDate for legacy
+     * products that have no batch records.
+     */
+    private LocalDate effectiveExpiry(Product product) {
+        return productBatchRepository
+                .findEarliestExpiryDateByProductId(product.getId())
+                .orElse(product.getExpiryDate());
+    }
+
+    /** Calculates days from today to the product's effective (batch-derived) expiry date. */
     private long daysUntil(LocalDate today, Product product) {
-        return ChronoUnit.DAYS.between(today, product.getExpiryDate());
+        return ChronoUnit.DAYS.between(today, effectiveExpiry(product));
     }
 
     /** Maps a Product entity + computed daysUntilExpiry to the lightweight response DTO. */
@@ -96,7 +107,7 @@ public class ExpiryServiceImpl implements ExpiryService {
                 product.getPrice(),
                 product.getUnit(),
                 product.getStockQuantity(),
-                product.getExpiryDate(),
+                effectiveExpiry(product),
                 daysUntil(today, product),
                 product.getDiscountPercentage()
         );

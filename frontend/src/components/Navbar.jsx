@@ -42,7 +42,8 @@ export default function Navbar() {
     <nav className="bg-white shadow-sm sticky top-0 z-10">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="text-2xl font-bold text-green-600 tracking-tight">
+        <Link to="/" className="flex items-center gap-0 text-2xl font-bold text-green-600 tracking-tight">
+          <img src="/logo.svg" alt="UrbanFresh logo" className="h-9 w-9" />
           UrbanFresh
         </Link>
 

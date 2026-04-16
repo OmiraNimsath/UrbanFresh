@@ -324,13 +324,14 @@ export default function ProductFormModal({ product, brands, onSubmit, onClose, l
           </Field>
 
           {/* Expiry Date */}
-          <Field label="Expiry Date">
+          <Field label={<>Expiry Date <span className="text-red-500">*</span></>}>
             <input
               name="expiryDate"
               type="date"
               value={form.expiryDate}
               onChange={handleChange}
               className={inputCls}
+              required
             />
           </Field>
 

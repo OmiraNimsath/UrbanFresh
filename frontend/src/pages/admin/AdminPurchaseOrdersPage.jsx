@@ -20,6 +20,8 @@ export default function AdminPurchaseOrdersPage() {
   const [quantity, setQuantity] = useState(50);
   const [creating, setCreating] = useState(false);
   const [confirmOrderId, setConfirmOrderId] = useState(null);
+  const [confirmOrderItems, setConfirmOrderItems] = useState([]); // items of the order being confirmed
+  const [batchFormData, setBatchFormData] = useState({}); // { [itemId]: { batchNumber, manufacturingDate, supplierExpiryDate } }
   const [viewReason, setViewReason] = useState(null);
 
   useEffect(() => {
@@ -61,18 +63,46 @@ export default function AdminPurchaseOrdersPage() {
   const handleConfirmAction = async () => {
     if (!confirmOrderId) return;
     try {
-      await confirmDeliveryAndStock(confirmOrderId);
-      toast.success('Stock updated successfully!');
+      // Build per-item batch overrides from the form
+      const items = confirmOrderItems.map((item) => {
+        const d = batchFormData[item.id] || {};
+        return {
+          itemId: item.id,
+          batchNumber: null,
+          manufacturingDate: null,
+          supplierExpiryDate: d.supplierExpiryDate || null,
+        };
+      });
+      await confirmDeliveryAndStock(confirmOrderId, { items });
+      toast.success('Stock updated and batches created successfully!');
       loadOrders();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to confirm delivery');
     } finally {
       setConfirmOrderId(null);
+      setConfirmOrderItems([]);
+      setBatchFormData({});
     }
   };
 
-  const handleConfirm = (orderId) => {
-    setConfirmOrderId(orderId);
+  const handleConfirm = (order) => {
+    setConfirmOrderId(order.id);
+    setConfirmOrderItems(order.items || []);
+    // Pre-fill with any existing batch data on the PO items
+    const initial = {};
+    (order.items || []).forEach((item) => {
+      initial[item.id] = {
+          supplierExpiryDate: item.supplierExpiryDate || '',
+        };
+    });
+    setBatchFormData(initial);
+  };
+
+  const handleBatchFieldChange = (itemId, field, value) => {
+    setBatchFormData((prev) => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], [field]: value },
+    }));
   };
 
   const th = "px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider text-xs";
@@ -86,29 +116,48 @@ export default function AdminPurchaseOrdersPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       {confirmOrderId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm transition-opacity">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 w-full max-w-sm shadow-2xl transform transition-all duration-300 scale-100">
-            <div className="mb-4 text-center">
-              <svg className="mx-auto mb-4 text-amber-500 w-12 h-12" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
-              <h3 className="mb-2 text-lg font-bold text-gray-800">Confirm Action</h3>
-              <p className="text-gray-500 text-sm">Are you sure you want to mark this as completed and update stock?</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+            <div className="bg-gray-50 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">Confirm Delivery & Create Batches</h3>
+              <button onClick={() => { setConfirmOrderId(null); setConfirmOrderItems([]); setBatchFormData({}); }} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
             </div>
-            <div className="flex justify-center gap-3 mt-6">
+            <div className="p-6 max-h-[70vh] overflow-y-auto space-y-5">
+              <p className="text-sm text-gray-500">Enter batch details for each item. <span className="font-medium text-amber-600">Expiry date is required</span> to enable batch tracking. Leave blank to add stock without batch.</p>
+              {confirmOrderItems.map((item) => (
+                <div key={item.id} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-800 text-sm">{item.productName}</span>
+                    <span className="text-xs text-gray-500 bg-white border border-gray-200 rounded px-2 py-0.5">Qty: {item.quantity}</span>
+                  </div>
+                  <div>
+                      <label className="block text-xs font-medium text-amber-700 mb-1">Expiry Date *</label>
+                      <input
+                        type="date"
+                        value={batchFormData[item.id]?.supplierExpiryDate || ''}
+                        onChange={(e) => handleBatchFieldChange(item.id, 'supplierExpiryDate', e.target.value)}
+                        className="w-full px-3 py-1.5 text-sm border border-amber-300 rounded-lg focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                      />
+                    </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-gray-200"
-                onClick={() => setConfirmOrderId(null)}
+                onClick={() => { setConfirmOrderId(null); setConfirmOrderItems([]); setBatchFormData({}); }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
               >
-                No, cancel
+                Cancel
               </button>
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-300"
                 onClick={handleConfirmAction}
+                className="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
               >
-                Yes, complete
+                Confirm & Update Stock
               </button>
             </div>
           </div>
@@ -217,7 +266,7 @@ export default function AdminPurchaseOrdersPage() {
                     </td>
                     <td className={td}>
                       {order.status === "DELIVERED" && (
-                        <button onClick={() => handleConfirm(order.id)} className="text-xs bg-indigo-600 text-white rounded px-3 py-1 hover:bg-indigo-700 transition">
+                        <button onClick={() => handleConfirm(order)} className="text-xs bg-indigo-600 text-white rounded px-3 py-1 hover:bg-indigo-700 transition">
                           Confirm Delivery & Update Stock
                         </button>
                       )}
