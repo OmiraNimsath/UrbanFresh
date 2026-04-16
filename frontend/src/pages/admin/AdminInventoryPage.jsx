@@ -467,7 +467,7 @@ export default function AdminInventoryPage() {
 
 /* ─────────────────────────────────────────────
    BatchDrawer — slide-over panel listing all
-   batches for a product with quarantine action
+   batches for a product
 ───────────────────────────────────────────── */
 
 const BATCH_STATUS_STYLES = {
