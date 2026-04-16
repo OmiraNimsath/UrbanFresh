@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { getMyOrders, getLoyaltyPoints } from '../../services/orderService';
+import { useCart } from '../../context/CartContext';
+import { getMyOrders, getLoyaltyPoints, getRecommendations } from '../../services/orderService';
 import { formatAmount } from '../../utils/priceUtils';
 import PaymentModal from '../../components/PaymentModal';
 import useNotifications from '../../hooks/useNotifications';
@@ -21,9 +22,12 @@ export default function CustomerDashboard() {
 
   const [orders, setOrders] = useState([]);
   const [loyalty, setLoyalty] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
+
+  const { addToCart } = useCart();
 
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -32,8 +36,8 @@ export default function CustomerDashboard() {
    * allSettled ensures partial success: if one call fails, the other section
    * still renders instead of both being hidden by a single catch. */
   useEffect(() => {
-    Promise.allSettled([getMyOrders(), getLoyaltyPoints()])
-      .then(([ordersResult, loyaltyResult]) => {
+    Promise.allSettled([getMyOrders(), getLoyaltyPoints(), getRecommendations()])
+      .then(([ordersResult, loyaltyResult, recsResult]) => {
         if (ordersResult.status === 'fulfilled') {
           setOrders(ordersResult.value.data);
         } else {
@@ -44,6 +48,10 @@ export default function CustomerDashboard() {
         } else {
           toast.error('Failed to load loyalty points. Please refresh.');
         }
+        if (recsResult.status === 'fulfilled') {
+          setRecommendations(recsResult.value.data);
+        }
+        // Recommendations failure is silent — the section is simply hidden
       })
       .finally(() => setLoading(false));
   }, []);
@@ -142,6 +150,11 @@ export default function CustomerDashboard() {
           />
         )}
 
+        {/* ── Buy Again Section ── */}
+        {recommendations.length > 0 && (
+          <BuyAgainSection recommendations={recommendations} onAddToCart={addToCart} />
+        )}
+
         {/* ── Loyalty Points Section ── */}
         {loyalty && (
           <div className="bg-white rounded-2xl shadow-sm p-6">
@@ -222,6 +235,71 @@ export default function CustomerDashboard() {
 }
 
 /* ── Sub-components ── */
+
+/**
+ * "Buy Again" section — horizontal scrolling row of product cards.
+ * Shows up to 5 products the customer has ordered most frequently.
+ * Each card has an "Add to Cart" button; the section is hidden entirely
+ * when recommendations is empty (no confirmed order history).
+ *
+ * @param {RecommendationResponse[]} recommendations - ranked list from backend
+ * @param {function} onAddToCart - CartContext addToCart(productId, quantity)
+ */
+function BuyAgainSection({ recommendations, onAddToCart }) {
+  const handleAdd = async (productId, name) => {
+    try {
+      await onAddToCart(productId, 1);
+      toast.success(`${name} added to cart`);
+    } catch {
+      toast.error('Could not add to cart. Please try again.');
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-6">
+      <h2 className="text-lg font-bold text-gray-800 mb-4">🔁 Buy Again</h2>
+      <div className="flex gap-4 overflow-x-auto pb-2">
+        {recommendations.map((rec) => (
+          <div
+            key={rec.productId}
+            className="shrink-0 w-40 border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+          >
+            {/* Product image */}
+            <div className="w-full h-28 bg-gray-50 flex items-center justify-center overflow-hidden">
+              {rec.imageUrl ? (
+                <img
+                  src={rec.imageUrl}
+                  alt={rec.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              ) : (
+                <span className="text-3xl" aria-hidden="true">🛍️</span>
+              )}
+            </div>
+
+            {/* Product info */}
+            <div className="p-3 flex flex-col gap-2">
+              <p
+                className="text-xs font-semibold text-gray-800 leading-tight line-clamp-2"
+                title={rec.name}
+              >
+                {rec.name}
+              </p>
+              <p className="text-xs font-bold text-green-700">{formatAmount(rec.price)}</p>
+              <button
+                onClick={() => handleAdd(rec.productId, rec.name)}
+                className="w-full text-xs bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium transition-colors"
+              >
+                Add to Cart
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Displays a single loyalty stat tile.
