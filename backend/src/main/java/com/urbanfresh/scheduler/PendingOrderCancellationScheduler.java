@@ -29,12 +29,21 @@ public class PendingOrderCancellationScheduler {
 
     /**
      * Scheduled entry point — runs at the top of every hour.
-     * Also invoked once immediately after startup via ApplicationReadyEvent.
      */
     @Scheduled(cron = "0 0 * * * *")
-    @EventListener(ApplicationReadyEvent.class)
     public void cancelStalePendingOrders() {
         log.info("[PendingOrderCancellationScheduler] Checking for stale PENDING orders (>24 h)...");
+        orderService.cancelStalePendingOrders();
+    }
+
+    /**
+     * Startup hook — runs once after the application context is fully ready
+     * to cancel any stale PENDING orders created during downtime.
+     * Kept separate from the @Scheduled method to prevent double-fire on startup.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void cancelStalePendingOrdersOnStartup() {
+        log.info("[PendingOrderCancellationScheduler] Startup check for stale PENDING orders (>24 h)...");
         orderService.cancelStalePendingOrders();
     }
 }
