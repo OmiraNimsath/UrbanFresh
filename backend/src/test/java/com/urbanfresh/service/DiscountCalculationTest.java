@@ -28,6 +28,7 @@ import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
 import com.urbanfresh.service.impl.OrderServiceImpl;
+import com.urbanfresh.service.ProductBatchService;
 
 /**
  * Test Layer – Unit tests for discount calculation in order creation.
@@ -54,6 +55,9 @@ class DiscountCalculationTest {
 
     @Mock(lenient = true)
     private com.urbanfresh.service.NotificationService notificationService;
+
+    @Mock(lenient = true)
+    private ProductBatchService productBatchService;
 
     @InjectMocks
     private OrderServiceImpl orderService;
