@@ -1,6 +1,8 @@
-import { useAuth } from '../../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { FiClock, FiPackage, FiTruck, FiUser } from 'react-icons/fi';
+
+import { useAuth } from '../../context/AuthContext';
 import DeliveryPageLayout from '../../components/delivery/DeliveryPageLayout';
 import useDeliveryOrders from '../../hooks/useDeliveryOrders';
 
@@ -34,59 +36,48 @@ export default function DeliveryDashboard() {
 
   return (
     <DeliveryPageLayout
-      title="Delivery Dashboard"
-      subtitle="Simple navigation to current orders, history, and profile updates."
-      actions={
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="h-10 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="h-10 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-100"
-          >
-            Logout
-          </button>
-        </div>
-      }
+      activeKey="dashboard"
+      onRefresh={handleRefresh}
+      onLogout={handleLogout}
     >
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <p className="text-sm text-slate-600">
-          Welcome, <span className="font-semibold text-slate-800">{user?.name}</span>
+      <section className="rounded-[26px] bg-linear-to-r from-[#114f39] to-[#1b5a42] p-6 text-white shadow-sm sm:p-8">
+        <h2 className="text-3xl font-semibold leading-tight sm:text-[32px]">Ready to Harvest?</h2>
+        <p className="mt-3 max-w-xl text-base text-[#c6ddd4]">
+          {user?.name || 'Delivery partner'}, you have {currentOrders.length} fresh orders waiting for dispatch today.
         </p>
+      </section>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Link to="/delivery/orders/current" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:bg-slate-100 transition">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current Orders</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{currentOrders.length}</p>
-            <p className="mt-1 text-sm text-slate-600">Open active assignments</p>
-          </Link>
-          <Link to="/delivery/orders/history" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:bg-slate-100 transition">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">History</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{historyOrders.length}</p>
-            <p className="mt-1 text-sm text-slate-600">Delivered and returned orders</p>
-          </Link>
-          <Link to="/delivery/profile" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:bg-slate-100 transition">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">My Profile</p>
-            <p className="mt-1 text-lg font-bold text-slate-900">Update Details</p>
-            <p className="mt-1 text-sm text-slate-600">Name, phone and address</p>
-          </Link>
+      <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Link to="/delivery/orders/current" className="rounded-3xl bg-[#a7ecc6] p-5 text-[#1b5e45] shadow-sm transition hover:brightness-[0.98]">
+          <FiTruck size={24} />
+          <p className="mt-4 text-xs font-medium tracking-[0.08em]">Current Orders</p>
+          <p className="mt-2 text-3xl font-semibold leading-none">{currentOrders.length}</p>
+        </Link>
+        <Link to="/delivery/orders/history" className="rounded-3xl border border-[#dce7e2] bg-white p-5 shadow-sm transition hover:border-[#c9dbd2]">
+          <FiClock size={24} className="text-[#0d4a38]" />
+          <p className="mt-4 text-xs font-medium tracking-[0.08em] text-[#576d65]">Delivery History</p>
+          <p className="mt-2 text-2xl font-semibold text-[#123f32]">{historyOrders.length}</p>
+        </Link>
+        <Link to="/delivery/profile" className="rounded-3xl border border-[#dce7e2] bg-white p-5 shadow-sm transition hover:border-[#c9dbd2]">
+          <FiUser size={24} className="text-[#0d4a38]" />
+          <p className="mt-4 text-xs font-medium tracking-[0.08em] text-[#576d65]">My Profile</p>
+          <p className="mt-2 text-base font-semibold text-[#123f32]">Manage details</p>
+        </Link>
+        <div className="rounded-3xl border border-[#dce7e2] bg-white p-5 shadow-sm">
+          <FiPackage size={24} className="text-[#0d4a38]" />
+          <p className="mt-4 text-xs font-medium tracking-[0.08em] text-[#576d65]">Total Visible</p>
+          <p className="mt-2 text-2xl font-semibold text-[#123f32]">{orders.length}</p>
         </div>
       </section>
 
-      <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <section className="mt-4 rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Out For Delivery Now</h2>
-          <Link
-            to="/delivery/orders/current"
-            className="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-          >
-            View Current Orders
+          <div>
+            <h3 className="text-2xl font-semibold leading-tight text-[#0d3f31] sm:text-3xl">Active Shipments</h3>
+            <p className="text-sm text-[#6f817b]">{outForDeliveryOrders.length} active deliveries in progress.</p>
+          </div>
+          <Link to="/delivery/orders/current" className="text-sm font-semibold text-[#1d6a4d] hover:text-[#114f39]">
+            View All
           </Link>
         </div>
 
@@ -99,19 +90,20 @@ export default function DeliveryDashboard() {
         )}
 
         {!loading && !error && outForDeliveryOrders.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {outForDeliveryOrders.slice(0, 5).map((order) => (
+          <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {outForDeliveryOrders.slice(0, 6).map((order) => (
               <button
                 key={order.orderId}
                 type="button"
                 onClick={() => navigate(`/delivery/orders/${order.orderId}`)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+                className="flex w-full items-center gap-3 rounded-2xl border border-[#e7eeea] bg-white px-3 py-3 text-left transition hover:border-[#cddfd6] hover:bg-[#f8fbf9]"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">Order #{order.orderId}</p>
-                  <span className="text-xs font-medium text-emerald-700">Open details</span>
+                <div className="h-14 w-14 shrink-0 rounded-xl bg-[#dfeee6]" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium tracking-wide text-[#6f817b]">#PO-{order.orderId}</p>
+                  <p className="truncate text-lg font-semibold text-[#123f32] sm:text-xl">{order.customerName || 'Customer'}</p>
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{order.customerName || 'Customer'}</p>
+                <span className="text-2xl text-[#8da49d]">›</span>
               </button>
             ))}
           </div>
@@ -120,6 +112,13 @@ export default function DeliveryDashboard() {
         {!loading && !error && orders.length > 0 && (
           <p className="mt-4 text-xs text-slate-500">Total orders: {orders.length}</p>
         )}
+      </section>
+
+      <section className="mt-4 rounded-3xl bg-[#9fe5c0] p-5 text-[#0f4936] shadow-sm">
+        <p className="text-xs font-medium tracking-[0.08em]">Eco Tip</p>
+        <p className="mt-2 text-base">
+          Optimizing your route today can reduce fuel usage and delivery delay risk.
+        </p>
       </section>
     </DeliveryPageLayout>
   );
