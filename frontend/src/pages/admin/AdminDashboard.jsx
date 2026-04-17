@@ -128,15 +128,18 @@ const AdminDashboard = () => {
                     linked
                   />
                 </Link>
-                <AlertItem
-                  label="Wasted Value This Month"
-                  value={`Rs. ${Number(dashboardData?.wastedValueThisMonth || 0).toLocaleString('en-LK', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`}
-                  hint="Expired stock loss this month"
-                  tone="slate"
-                />
+                <Link to="/admin/waste-report" className="block">
+                  <AlertItem
+                    label="Wasted Value This Month"
+                    value={`Rs. ${Number(dashboardData?.wastedValueThisMonth || 0).toLocaleString('en-LK', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`}
+                    hint="Expired stock loss this month"
+                    tone="slate"
+                    linked
+                  />
+                </Link>
               </div>
           </section>
         </>

@@ -26,6 +26,8 @@ export default function AdminDeliveryLayout({
     { to: '/admin/delivery-personnel', label: 'Delivery Personnel' },
     { to: '/admin/suppliers', label: 'Manage Suppliers' },
     { to: '/admin/brands', label: 'Manage Brands' },
+    { to: '/admin/expiry', label: 'Expiry Report' },
+    { to: '/admin/waste-report', label: 'Waste Report' },
   ];
 
   const isActivePath = (path) =>
