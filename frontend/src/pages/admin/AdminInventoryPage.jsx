@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
 import { getInventory, updateInventory, getProductBatches } from '../../services/inventoryService';
 import { createPurchaseOrder } from '../../services/adminPurchaseOrderService';
+import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
 
 /**
  * Admin Inventory Management page.
@@ -12,31 +12,21 @@ import { createPurchaseOrder } from '../../services/adminPurchaseOrderService';
  * Layer: Presentation (Admin)
  */
 export default function AdminInventoryPage() {
-  const { logout } = useAuth();
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [editItem, setEditItem] = useState(null);
+  const [formValues, setFormValues] = useState({ quantity: '', reorderThreshold: '' });
+  const [saving, setSaving] = useState(false);
 
-  const [inventory, setInventory]     = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState(null);
-  const [editItem, setEditItem]       = useState(null);
-  const [formValues, setFormValues]   = useState({ quantity: '', reorderThreshold: '' });
-  const [saving, setSaving]           = useState(false);
-
-  // Order state
-  const [orderItem, setOrderItem]     = useState(null);
+  const [orderItem, setOrderItem] = useState(null);
   const [orderQuantity, setOrderQuantity] = useState('');
-  const [ordering, setOrdering]       = useState(false);
+  const [ordering, setOrdering] = useState(false);
 
-  // Batch drawer state
-  const [batchDrawerItem, setBatchDrawerItem]   = useState(null); // inventory row
-  const [batches, setBatches]                   = useState([]);
-  const [batchesLoading, setBatchesLoading]     = useState(false);
+  const [batchDrawerItem, setBatchDrawerItem] = useState(null);
+  const [batches, setBatches] = useState([]);
+  const [batchesLoading, setBatchesLoading] = useState(false);
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
-
-  /**
-   * Loads the full inventory list from the API.
-   * Resets error state on each call so stale errors are cleared on refresh.
-   */
   const fetchInventory = async () => {
     setLoading(true);
     setError(null);
@@ -54,14 +44,6 @@ export default function AdminInventoryPage() {
     fetchInventory();
   }, []);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-
-  /**
-   * Opens the inline edit form for the selected inventory row.
-   * Pre-fills inputs with the row's current values.
-   *
-   * @param {object} item  The inventory row to edit.
-   */
   const handleEdit = (item) => {
     setEditItem(item);
     setFormValues({
@@ -70,13 +52,11 @@ export default function AdminInventoryPage() {
     });
   };
 
-  /** Discards unsaved changes and collapses the edit row. */
   const handleCancelEdit = () => {
     setEditItem(null);
     setFormValues({ quantity: '', reorderThreshold: '' });
   };
 
-  /** Opens the inline ordering form */
   const handleOrder = (item) => {
     if (!item.brandId) {
       toast.error('Cannot create order: missing brand data for product.');
@@ -86,13 +66,11 @@ export default function AdminInventoryPage() {
     setOrderQuantity('');
   };
 
-  /** Cancels formatting order */
   const handleCancelOrder = () => {
     setOrderItem(null);
     setOrderQuantity('');
   };
 
-  /** Opens the batch drawer for a product row and loads its batches. */
   const handleViewBatches = async (item) => {
     setBatchDrawerItem(item);
     setBatches([]);
@@ -107,15 +85,17 @@ export default function AdminInventoryPage() {
     }
   };
 
-  /** Creates purchase order for the row item */
   const handleSaveOrder = async (e) => {
     e.preventDefault();
-    if (!orderQuantity || isNaN(orderQuantity) || parseInt(orderQuantity, 10) <= 0) return;
+    if (!orderQuantity || Number.isNaN(Number(orderQuantity)) || parseInt(orderQuantity, 10) <= 0) {
+      return;
+    }
+
     setOrdering(true);
     try {
       await createPurchaseOrder({
         brandId: orderItem.brandId,
-        items: [{ productId: orderItem.productId, quantity: parseInt(orderQuantity, 10) }]
+        items: [{ productId: orderItem.productId, quantity: parseInt(orderQuantity, 10) }],
       });
       toast.success(`Purchase order created for ${orderItem.productName}`);
       setOrderItem(null);
@@ -127,12 +107,6 @@ export default function AdminInventoryPage() {
     }
   };
 
-  /**
-   * Submits the inventory update for the currently-edited row.
-   * Shows a toast on success or failure.
-   *
-   * @param {Event} e  The form submit event.
-   */
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -152,152 +126,116 @@ export default function AdminInventoryPage() {
     }
   };
 
-  // ── Render helpers ─────────────────────────────────────────────────────────
+  const formatDate = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
 
-  /** Formats an ISO datetime string to a human-readable local string. */
-  const formatDate = (iso) =>
-    iso ? new Date(iso).toLocaleString() : '—';
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const lowStockCount = inventory.filter((item) => item.lowStock).length;
+  const healthyCount = inventory.length - lowStockCount;
+  const totalQuantity = inventory.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <AdminDeliveryLayout
+      title="Inventory Management"
+      description="Monitor stock levels, update thresholds, and create purchase orders without leaving this screen."
+      breadcrumbCurrent="Inventory"
+      actions={
+        <>
           <Link
-            to="/admin"
-            className="text-gray-400 hover:text-gray-600 text-sm transition-colors"
+            to="/admin/purchase-orders"
+            className="inline-flex items-center rounded-lg border border-[#d4dfdb] bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
-            ← Dashboard
+            View PO Status
           </Link>
-          <span className="text-gray-300">|</span>
-          <h1 className="text-lg font-semibold text-gray-800">Inventory Management</h1>
-        </div>
-        <button
-          onClick={logout}
-          className="text-sm text-gray-500 hover:text-red-600 transition-colors"
-        >
-          Logout
-        </button>
-      </header>
+          <button
+            onClick={fetchInventory}
+            disabled={loading}
+            className="inline-flex items-center rounded-lg bg-[#0d4a38] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#083a2c] disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </>
+      }
+    >
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+      )}
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Total Stock Units" value={totalQuantity} tone="default" />
+        <MetricCard label="Low Stock Items" value={lowStockCount} tone="red" />
+        <MetricCard label="Healthy Items" value={healthyCount} tone="green" />
+      </section>
 
-        {/* ── Page heading ── */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Stock Levels</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              View and update quantity and reorder thresholds for all products.
-            </p>
-          </div>
-          <div className="flex space-x-3">
-            <Link to="/admin/purchase-orders" className="text-sm bg-purple-600 text-white rounded-lg px-4 py-2 hover:bg-purple-700 transition-colors">
-              View POs Status
-            </Link>
-            <button
-              onClick={fetchInventory}
-              disabled={loading}
-              className="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors"       
-            >
-              ↻ Refresh
-            </button>
-          </div>
-        </div>
+      <section className="rounded-2xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
+        <h2 className="text-lg font-semibold text-slate-900">Stock Levels</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          View and update quantity and reorder thresholds for all products.
+        </p>
 
-        {/* ── Error banner ── */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* ── Inventory table ── */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+        <div className="mt-4 hidden overflow-x-auto rounded-xl border border-[#edf2ef] md:block">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50">
               <tr>
-                <th className="text-left px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Product</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Category</th>
-                <th className="text-right px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Quantity</th>
-                <th className="text-right px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Reorder Threshold</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Status</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Last Updated</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Updated By</th>
-                <th className="px-6 py-3"></th>
+                <th className={th}>Product</th>
+                <th className={th}>Category</th>
+                <th className={`${th} text-right`}>Quantity</th>
+                <th className={`${th} text-right`}>Reorder Threshold</th>
+                <th className={th}>Status</th>
+                <th className={th}>Last Updated</th>
+                <th className={th}>Updated By</th>
+                <th className={th}>Actions</th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100">
-
-              {/* Loading skeleton */}
+            <tbody>
               {loading &&
                 Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
+                  <tr key={i} className="animate-pulse border-t border-[#edf2ef]">
                     {Array.from({ length: 8 }).map((__, j) => (
-                      <td key={j} className="px-6 py-4">
-                        <div className="h-4 bg-gray-200 rounded w-full" />
+                      <td key={j} className="px-4 py-4">
+                        <div className="h-4 w-full rounded bg-slate-100" />
                       </td>
                     ))}
                   </tr>
                 ))}
 
-              {/* Data rows */}
               {!loading &&
                 inventory.map((item) => {
                   if (editItem?.productId === item.productId) {
                     return (
-                      /* ── Inline edit row ── */
-                      <tr key={item.productId} className="bg-amber-50">
-                        <td className="px-6 py-3 font-medium text-gray-900 whitespace-nowrap">
-                          {item.productName}
-                        </td>
-                        <td className="px-6 py-3 text-gray-500">{item.category || '—'}</td>
-
-                        {/* Quantity input — form spans across shared form id */}
-                        <td className="px-6 py-3">
-                          <form id={`inv-edit-form-${item.productId}`} onSubmit={handleSave} className="flex justify-end">
+                      <tr key={item.productId} className="border-t border-[#edf2ef] bg-amber-50/70">
+                        <td className="px-4 py-3 font-medium text-slate-900">{item.productName}</td>
+                        <td className="px-4 py-3 text-slate-500">{item.category || '—'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <form id={`inv-edit-form-${item.productId}`} onSubmit={handleSave} className="inline-flex">
                             <input
                               type="number"
                               min="0"
                               value={formValues.quantity}
-                              onChange={(e) =>
-                                setFormValues((v) => ({ ...v, quantity: e.target.value }))
-                              }
-                              className="w-24 border border-gray-300 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              onChange={(e) => setFormValues((v) => ({ ...v, quantity: e.target.value }))}
+                              className="w-24 rounded-md border border-[#d4dfdb] bg-white px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-[#0d4a38]/40"
                               required
                             />
                           </form>
                         </td>
-
-                        {/* Reorder threshold input */}
-                        <td className="px-6 py-3 text-right">
+                        <td className="px-4 py-3 text-right">
                           <input
                             type="number"
                             min="0"
                             value={formValues.reorderThreshold}
-                            onChange={(e) =>
-                              setFormValues((v) => ({ ...v, reorderThreshold: e.target.value }))
-                            }
+                            onChange={(e) => setFormValues((v) => ({ ...v, reorderThreshold: e.target.value }))}
                             form={`inv-edit-form-${item.productId}`}
-                            className="w-24 border border-gray-300 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="w-24 rounded-md border border-[#d4dfdb] bg-white px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-[#0d4a38]/40"
                             required
                           />
                         </td>
-
-                        {/* Spacer columns */}
-                        <td className="px-6 py-3" colSpan={3} />
-
-                        {/* Save / Cancel actions */}
-                        <td className="px-6 py-3">
+                        <td className="px-4 py-3" colSpan={3} />
+                        <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <button
                               type="submit"
                               form={`inv-edit-form-${item.productId}`}
                               disabled={saving}
-                              className="text-xs bg-green-600 text-white rounded px-3 py-1.5 hover:bg-green-700 disabled:opacity-50 transition-colors"
+                              className="rounded bg-[#0d4a38] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#083a2c] disabled:opacity-50"
                             >
                               {saving ? 'Saving…' : 'Save'}
                             </button>
@@ -305,7 +243,7 @@ export default function AdminInventoryPage() {
                               type="button"
                               onClick={handleCancelEdit}
                               disabled={saving}
-                              className="text-xs bg-white border border-gray-300 text-gray-600 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                              className="rounded border border-[#d4dfdb] bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                             >
                               Cancel
                             </button>
@@ -317,43 +255,30 @@ export default function AdminInventoryPage() {
 
                   if (orderItem?.productId === item.productId) {
                     return (
-                      /* ── Inline order row ── */
-                      <tr key={item.productId} className="bg-purple-50">
-                        <td className="px-6 py-3 font-medium text-gray-900 whitespace-nowrap">
-                          {item.productName}
-                        </td>
-                        <td className="px-6 py-3 text-gray-500">{item.category || '—'}</td>
-
-                        {/* Quantity to order */}
-                        <td className="px-6 py-3">
-                          <form id={`inv-order-form-${item.productId}`} onSubmit={handleSaveOrder} className="flex justify-end gap-2 items-center">
-                            <span className="text-xs text-gray-600">Order Qty:</span>
+                      <tr key={item.productId} className="border-t border-[#edf2ef] bg-purple-50/70">
+                        <td className="px-4 py-3 font-medium text-slate-900">{item.productName}</td>
+                        <td className="px-4 py-3 text-slate-500">{item.category || '—'}</td>
+                        <td className="px-4 py-3" colSpan={2}>
+                          <form id={`inv-order-form-${item.productId}`} onSubmit={handleSaveOrder} className="flex items-center justify-end gap-2">
+                            <span className="text-xs text-slate-600">Order Qty:</span>
                             <input
                               type="number"
                               min="1"
                               value={orderQuantity}
                               onChange={(e) => setOrderQuantity(e.target.value)}
-                              className="w-24 border border-gray-300 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-24 rounded-md border border-[#d4dfdb] bg-white px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                               required
                             />
                           </form>
                         </td>
-
-                        {/* Current Reorder Threshold / read only */}
-                        <td className="px-6 py-3 text-right text-gray-700">
-                          {item.reorderThreshold}
-                        </td>
-
-                        <td className="px-6 py-3" colSpan={3} />
-
-                        {/* Order / Cancel actions */}
-                        <td className="px-6 py-3">
+                        <td className="px-4 py-3" colSpan={3} />
+                        <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <button
                               type="submit"
                               form={`inv-order-form-${item.productId}`}
                               disabled={ordering}
-                              className="text-xs bg-purple-600 text-white rounded px-3 py-1.5 hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                              className="rounded bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50"
                             >
                               {ordering ? 'Sending…' : 'Send Order'}
                             </button>
@@ -361,7 +286,7 @@ export default function AdminInventoryPage() {
                               type="button"
                               onClick={handleCancelOrder}
                               disabled={ordering}
-                              className="text-xs bg-white border border-gray-300 text-gray-600 rounded px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                              className="rounded border border-[#d4dfdb] bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                             >
                               Cancel
                             </button>
@@ -372,69 +297,33 @@ export default function AdminInventoryPage() {
                   }
 
                   return (
-                    /* ── Read-only row ── */
-                    <tr key={item.productId} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
-                        {item.productName}
-                      </td>
-                      <td className="px-6 py-4 text-gray-500">{item.category || '—'}</td>
-
-                      {/* Quantity — red when low stock */}
-                      <td className="px-6 py-4 text-right">
-                        <span
-                          className={`font-semibold ${
-                            item.lowStock ? 'text-red-600' : 'text-gray-800'
-                          }`}
-                        >
+                    <tr key={item.productId} className="border-t border-[#edf2ef]">
+                      <td className="px-4 py-4 font-medium text-slate-900">{item.productName}</td>
+                      <td className="px-4 py-4 text-slate-500">{item.category || '—'}</td>
+                      <td className="px-4 py-4 text-right">
+                        <span className={item.lowStock ? 'font-semibold text-red-600' : 'font-semibold text-slate-800'}>
                           {item.quantity}
                         </span>
                       </td>
-
-                      <td className="px-6 py-4 text-right text-gray-700">
-                        {item.reorderThreshold}
-                      </td>
-
-                      {/* Status badge */}
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 text-right text-slate-700">{item.reorderThreshold}</td>
+                      <td className="px-4 py-4">
                         {item.lowStock ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full px-2.5 py-0.5">
-                            ⚠ Low Stock
+                          <span className="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                            Low Stock
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">
-                            ✓ OK
+                          <span className="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                            In Stock
                           </span>
                         )}
                       </td>
-
-                      <td className="px-6 py-4 text-gray-400 text-xs whitespace-nowrap">
-                        {formatDate(item.updatedAt)}
-                      </td>
-
-                      <td className="px-6 py-4 text-gray-400 text-xs">
-                        {item.updatedBy || '—'}
-                      </td>
-
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 text-xs text-slate-500">{formatDate(item.updatedAt)}</td>
+                      <td className="px-4 py-4 text-xs text-slate-500">{item.updatedBy || '—'}</td>
+                      <td className="px-4 py-4">
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit(item)}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleOrder(item)}
-                            className="text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors"
-                          >
-                            Order
-                          </button>
-                          <button
-                            onClick={() => handleViewBatches(item)}
-                            className="text-xs text-amber-600 hover:text-amber-800 font-medium transition-colors"
-                          >
-                            Batches
-                          </button>
+                          <button onClick={() => handleEdit(item)} className="text-xs font-semibold text-[#0d4a38] hover:underline">Edit</button>
+                          <button onClick={() => handleOrder(item)} className="text-xs font-semibold text-purple-700 hover:underline">Order</button>
+                          <button onClick={() => handleViewBatches(item)} className="text-xs font-semibold text-amber-700 hover:underline">Batches</button>
                         </div>
                       </td>
                     </tr>
@@ -443,16 +332,48 @@ export default function AdminInventoryPage() {
             </tbody>
           </table>
 
-          {/* Empty state */}
           {!loading && inventory.length === 0 && (
-            <div className="text-center py-16 text-gray-400">
-              No products found.
-            </div>
+            <div className="py-16 text-center text-sm text-slate-400">No products found.</div>
           )}
         </div>
-      </div>
 
-      {/* ── Batch drawer ── */}
+        <div className="mt-4 space-y-3 md:hidden">
+          {loading &&
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-28 animate-pulse rounded-xl bg-slate-100" />
+            ))}
+
+          {!loading && inventory.length === 0 && (
+            <div className="rounded-xl border border-[#edf2ef] p-6 text-center text-sm text-slate-500">No products found.</div>
+          )}
+
+          {!loading &&
+            inventory.map((item) => (
+              <article key={item.productId} className="rounded-xl border border-[#edf2ef] bg-[#fbfdfc] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{item.productName}</p>
+                    <p className="mt-1 text-xs text-slate-500">{item.category || 'No category'}</p>
+                  </div>
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.lowStock ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                    {item.lowStock ? 'Low Stock' : 'In Stock'}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                  <p>Quantity: <span className={item.lowStock ? 'font-semibold text-red-600' : 'font-semibold text-slate-800'}>{item.quantity}</span></p>
+                  <p>Threshold: <span className="font-semibold text-slate-800">{item.reorderThreshold}</span></p>
+                  <p className="col-span-2">Updated: <span className="font-medium text-slate-700">{formatDate(item.updatedAt)}</span></p>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => handleEdit(item)} className="text-xs font-semibold text-[#0d4a38] hover:underline">Edit</button>
+                  <button onClick={() => handleOrder(item)} className="text-xs font-semibold text-purple-700 hover:underline">Order</button>
+                  <button onClick={() => handleViewBatches(item)} className="text-xs font-semibold text-amber-700 hover:underline">Batches</button>
+                </div>
+              </article>
+            ))}
+        </div>
+      </section>
+
       {batchDrawerItem && (
         <BatchDrawer
           item={batchDrawerItem}
@@ -461,90 +382,89 @@ export default function AdminInventoryPage() {
           onClose={() => setBatchDrawerItem(null)}
         />
       )}
-    </div>
+    </AdminDeliveryLayout>
   );
 }
 
-/* ─────────────────────────────────────────────
-   BatchDrawer — slide-over panel listing all
-   batches for a product
-───────────────────────────────────────────── */
+function MetricCard({ label, value, tone }) {
+  const toneClass =
+    tone === 'red'
+      ? 'bg-[#fdecee] text-red-700'
+      : tone === 'green'
+        ? 'bg-[#eaf5ef] text-[#0d4a38]'
+        : 'bg-white text-slate-900';
 
-const BATCH_STATUS_STYLES = {
-  RECEIVED:     'bg-blue-50 text-blue-700 border-blue-200',
-  ACTIVE:       'bg-green-50 text-green-700 border-green-200',
-  NEAR_EXPIRY:  'bg-amber-50 text-amber-700 border-amber-200',
-  EXPIRED:      'bg-gray-100 text-gray-500 border-gray-200',
-};
+  return (
+    <article className={`rounded-xl border border-[#e4ebe8] px-4 py-3 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="mt-1 text-2xl font-bold">{value}</p>
+    </article>
+  );
+}
 
+/*
+ * BatchDrawer — slide-over panel listing all
+ * batches for a product.
+ */
 function BatchDrawer({ item, batches, loading, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
-      {/* Panel */}
-      <div className="relative w-full max-w-lg bg-white shadow-xl flex flex-col h-full">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div className="relative h-full w-full max-w-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-[#e4ebe8] px-6 py-4">
           <div>
-            <h2 className="text-base font-bold text-gray-800">Batch Inventory</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{item.productName}</p>
+            <h2 className="text-base font-bold text-slate-900">Batch Inventory</h2>
+            <p className="mt-0.5 text-xs text-slate-500">{item.productName}</p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close batch drawer"
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+          <button onClick={onClose} aria-label="Close batch drawer" className="text-slate-400 transition hover:text-slate-600">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="h-[calc(100%-73px)] overflow-y-auto px-6 py-4">
           {loading && (
             <div className="space-y-3 animate-pulse">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-16 bg-gray-100 rounded-lg" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-lg bg-slate-100" />
               ))}
             </div>
           )}
 
           {!loading && batches.length === 0 && (
-            <div className="text-center py-16 text-gray-400 text-sm">
-              No batch records found for this product.
-            </div>
+            <div className="py-16 text-center text-sm text-slate-500">No batch records found for this product.</div>
           )}
 
           {!loading && batches.length > 0 && (
             <div className="space-y-3">
               {batches.map((batch) => (
-                <div
-                  key={batch.id}
-                  className="border border-gray-200 rounded-lg p-4 flex items-start justify-between gap-3"
-                >
-                  <div className="flex-1 min-w-0 space-y-1 text-sm">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-800">{batch.batchNumber}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-0.5">
-                      {batch.expiryDate && <span>Expires: <span className="text-gray-700">{batch.expiryDate}</span></span>}
-                      {batch.manufacturingDate && <span>Mfg: <span className="text-gray-700">{batch.manufacturingDate}</span></span>}
-                      <span>Received: <span className="text-gray-700">{batch.receivedQuantity}</span></span>
-                      <span>Available: <span className={batch.availableQuantity === 0 ? 'text-red-500 font-medium' : 'text-gray-700'}>{batch.availableQuantity}</span></span>
-                    </div>
-                    {batch.notes && (
-                      <p className="text-xs text-gray-400 italic">{batch.notes}</p>
+                <article key={batch.id} className="rounded-lg border border-[#e4ebe8] p-4">
+                  <p className="text-sm font-semibold text-slate-900">{batch.batchNumber}</p>
+                  <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-slate-500 sm:grid-cols-2">
+                    {batch.expiryDate && (
+                      <p>
+                        Expires: <span className="font-medium text-slate-700">{batch.expiryDate}</span>
+                      </p>
                     )}
+                    {batch.manufacturingDate && (
+                      <p>
+                        Mfg: <span className="font-medium text-slate-700">{batch.manufacturingDate}</span>
+                      </p>
+                    )}
+                    <p>
+                      Received: <span className="font-medium text-slate-700">{batch.receivedQuantity}</span>
+                    </p>
+                    <p>
+                      Available:{' '}
+                      <span className={batch.availableQuantity === 0 ? 'font-medium text-red-600' : 'font-medium text-slate-700'}>
+                        {batch.availableQuantity}
+                      </span>
+                    </p>
                   </div>
-
-                </div>
+                  {batch.notes && <p className="mt-2 text-xs italic text-slate-400">{batch.notes}</p>}
+                </article>
               ))}
             </div>
           )}
@@ -553,3 +473,5 @@ function BatchDrawer({ item, batches, loading, onClose }) {
     </div>
   );
 }
+
+const th = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500';
