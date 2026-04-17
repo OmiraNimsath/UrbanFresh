@@ -64,20 +64,18 @@ export default function PaymentModal({ orderId, totalAmount, isOpen, onClose, on
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 backdrop-blur-md bg-transparent flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md space-y-4 rounded-2xl border border-[#e4ebe8] bg-white p-6 shadow-2xl">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Retry Payment</h2>
-          <p className="text-sm text-gray-500 mt-1">Enter your card details to complete payment</p>
+          <h2 className="text-xl font-bold text-[#163a2f]">Retry Payment</h2>
+          <p className="mt-1 text-sm text-[#6f817b]">Enter your card details to complete payment</p>
         </div>
 
-        {/* Order total display */}
-        <div className="bg-green-50 rounded-lg p-4">
-          <p className="text-xs text-gray-500">Order Total</p>
-          <p className="text-2xl font-bold text-green-700 mt-1">{formatAmount(totalAmount)}</p>
+        <div className="rounded-xl border border-[#e4ebe8] bg-[#f8fbf9] p-4">
+          <p className="text-xs text-[#6f817b]">Order Total</p>
+          <p className="mt-1 text-2xl font-bold text-[#0d4a38]">{formatAmount(totalAmount)}</p>
         </div>
 
-        {/* Stripe payment form */}
         {stripePromise && clientSecret ? (
           <Elements stripe={stripePromise} options={{ clientSecret }}>
             <PaymentFormContent
@@ -91,15 +89,14 @@ export default function PaymentModal({ orderId, totalAmount, isOpen, onClose, on
           </Elements>
         ) : (
           <div className="flex items-center justify-center py-8">
-            <p className="text-sm text-gray-500">Loading payment form…</p>
+            <p className="text-sm text-[#6f817b]">Loading payment form...</p>
           </div>
         )}
 
-        {/* Close button */}
         <button
           onClick={onClose}
           disabled={loading}
-          className="w-full text-sm text-gray-600 hover:text-gray-800 font-medium py-2 transition-colors disabled:opacity-50"
+          className="w-full rounded-lg border border-[#e4ebe8] py-2 text-sm font-semibold text-[#6f817b] transition-colors hover:bg-[#f8fbf9] hover:text-[#163a2f] disabled:opacity-50"
         >
           Cancel
         </button>
@@ -180,7 +177,7 @@ function PaymentFormContent({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="border border-gray-200 rounded-lg p-3 focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-200">
+      <div className="rounded-lg border border-[#e4ebe8] p-3 focus-within:border-[#0d4a38] focus-within:ring-2 focus-within:ring-[#d9ebe3]">
         <CardElement
           options={{
             style: {
@@ -198,14 +195,14 @@ function PaymentFormContent({
       <button
         type="submit"
         disabled={!stripe || loading}
-        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:cursor-not-allowed"
+        className="w-full rounded-lg bg-[#0d4a38] py-2.5 font-semibold text-white transition-colors hover:bg-[#083a2c] disabled:cursor-not-allowed disabled:bg-gray-300"
       >
         {loading ? buttonLabel : 'Pay Now'}
       </button>
 
       {loading && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2">
-          <p className="text-xs font-semibold text-green-800">{progressLabel}</p>
+        <div className="rounded-lg border border-[#d6e8df] bg-[#eaf5ef] px-3 py-2">
+          <p className="text-xs font-semibold text-[#0d4a38]">{progressLabel}</p>
         </div>
       )}
     </form>

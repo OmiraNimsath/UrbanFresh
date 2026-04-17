@@ -12,6 +12,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import Breadcrumbs from '../../components/customer/Breadcrumbs';
+import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import PaymentModal from '../../components/PaymentModal';
 import { useAuth } from '../../context/AuthContext';
 import { resolveOrderForSuccess } from '../../services/orderService';
@@ -184,7 +187,7 @@ export default function OrderSuccessPage() {
     }
   };
 
-  const handlePaymentModalSuccess = (result) => {
+  const handlePaymentModalSuccess = () => {
     toast.success('Payment completed successfully!');
     setIsPaymentModalOpen(false);
     loadOrder({ preserveCurrentView: false });
@@ -194,7 +197,15 @@ export default function OrderSuccessPage() {
     <div className={`min-h-screen flex flex-col ${tone.pageBg}`}>
       <Navbar />
 
-      <main className="max-w-5xl mx-auto px-4 py-10 sm:py-14" aria-live="polite">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 pb-24 sm:py-10 md:px-8 md:pb-8" aria-live="polite">
+        <Breadcrumbs
+          items={[
+            { label: 'Products', to: '/products' },
+            { label: 'Orders', to: '/dashboard' },
+            { label: order?.orderId ? `Order #${order.orderId}` : 'Order Status' },
+          ]}
+        />
+
         {pageState === PAGE_STATE.LOADING && <LoadingSkeleton />}
 
         {pageState === PAGE_STATE.ERROR && (
@@ -289,9 +300,8 @@ export default function OrderSuccessPage() {
         )}
       </main>
 
-      <footer className="bg-gray-100 border-t border-gray-200 text-gray-500 text-center py-6 text-sm mt-auto">
-        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
-      </footer>
+      <MobileBottomNav activeKey="profile" />
+      <Footer />
     </div>
   );
 }

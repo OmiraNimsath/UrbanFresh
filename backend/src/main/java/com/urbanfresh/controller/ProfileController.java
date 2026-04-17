@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Controller Layer – Exposes profile endpoints under /api/profile.
- * Both endpoints require an authenticated CUSTOMER; the email is read directly
+ * Both endpoints require an authenticated CUSTOMER, DELIVERY, or SUPPLIER; the email is read directly
  * from the validated JWT (via UserDetails principal) so users can only ever
  * access their own profile — no user-ID path parameter is needed or exposed.
  */
@@ -38,7 +38,7 @@ public class ProfileController {
      * @return 200 ProfileResponse
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('CUSTOMER','DELIVERY')")
+    @PreAuthorize("hasAnyRole('CUSTOMER','DELIVERY','SUPPLIER')")
     public ResponseEntity<ProfileResponse> getProfile(
             @AuthenticationPrincipal UserDetails principal) {
 
@@ -56,7 +56,7 @@ public class ProfileController {
      * @return 200 updated ProfileResponse
      */
     @PutMapping
-    @PreAuthorize("hasAnyRole('CUSTOMER','DELIVERY')")
+    @PreAuthorize("hasAnyRole('CUSTOMER','DELIVERY','SUPPLIER')")
     public ResponseEntity<ProfileResponse> updateProfile(
             @AuthenticationPrincipal UserDetails principal,
             @Valid @RequestBody UpdateProfileRequest request) {

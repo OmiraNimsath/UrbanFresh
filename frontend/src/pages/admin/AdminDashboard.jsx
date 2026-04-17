@@ -1,36 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 import adminDashboardService from '../../services/adminDashboardService';
 import { useAuth } from '../../context/AuthContext';
+import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
 
 /**
  * Admin Dashboard Component
  * Layer: UI (React component)
  * Displays admin KPI metrics, alerts, and operational overview
- * Shows: total orders, revenue, product count, supplier count, and alerts for low stock/near expiry
  */
 const AdminDashboard = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const handleLogout = () => {
-    logout();
-    toast.success('Logged out successfully');
-    navigate('/login', { replace: true });
-  };
 
   useEffect(() => {
     fetchDashboardMetrics();
   }, []);
 
-  /**
-   * Fetch dashboard metrics from backend
-   * Handles loading, error, and success states
-   */
   const fetchDashboardMetrics = async () => {
     try {
       setLoading(true);
@@ -45,287 +33,138 @@ const AdminDashboard = () => {
     }
   };
 
-  // Loading state: skeleton
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-800 mb-8">Admin Dashboard</h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-lg shadow-md p-6 animate-pulse"
-              >
-                <div className="h-8 bg-gray-200 rounded mb-4 w-full"></div>
-                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const summaryCards = [
+    {
+      label: 'Total Orders',
+      value: dashboardData?.totalOrders || 0,
+      hint: 'All-time customer orders',
+      tone: 'text-[#0d4a38]'
+    },
+    {
+      label: 'Total Revenue',
+      value: `Rs. ${(dashboardData?.totalRevenue || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`,
+      hint: 'From confirmed orders',
+      tone: 'text-[#0d4a38]'
+    },
+    {
+      label: 'Total Products',
+      value: dashboardData?.totalProductsCount || 0,
+      hint: 'Active catalog items',
+      tone: 'text-slate-900'
+    },
+    {
+      label: 'Active Suppliers',
+      value: dashboardData?.activeSuppliersCount || 0,
+      hint: 'Registered suppliers',
+      tone: 'text-slate-900'
+    },
+  ];
 
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-800 mb-8">Admin Dashboard</h1>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <p className="text-red-800 mb-4">{error}</p>
-            <button
-              onClick={fetchDashboardMetrics}
-              className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Success state: render dashboard
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header with User Info and Logout */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-green-700">UrbanFresh Admin</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Welcome, <span className="font-semibold">{user?.name}</span> (Admin)
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              to="/admin/profile"
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
-            >
-              My Profile
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
-            >
-              Logout
-            </button>
-          </div>
+    <AdminDeliveryLayout
+      title="UrbanFresh Admin"
+      description={`Welcome, ${user?.name || 'Admin'} (Admin)`}
+      breadcrumbCurrent="Overview"
+    >
+      {dashboardData?.summary?.lastUpdated && (
+        <div className="rounded-2xl border border-[#e4ebe8] bg-white px-4 py-3 text-sm text-slate-500 sm:px-6">
+          Last updated: {dashboardData.summary.lastUpdated}
         </div>
+      )}
 
-        {/* Dashboard Title */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Overview</h2>
-          {dashboardData?.summary && (
-            <p className="text-sm text-gray-500">
-              Last updated: {dashboardData.summary.lastUpdated}
-            </p>
-          )}
+      {loading && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-28 animate-pulse rounded-2xl border border-[#e4ebe8] bg-white" />
+          ))}
         </div>
+      )}
 
-        {/* KPI Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Total Orders Card */}
-          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-gray-600 font-medium">Total Orders</p>
-              <span className="text-3xl">📦</span>
-            </div>
-            <p className="text-3xl font-bold text-green-700">
-              {dashboardData?.totalOrders || 0}
-            </p>
-            <p className="text-xs text-gray-400 mt-2">All-time customer orders</p>
-          </div>
-
-          {/* Total Revenue Card */}
-          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-gray-600 font-medium">Total Revenue</p>
-              <span className="text-3xl">💰</span>
-            </div>
-            <p className="text-2xl font-bold text-green-700">
-              Rs. {(dashboardData?.totalRevenue || 0).toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </p>
-            <p className="text-xs text-gray-400 mt-2">From confirmed orders</p>
-          </div>
-
-          {/* Total Products Card */}
-          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-gray-600 font-medium">Total Products</p>
-              <span className="text-3xl">🛒</span>
-            </div>
-            <p className="text-3xl font-bold text-green-700">
-              {dashboardData?.totalProductsCount || 0}
-            </p>
-            <p className="text-xs text-gray-400 mt-2">Active catalog items</p>
-          </div>
-
-          {/* Active Suppliers Card */}
-          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-gray-600 font-medium">Active Suppliers</p>
-              <span className="text-3xl">👥</span>
-            </div>
-            <p className="text-3xl font-bold text-green-700">
-              {dashboardData?.activeSuppliersCount || 0}
-            </p>
-            <p className="text-xs text-gray-400 mt-2">Registered suppliers</p>
-          </div>
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={fetchDashboardMetrics}
+            className="mt-4 inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+          >
+            Retry
+          </button>
         </div>
+      )}
 
-        {/* Alerts Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Alerts & Warnings</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Low Stock Alert */}
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">⚠️</span>
-                <p className="font-semibold text-gray-800">Low Stock Items</p>
-              </div>
-              <p className="text-2xl font-bold text-yellow-700 mb-2">
-                {dashboardData?.lowStockItemsCount || 0}
-              </p>
-              <p className="text-sm text-gray-600">
-                Products below reorder threshold
-              </p>
-            </div>
+      {!loading && !error && (
+        <>
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {summaryCards.map((card) => (
+              <article
+                key={card.label}
+                className="rounded-2xl border border-[#e4ebe8] bg-white p-5 shadow-sm"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
+                <p className={`mt-2 text-2xl font-bold sm:text-3xl ${card.tone}`}>{card.value}</p>
+                <p className="mt-2 text-xs text-slate-500">{card.hint}</p>
+              </article>
+            ))}
+          </section>
 
-            {/* Near Expiry Alert — links to expiry dashboard */}
-            <Link
-              to="/admin/expiry"
-              className="bg-orange-50 border-l-4 border-orange-400 rounded-lg p-6 hover:bg-orange-100 transition-colors block"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">🕐</span>
-                <p className="font-semibold text-gray-800">Near Expiry Items</p>
+          <section className="rounded-2xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Operational Alerts</h2>
+              <div className="mt-4 space-y-3">
+                <AlertItem
+                  label="Low Stock Items"
+                  value={dashboardData?.lowStockItemsCount || 0}
+                  hint="Products below reorder threshold"
+                  tone="red"
+                />
+                <Link to="/admin/expiry" className="block">
+                  <AlertItem
+                    label="Near Expiry Items"
+                    value={dashboardData?.nearExpiryItemsCount || 0}
+                    hint="Items expiring within 7 days"
+                    tone="amber"
+                    linked
+                  />
+                </Link>
+                <Link to="/admin/waste-report" className="block">
+                  <AlertItem
+                    label="Wasted Value This Month"
+                    value={`Rs. ${Number(dashboardData?.wastedValueThisMonth || 0).toLocaleString('en-LK', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`}
+                    hint="Expired stock loss this month"
+                    tone="slate"
+                    linked
+                  />
+                </Link>
               </div>
-              <p className="text-2xl font-bold text-orange-700 mb-2">
-                {dashboardData?.nearExpiryItemsCount || 0}
-              </p>
-              <p className="text-sm text-gray-600">
-                Items expiring within 7 days · <span className="underline">View details</span>
-              </p>
-            </Link>
-
-            {/* Wasted Value This Month */}
-            <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">♻️</span>
-                <p className="font-semibold text-gray-800">Wasted Value This Month</p>
-              </div>
-              <p className="text-2xl font-bold text-red-700 mb-2">
-                Rs. {Number(dashboardData?.wastedValueThisMonth || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-              <p className="text-sm text-gray-600">
-                Expired stock loss this month
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Link
-              to="/admin/products"
-              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
-            >
-              <span className="text-3xl">🛒</span>
-              <div>
-                <p className="font-semibold text-gray-800">Manage Products</p>
-                <p className="text-xs text-gray-400">Add, edit, delete products</p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/inventory"
-              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
-            >
-              <span className="text-3xl">📦</span>
-              <div>
-                <p className="font-semibold text-gray-800">Inventory</p>
-                <p className="text-xs text-gray-400">Manage stock & reorder</p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/orders"
-              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
-            >
-              <span className="text-3xl">🧾</span>
-              <div>
-                <p className="font-semibold text-gray-800">Manage Orders</p>
-                <p className="text-xs text-gray-400">Review order status</p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/delivery-personnel"
-              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
-            >
-              <span className="text-3xl">🚚</span>
-              <div>
-                <p className="font-semibold text-gray-800">Delivery Personnel</p>
-                <p className="text-xs text-gray-400">Create & manage accounts</p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/suppliers"
-              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
-            >
-              <span className="text-3xl">🏷️</span>
-              <div>
-                <p className="font-semibold text-gray-800">Manage Suppliers</p>
-                <p className="text-xs text-gray-400">Create suppliers and assign brands</p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/brands"
-              className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
-            >
-              <span className="text-3xl">🏭</span>
-              <div>
-                <p className="font-semibold text-gray-800">Manage Brands</p>
-                <p className="text-xs text-gray-400">Create, update, and deactivate brands</p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/expiry"
-              className="flex items-center gap-4 p-4 bg-white border border-orange-200 rounded-lg hover:border-orange-400 hover:bg-orange-50 transition-colors"
-            >
-              <span className="text-3xl">🕐</span>
-              <div>
-                <p className="font-semibold text-gray-800">Expiry Dashboard</p>
-                <p className="text-xs text-gray-400">Near-expiry products by urgency</p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/waste-report"
-              className="flex items-center gap-4 p-4 bg-white border border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
-            >
-              <span className="text-3xl">♻️</span>
-              <div>
-                <p className="font-semibold text-gray-800">Waste Report</p>
-                <p className="text-xs text-gray-400">Expired stock waste analysis</p>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
+          </section>
+        </>
+      )}
+    </AdminDeliveryLayout>
   );
 };
+
+function AlertItem({ label, value, hint, tone, linked = false }) {
+  const toneClass =
+    tone === 'red'
+      ? 'border-red-200 bg-[#fdecee] text-red-700'
+      : tone === 'amber'
+        ? 'border-amber-200 bg-[#fdf4e8] text-amber-700'
+        : 'border-slate-200 bg-[#f7f9f8] text-slate-700';
+
+  return (
+    <article
+      className={`rounded-xl border p-3 transition ${toneClass} ${linked ? 'hover:brightness-95' : ''}`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide">{label}</p>
+      <p className="mt-2 text-lg font-bold">{value}</p>
+      <p className="mt-1 text-xs opacity-80">{hint}</p>
+    </article>
+  );
+}
 
 export default AdminDashboard;

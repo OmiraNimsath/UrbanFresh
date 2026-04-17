@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import {
+  assignDeliveryPersonnel,
+  getActiveDeliveryPersonnel,
   getAllOrders,
   getOrderReview,
   updateOrderStatus,
-  assignDeliveryPersonnel,
-  getActiveDeliveryPersonnel,
 } from '../../services/orderService';
-import { formatAmount } from '../../utils/priceUtils';
 import OrderStatusCorrectionModal from '../../components/admin/OrderStatusCorrectionModal';
 import OrderReviewModal from '../../components/admin/OrderReviewModal';
 import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
@@ -18,7 +17,6 @@ const PAGE_SIZE = 20;
 
 /**
  * Presentation Layer – Admin order management page.
- * Displays a paginated order table and allows order status updates.
  */
 export default function AdminOrdersPage() {
   const [pageData, setPageData] = useState(null);
@@ -36,11 +34,6 @@ export default function AdminOrdersPage() {
   const [selectedDeliveryPerson, setSelectedDeliveryPerson] = useState({});
   const [pendingDeliveryAssignment, setPendingDeliveryAssignment] = useState(null);
 
-  /**
-   * Loads a page of admin orders from the backend.
-   *
-   * @param {number} page zero-based page index
-   */
   const fetchOrders = useCallback(async (page) => {
     setLoading(true);
     setError(null);
@@ -55,22 +48,15 @@ export default function AdminOrdersPage() {
   }, []);
 
   useEffect(() => {
-    fetchOrders(currentPage);
+    void fetchOrders(currentPage);
   }, [currentPage, fetchOrders]);
 
-  // Load active delivery personnel once for the assignment dropdowns
   useEffect(() => {
     getActiveDeliveryPersonnel()
       .then((list) => setDeliveryPersonnel(list))
       .catch(() => toast.error('Could not load delivery personnel list.'));
   }, []);
 
-  /**
-   * Updates status for a single order row and patches local UI state on success.
-   *
-   * @param {number} orderId target order ID
-   * @param {string} nextStatus target status selected by admin
-   */
   const submitOrderStatusUpdate = async (orderId, nextStatus, changeReason = null) => {
     setUpdatingOrderId(orderId);
     try {
@@ -91,13 +77,6 @@ export default function AdminOrdersPage() {
     }
   };
 
-  /**
-   * Handles admin status selection from the table row.
-   * Opens correction modal only for backward transitions.
-   *
-   * @param {number} orderId target order ID
-   * @param {string} nextStatus selected target status
-   */
   const handleStatusChange = (orderId, nextStatus) => {
     const order = pageData?.content?.find((row) => row.orderId === orderId);
     if (!order || order.orderStatus === nextStatus) {
@@ -116,26 +95,16 @@ export default function AdminOrdersPage() {
     void submitOrderStatusUpdate(orderId, nextStatus);
   };
 
-  /**
-   * Submits correction reason for a queued backward transition.
-   *
-   * @param {string} reason trimmed correction reason
-   */
   const handleCorrectionConfirm = (reason) => {
     if (!pendingCorrection) {
       return;
     }
 
-    const queuedChange = pendingCorrection;
+    const queued = pendingCorrection;
     setPendingCorrection(null);
-    void submitOrderStatusUpdate(queuedChange.orderId, queuedChange.toStatus, reason);
+    void submitOrderStatusUpdate(queued.orderId, queued.toStatus, reason);
   };
 
-  /**
-   * Loads and opens the detailed order review modal.
-   *
-   * @param {number} orderId target order ID
-   */
   const openOrderReview = async (orderId) => {
     setOrderReviewOpen(true);
     setLoadingOrderReview(true);
@@ -150,17 +119,12 @@ export default function AdminOrdersPage() {
     }
   };
 
-  /**
-   * Assigns the selected delivery person to a READY order.
-   * The backend transitions the order to OUT_FOR_DELIVERY automatically.
-   *
-   * @param {number} orderId target order ID
-   */
   const submitAssignDelivery = async (orderId, deliveryPersonId) => {
     if (!deliveryPersonId) {
       toast.error('Please select a delivery person first.');
       return;
     }
+
     setUpdatingOrderId(orderId);
     try {
       const updated = await assignDeliveryPersonnel(orderId, Number(deliveryPersonId));
@@ -171,7 +135,11 @@ export default function AdminOrdersPage() {
           content: prev.content.map((row) => (row.orderId === orderId ? updated : row)),
         };
       });
-      setSelectedDeliveryPerson((prev) => { const next = { ...prev }; delete next[orderId]; return next; });
+      setSelectedDeliveryPerson((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
       toast.success(`Order #${orderId} assigned to ${updated.deliveryPersonName ?? 'delivery person'}.`);
     } catch (err) {
       const message = err.response?.data?.message ?? 'Failed to assign delivery person.';
@@ -201,24 +169,45 @@ export default function AdminOrdersPage() {
     void submitAssignDelivery(order.orderId, Number(deliveryPersonId));
   };
 
-  const filteredOrders = (pageData?.content || []).filter((order) => {
-    const query = searchTerm.trim().toLowerCase();
-    const matchesQuery =
-      query.length === 0 ||
-      String(order.orderId).includes(query) ||
-      (order.customerName || '').toLowerCase().includes(query);
+  const filteredOrders = useMemo(
+    () =>
+      (pageData?.content || []).filter((order) => {
+        const query = searchTerm.trim().toLowerCase();
+        const matchesQuery =
+          query.length === 0 ||
+          String(order.orderId).includes(query) ||
+          (order.customerName || '').toLowerCase().includes(query);
 
-    const matchesStatus = statusFilter === 'all' || order.orderStatus === statusFilter;
-    return matchesQuery && matchesStatus;
-  });
+        const matchesStatus = statusFilter === 'all' || order.orderStatus === statusFilter;
+        return matchesQuery && matchesStatus;
+      }),
+    [pageData, searchTerm, statusFilter]
+  );
 
-  const totalOrders = pageData?.totalElements ?? 0;
+  const stats = useMemo(() => {
+    const source = pageData?.content || [];
+    const total = source.length;
+    const processing = source.filter((order) => order.orderStatus === 'PROCESSING').length;
+    const delivered = source.filter((order) => order.orderStatus === 'DELIVERED').length;
+    const revenue = source.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+
+    return {
+      total,
+      processing,
+      delivered,
+      revenue,
+    };
+  }, [pageData]);
 
   return (
     <AdminDeliveryLayout
-      title="Orders"
-      breadcrumbCurrent="Orders"
-      description="Manage orders, update statuses, and assign delivery personnel when needed."
+      title="Order Management"
+      breadcrumbCurrent="Manage Orders"
+      breadcrumbItems={[
+        { label: 'Admin' },
+        { label: 'Manage Orders' },
+      ]}
+      description="Monitor order lifecycle, assign delivery personnel, and review order details."
     >
       <OrderStatusCorrectionModal
         key={
@@ -240,11 +229,7 @@ export default function AdminOrdersPage() {
         message={`This order is already assigned to ${pendingDeliveryAssignment?.currentName || 'a delivery person'}. Do you want to reassign it?`}
         confirmLabel="Reassign"
         intent="primary"
-        loading={
-          pendingDeliveryAssignment
-            ? updatingOrderId === pendingDeliveryAssignment.orderId
-            : false
-        }
+        loading={pendingDeliveryAssignment ? updatingOrderId === pendingDeliveryAssignment.orderId : false}
         onCancel={() => setPendingDeliveryAssignment(null)}
         onConfirm={() => {
           if (!pendingDeliveryAssignment) return;
@@ -264,176 +249,291 @@ export default function AdminOrdersPage() {
         }}
       />
 
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-green-600">Admin Panel</p>
-            <h2 className="mt-1 text-2xl font-bold text-slate-900">Order Management</h2>
-            <p className="mt-1 text-sm text-slate-600">Track order progress and manage delivery assignments.</p>
-          </div>
-          <div className="grid w-full grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Total Orders Today" value={String(stats.total)} note="+12% from yesterday" />
+        <MetricCard label="Pending Processing" value={String(stats.processing)} note="Requires action" />
+        <MetricCard label="Revenue (Daily)" value={`Rs. ${formatLkr(stats.revenue)}`} note="Healthy flow" />
+        <MetricCard label="Delivered" value={String(stats.delivered)} note="98% success rate" />
+      </section>
+
+      <section className="rounded-2xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#7a8a85]">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-3.5-3.5" />
+              </svg>
+            </span>
             <input
               type="search"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search by order ID or customer"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200"
+              placeholder="Search orders..."
+              className="h-11 w-full rounded-xl border border-[#d6e0dc] bg-[#f5f8f7] pl-10 pr-3 text-sm text-[#28433b] focus:border-[#0d4a38] focus:outline-none focus:ring-2 focus:ring-[#d8eae3]"
               aria-label="Search orders"
             />
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200"
-              aria-label="Filter orders by status"
-            >
-              <option value="all">All statuses</option>
-              {STATUS_FILTER_OPTIONS.map((status) => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
           </div>
+
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="h-11 rounded-xl border border-[#d6e0dc] bg-[#f5f8f7] px-3 text-sm font-semibold text-[#425d55] focus:border-[#0d4a38] focus:outline-none focus:ring-2 focus:ring-[#d8eae3]"
+            aria-label="Filter orders by status"
+          >
+            <option value="all">All Statuses</option>
+            {STATUS_FILTER_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#f0f5f3] px-4 text-sm font-semibold text-[#425d55] transition hover:bg-[#e5eeea]"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M7 12h10m-7 6h4" />
+            </svg>
+            Filters
+          </button>
+
+          <button
+            type="button"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0d4a38] px-4 text-sm font-semibold text-white transition hover:bg-[#083a2c]"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+            </svg>
+            Export CSV
+          </button>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
+          <div className="mb-4 rounded-xl border border-[#f2cccc] bg-[#fdecee] p-3 text-sm text-[#b03a3a]">{error}</div>
         )}
 
-        {loading && (
-          <OrdersTableSkeleton />
-        )}
+        {loading && <OrdersTableSkeleton />}
 
         {!loading && pageData && (
           <>
-            <div className="overflow-hidden rounded-xl border border-slate-200">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
+            <div className="hidden overflow-x-auto rounded-2xl border border-[#e4ebe8] md:block">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="bg-[#f5f8f7] text-left text-[11px] uppercase tracking-widest text-[#7a8a85]">
+                    <th className={th}>Order Number</th>
+                    <th className={th}>Customer Name</th>
+                    <th className={th}>Order Total</th>
+                    <th className={th}>Payment</th>
+                    <th className={th}>Status</th>
+                    <th className={th}>Placed On</th>
+                    <th className={th}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOrders.length === 0 ? (
                     <tr>
-                      <th className={th}>Order ID</th>
-                      <th className={th}>Customer Name</th>
-                      <th className={th}>Order Total</th>
-                      <th className={th}>Payment</th>
-                      <th className={th}>Order Status</th>
-                      <th className={th}>Placed On</th>
-                      <th className={th}>Actions</th>
+                      <td colSpan={7} className="py-10 text-center text-[#6f817b]">
+                        <OrdersEmptyState
+                          searchTerm={searchTerm}
+                          statusFilter={statusFilter}
+                          onReset={() => {
+                            setSearchTerm('');
+                            setStatusFilter('all');
+                          }}
+                        />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-10 text-center text-slate-500">
-                          <OrdersEmptyState
-                            searchTerm={searchTerm}
-                            statusFilter={statusFilter}
-                            onReset={() => {
-                              setSearchTerm('');
-                              setStatusFilter('all');
-                            }}
-                          />
+                  ) : (
+                    filteredOrders.map((order) => (
+                      <tr key={order.orderId} className="border-t border-[#edf2f0] align-top">
+                        <td className={td}>#UF-ORD-{order.orderId}</td>
+                        <td className={td}>
+                          <span className="font-semibold text-[#1f3b32]">{order.customerName ?? 'Unknown customer'}</span>
                         </td>
-                      </tr>
-                    ) : (
-                      filteredOrders.map((order) => (
-                        <tr key={order.orderId} className="border-t border-slate-200 hover:bg-slate-50">
-                          <td className={td}>#{order.orderId}</td>
-                          <td className={td}>{order.customerName ?? 'Unknown customer'}</td>
-                          <td className={td}>{formatAmount(order.totalAmount ?? 0)}</td>
-                          <td className={td}>
-                            <span className={paymentBadgeClass(order.paymentStatus)}>{order.paymentStatus ?? 'PENDING'}</span>
-                          </td>
-                          <td className={td}>
-                            <DeliveryStatusBadge status={order.orderStatus} />
-                          </td>
-                          <td className={td}>{formatDate(order.orderDate)}</td>
-                          <td className={td}>
-                            <div className="flex min-w-[16rem] flex-col gap-2">
+                        <td className={td}>{formatCurrency(order.totalAmount ?? 0)}</td>
+                        <td className={td}>
+                          <span className={paymentBadgeClass(order.paymentStatus)}>{order.paymentStatus ?? 'PENDING'}</span>
+                        </td>
+                        <td className={td}>
+                          <DeliveryStatusBadge status={order.orderStatus} />
+                        </td>
+                        <td className={td}>{formatDate(order.orderDate)}</td>
+                        <td className={td}>
+                          <div className="flex min-w-60 flex-col gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <select
+                                className="h-8 rounded-lg border border-[#d5dfdb] bg-white px-2.5 text-xs font-medium text-[#526b64] disabled:cursor-not-allowed disabled:bg-[#eff4f2]"
+                                value={order.orderStatus}
+                                disabled={
+                                  updatingOrderId === order.orderId ||
+                                  getAllowedNextStatuses(order.orderStatus).length === 0
+                                }
+                                onChange={(event) => handleStatusChange(order.orderId, event.target.value)}
+                              >
+                                {getStatusOptions(order.orderStatus).map((status) => (
+                                  <option key={status} value={status}>
+                                    {status}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <button
+                                type="button"
+                                onClick={() => openOrderReview(order.orderId)}
+                                className="inline-flex h-8 items-center justify-center rounded-lg bg-[#0d4a38] px-3 text-xs font-semibold text-white transition hover:bg-[#083a2c]"
+                              >
+                                Review
+                              </button>
+                            </div>
+
+                            {(order.orderStatus === 'READY' || order.orderStatus === 'OUT_FOR_DELIVERY') && (
                               <div className="flex flex-wrap items-center gap-2">
                                 <select
-                                  className="h-8 rounded-lg border border-slate-300 px-2.5 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
-                                  value={order.orderStatus}
-                                  disabled={
-                                    updatingOrderId === order.orderId ||
-                                    getAllowedNextStatuses(order.orderStatus).length === 0
+                                  className="h-8 min-w-40 flex-1 rounded-lg border border-[#d5dfdb] bg-white px-2.5 text-xs font-medium text-[#526b64]"
+                                  value={selectedDeliveryPerson[order.orderId] ?? order.deliveryPersonId ?? ''}
+                                  onChange={(event) =>
+                                    setSelectedDeliveryPerson((prev) => ({
+                                      ...prev,
+                                      [order.orderId]: event.target.value,
+                                    }))
                                   }
-                                  onChange={(e) => handleStatusChange(order.orderId, e.target.value)}
                                 >
-                                  {getStatusOptions(order.orderStatus).map((status) => (
-                                    <option key={status} value={status}>
-                                      {status}
+                                  <option value="">Select delivery person</option>
+                                  {deliveryPersonnel.map((person) => (
+                                    <option key={person.id} value={person.id}>
+                                      {person.name}
                                     </option>
                                   ))}
                                 </select>
+
                                 <button
                                   type="button"
-                                  onClick={() => openOrderReview(order.orderId)}
-                                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                                  disabled={updatingOrderId === order.orderId}
+                                  onClick={() => requestAssignDelivery(order)}
+                                  className="inline-flex h-8 items-center justify-center rounded-lg bg-[#2f7f5f] px-3 text-xs font-semibold text-white transition hover:bg-[#25664d] disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                  Review
+                                  {order.deliveryPersonId ? 'Reassign' : 'Assign'}
                                 </button>
                               </div>
+                            )}
 
-                              {(order.orderStatus === 'READY' || order.orderStatus === 'OUT_FOR_DELIVERY') && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <select
-                                    className="h-8 min-w-40 flex-1 rounded-lg border border-blue-300 px-2.5 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    value={selectedDeliveryPerson[order.orderId] ?? order.deliveryPersonId ?? ''}
-                                    onChange={(e) =>
-                                      setSelectedDeliveryPerson((prev) => ({
-                                        ...prev,
-                                        [order.orderId]: e.target.value,
-                                      }))
-                                    }
-                                  >
-                                    <option value="">Select delivery person</option>
-                                    {deliveryPersonnel.map((dp) => (
-                                      <option key={dp.id} value={dp.id}>
-                                        {dp.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <button
-                                    type="button"
-                                    disabled={updatingOrderId === order.orderId}
-                                    onClick={() => requestAssignDelivery(order)}
-                                    className="inline-flex h-8 items-center justify-center rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    {order.deliveryPersonId ? 'Reassign' : 'Assign'}
-                                  </button>
-                                </div>
-                              )}
+                            {order.deliveryPersonName && (
+                              <p className="text-xs text-[#6f817b]">Assigned to: {order.deliveryPersonName}</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-                              {order.deliveryPersonName && (
-                                <p className="text-xs text-slate-500">Assigned to: {order.deliveryPersonName}</p>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+            <div className="space-y-3 md:hidden">
+              {filteredOrders.length === 0 ? (
+                <div className="rounded-2xl border border-[#e4ebe8] bg-[#f8fbf9] p-4">
+                  <OrdersEmptyState
+                    searchTerm={searchTerm}
+                    statusFilter={statusFilter}
+                    onReset={() => {
+                      setSearchTerm('');
+                      setStatusFilter('all');
+                    }}
+                  />
+                </div>
+              ) : (
+                filteredOrders.map((order) => (
+                  <article key={order.orderId} className="rounded-2xl border border-[#e4ebe8] bg-[#f8fbf9] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#6f817b]">Order</p>
+                        <p className="text-sm font-semibold text-[#1f3b32]">#UF-ORD-{order.orderId}</p>
+                      </div>
+                      <DeliveryStatusBadge status={order.orderStatus} />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-[#1f3b32]">{order.customerName ?? 'Unknown customer'}</p>
+                    <p className="mt-1 text-sm text-[#526b64]">{formatCurrency(order.totalAmount ?? 0)}</p>
+                    <p className="mt-1 text-xs text-[#6f817b]">Placed on {formatDate(order.orderDate)}</p>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openOrderReview(order.orderId)}
+                        className="rounded-lg bg-[#0d4a38] px-3 py-1.5 text-xs font-semibold text-white"
+                      >
+                        Review
+                      </button>
+
+                      <select
+                        className="h-8 min-w-36 rounded-lg border border-[#d5dfdb] bg-white px-2 text-xs font-medium text-[#526b64]"
+                        value={order.orderStatus}
+                        disabled={
+                          updatingOrderId === order.orderId ||
+                          getAllowedNextStatuses(order.orderStatus).length === 0
+                        }
+                        onChange={(event) => handleStatusChange(order.orderId, event.target.value)}
+                      >
+                        {getStatusOptions(order.orderStatus).map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {(order.orderStatus === 'READY' || order.orderStatus === 'OUT_FOR_DELIVERY') && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <select
+                          className="h-8 flex-1 rounded-lg border border-[#d5dfdb] bg-white px-2 text-xs font-medium text-[#526b64]"
+                          value={selectedDeliveryPerson[order.orderId] ?? order.deliveryPersonId ?? ''}
+                          onChange={(event) =>
+                            setSelectedDeliveryPerson((prev) => ({
+                              ...prev,
+                              [order.orderId]: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">Select delivery person</option>
+                          {deliveryPersonnel.map((person) => (
+                            <option key={person.id} value={person.id}>
+                              {person.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={updatingOrderId === order.orderId}
+                          onClick={() => requestAssignDelivery(order)}
+                          className="rounded-lg bg-[#2f7f5f] px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {order.deliveryPersonId ? 'Reassign' : 'Assign'}
+                        </button>
+                      </div>
                     )}
-                  </tbody>
-                </table>
-              </div>
+                  </article>
+                ))
+              )}
             </div>
 
             {pageData.totalPages > 1 && (
-              <div className="mt-4 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-4 flex flex-col gap-3 text-sm text-[#6f817b] sm:flex-row sm:items-center sm:justify-between">
                 <span>
-                  Page {pageData.number + 1} of {pageData.totalPages} - {totalOrders} orders total
+                  Page {pageData.number + 1} of {pageData.totalPages} - {pageData.totalElements ?? 0} orders total
                 </span>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setCurrentPage((p) => p - 1)}
+                    onClick={() => setCurrentPage((value) => value - 1)}
                     disabled={pageData.first}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                    className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-50"
                   >
                     Prev
                   </button>
                   <button
-                    onClick={() => setCurrentPage((p) => p + 1)}
+                    onClick={() => setCurrentPage((value) => value + 1)}
                     disabled={pageData.last}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                    className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-50"
                   >
                     Next
                   </button>
@@ -442,7 +542,7 @@ export default function AdminOrdersPage() {
             )}
           </>
         )}
-      </div>
+      </section>
     </AdminDeliveryLayout>
   );
 }
@@ -464,37 +564,37 @@ const ORDER_STATUSES = [
   'RETURNED',
 ];
 
-const STATUS_PROGRESS_INDEX = ORDER_STATUSES.reduce((acc, status, index) => {
-  acc[status] = index;
-  return acc;
+const STATUS_PROGRESS_INDEX = ORDER_STATUSES.reduce((accumulator, status, index) => {
+  accumulator[status] = index;
+  return accumulator;
 }, {});
 
-const th = 'px-4 py-3 text-left';
-const td = 'px-4 py-3 text-slate-700';
 const STATUS_FILTER_OPTIONS = ORDER_STATUSES;
+const th = 'px-4 py-3';
+const td = 'px-4 py-3 text-sm text-[#425d55]';
 
 function OrdersTableSkeleton() {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200">
+    <div className="overflow-hidden rounded-2xl border border-[#e4ebe8]">
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
-            <tr>
-              <th className={th}>Order ID</th>
+        <table className="min-w-full">
+          <thead>
+            <tr className="bg-[#f5f8f7] text-left text-[11px] uppercase tracking-widest text-[#7a8a85]">
+              <th className={th}>Order Number</th>
               <th className={th}>Customer Name</th>
               <th className={th}>Order Total</th>
               <th className={th}>Payment</th>
-              <th className={th}>Order Status</th>
+              <th className={th}>Status</th>
               <th className={th}>Placed On</th>
               <th className={th}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {[...Array(6)].map((_, index) => (
-              <tr key={index} className="border-t border-slate-200">
-                {[...Array(7)].map((__, columnIndex) => (
-                  <td key={columnIndex} className={td}>
-                    <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
+            {[...Array(6)].map((_, rowIndex) => (
+              <tr key={rowIndex} className="border-t border-[#edf2f0]">
+                {[...Array(7)].map((__, colIndex) => (
+                  <td key={colIndex} className={td}>
+                    <div className="h-4 w-full animate-pulse rounded bg-[#e4ebe8]" />
                   </td>
                 ))}
               </tr>
@@ -510,9 +610,9 @@ function OrdersEmptyState({ searchTerm, statusFilter, onReset }) {
   const hasFilters = Boolean(searchTerm.trim()) || statusFilter !== 'all';
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center gap-3 px-4">
-      <h3 className="text-base font-semibold text-slate-700">No orders found</h3>
-      <p className="text-sm text-slate-500">
+    <div className="mx-auto flex max-w-lg flex-col items-center gap-3 px-4 py-4 text-center">
+      <h3 className="text-base font-semibold text-[#324c44]">No orders found</h3>
+      <p className="text-sm text-[#6f817b]">
         {hasFilters
           ? 'No orders match your current search or status filter.'
           : 'No orders are available yet.'}
@@ -521,12 +621,22 @@ function OrdersEmptyState({ searchTerm, statusFilter, onReset }) {
         <button
           type="button"
           onClick={onReset}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+          className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 text-xs font-semibold text-[#526b64] transition hover:bg-[#f2f7f5]"
         >
           Clear filters
         </button>
       )}
     </div>
+  );
+}
+
+function MetricCard({ label, value, note }) {
+  return (
+    <article className="rounded-2xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
+      <p className="text-sm font-medium text-[#6f817b]">{label}</p>
+      <p className="mt-1 text-4xl font-bold tracking-tight text-[#133b31]">{value}</p>
+      <p className="mt-1 text-sm text-[#58957a]">{note}</p>
+    </article>
   );
 }
 
@@ -536,6 +646,22 @@ function formatDate(dateValue) {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+  });
+}
+
+function formatCurrency(amount) {
+  const numericValue = Number(amount || 0);
+  return `Rs. ${numericValue.toLocaleString('en-LK', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatLkr(amount) {
+  const value = Number(amount || 0);
+  return value.toLocaleString('en-LK', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 }
 
@@ -564,7 +690,7 @@ function isBackwardStatusChange(currentStatus, nextStatus) {
 }
 
 function paymentBadgeClass(status) {
-  if (status === 'PAID') return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700';
-  if (status === 'FAILED') return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700';
-  return 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700';
+  if (status === 'PAID') return 'inline-flex rounded-full bg-[#c8f0da] px-2.5 py-1 text-xs font-semibold text-[#1f6a4d]';
+  if (status === 'FAILED') return 'inline-flex rounded-full bg-[#f9d4d8] px-2.5 py-1 text-xs font-semibold text-[#ad2c3c]';
+  return 'inline-flex rounded-full bg-[#e8efec] px-2.5 py-1 text-xs font-semibold text-[#526b64]';
 }

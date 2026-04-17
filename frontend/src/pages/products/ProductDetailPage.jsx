@@ -5,7 +5,11 @@ import { getProductById } from '../../services/productService';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import Breadcrumbs from '../../components/customer/Breadcrumbs';
+import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import { formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
+import { getApiErrorMessage } from '../../utils/errorMessageUtils';
 
 /**
  * Page Layer – Public product detail page.
@@ -23,14 +27,24 @@ export default function ProductDetailPage() {
   const [errorType, setErrorType] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     // Reset state whenever the product ID in the URL changes
-    setLoading(true);
-    setErrorType(null);
-    setProduct(null);
+    const resetTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setErrorType(null);
+      setProduct(null);
+    }, 0);
 
     getProductById(id)
-      .then(setProduct)
+      .then((data) => {
+        if (!cancelled) {
+          setProduct(data);
+        }
+      })
       .catch((err) => {
+        if (cancelled) return;
         // Distinguish a missing product (404) from a network/server failure
         if (err?.response?.status === 404) {
           setErrorType('not_found');
@@ -38,28 +52,37 @@ export default function ProductDetailPage() {
           setErrorType('error');
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(resetTimer);
+    };
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#f5f7f6] flex flex-col">
       <Navbar />
 
-      <div className="max-w-4xl mx-auto px-4 py-10">
-        {/* ── Back link ── */}
-        <Link
-          to="/products"
-          className="inline-flex items-center gap-1 text-sm text-green-600 hover:underline mb-6"
-        >
-          ← Back to Products
-        </Link>
+      <div className="flex-1 w-full pb-24 md:pb-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
+          <Breadcrumbs
+            items={[
+              { label: 'Products', to: '/products' },
+              { label: product?.name || 'Product Details' },
+            ]}
+          />
 
         {/* ── Loading skeleton ── */}
-        {loading && <ProductDetailSkeleton />}
+          {loading && <ProductDetailSkeleton />}
 
         {/* ── Scenario 2: invalid / not-found product ── */}
-        {!loading && errorType === 'not_found' && (
-          <div className="bg-white rounded-xl shadow-sm p-10 text-center">
+          {!loading && errorType === 'not_found' && (
+            <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-10 text-center">
             <p className="text-5xl mb-4">🔍</p>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Product Not Found</h2>
             <p className="text-gray-500 text-sm mb-6">
@@ -71,23 +94,23 @@ export default function ProductDetailPage() {
             >
               Browse All Products
             </Link>
-          </div>
-        )}
+            </div>
+          )}
 
         {/* ── Generic error (network, server, etc.) ── */}
-        {!loading && errorType === 'error' && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-sm text-red-700">
+          {!loading && errorType === 'error' && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-sm text-red-700">
             Could not load product details. Please check your connection and try again.
-          </div>
-        )}
+            </div>
+          )}
 
         {/* ── Scenario 1: product found ── */}
-        {!loading && product && <ProductDetail product={product} />}
+          {!loading && product && <ProductDetail product={product} />}
+        </div>
       </div>
 
-      <footer className="bg-gray-100 border-t border-gray-200 text-gray-500 text-center py-6 text-sm mt-auto">
-        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
-      </footer>
+      <MobileBottomNav activeKey="shop" />
+      <Footer />
     </div>
   );
 }
@@ -121,16 +144,16 @@ function ProductDetail({ product }) {
   const isNearExpiry = daysUntilExpiry !== null && daysUntilExpiry <= 7;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row">
+    <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm overflow-hidden flex flex-col md:flex-row">
       {/* ── Product image ── */}
       {product.imageUrl ? (
         <img
           src={product.imageUrl}
           alt={product.name}
-          className="w-full md:w-80 h-64 md:h-auto object-cover flex-shrink-0"
+          className="w-full md:w-80 h-64 md:h-auto object-cover shrink-0"
         />
       ) : (
-        <div className="w-full md:w-80 h-64 md:h-auto bg-green-100 flex items-center justify-center text-green-400 text-7xl flex-shrink-0">
+        <div className="w-full md:w-80 h-64 md:h-auto bg-green-100 flex items-center justify-center text-green-400 text-7xl shrink-0">
           🥦
         </div>
       )}
@@ -232,7 +255,7 @@ function ProductDetail({ product }) {
                     await addToCart(product.id, quantity);
                     toast.success(`${product.name} × ${quantity} added to cart`);
                   } catch (err) {
-                    toast.error(err?.response?.data?.message || 'Could not add to cart');
+                    toast.error(getApiErrorMessage(err, 'Could not add to cart. Please try again.'));
                   } finally {
                     setAdding(false);
                   }
@@ -255,7 +278,7 @@ function ProductDetail({ product }) {
 function ProductDetailSkeleton() {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row animate-pulse">
-      <div className="w-full md:w-80 h-64 bg-gray-200 flex-shrink-0" />
+      <div className="w-full md:w-80 h-64 bg-gray-200 shrink-0" />
       <div className="p-6 flex flex-col flex-1 gap-4">
         <div className="h-3 bg-gray-200 rounded w-1/4" />
         <div className="h-6 bg-gray-200 rounded w-2/3" />

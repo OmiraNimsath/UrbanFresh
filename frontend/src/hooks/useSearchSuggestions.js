@@ -19,17 +19,13 @@ import { getProductSuggestions } from '../services/productService';
  * @returns {{ suggestions: string[] }}
  */
 export default function useSearchSuggestions(query, delay = 300) {
-  const [fetchedSuggestions, setFetchedSuggestions] = useState([]);
+  const [suggestionState, setSuggestionState] = useState({ query: '', items: [] });
   // Monotonic id to identify the latest outstanding request. Incrementing
   // on every query change lets us ignore out-of-order responses.
   const latestRequestId = useRef(0);
 
   useEffect(() => {
     const trimmed = query.trim();
-
-    // Immediately clear stale suggestions when the query changes so the UI
-    // doesn't show results for a previous query while the new one is debouncing.
-    setFetchedSuggestions([]);
 
     // Do not fetch for very short queries — results would be too broad
     if (trimmed.length < 2) return;
@@ -38,31 +34,34 @@ export default function useSearchSuggestions(query, delay = 300) {
     // when the network response arrives we can ignore it if a newer query
     // was issued in the meantime.
     const requestId = ++latestRequestId.current;
+    let disposed = false;
 
     const timer = setTimeout(() => {
       getProductSuggestions(trimmed)
         .then((results) => {
           // Only apply results when this response matches the most recent
           // request id — otherwise it's stale and must be ignored.
-          if (requestId === latestRequestId.current) {
-            setFetchedSuggestions(results);
+          if (!disposed && requestId === latestRequestId.current) {
+            setSuggestionState({ query: trimmed, items: results });
           }
         })
         .catch(() => {
-          if (requestId === latestRequestId.current) {
-            setFetchedSuggestions([]);
+          if (!disposed && requestId === latestRequestId.current) {
+            setSuggestionState({ query: trimmed, items: [] });
           }
         });
     }, delay);
 
-    // Cancel the pending timer when the query changes before the delay fires
-    // and advance the request id so any in-flight response will be ignored.
+    // Cancel the pending timer when the query changes before the delay fires.
     return () => {
+      disposed = true;
       clearTimeout(timer);
-      latestRequestId.current++;
     };
   }, [query, delay]);
 
   const trimmed = query.trim();
-  return { suggestions: trimmed.length >= 2 ? fetchedSuggestions : [] };
+  const suggestions =
+    trimmed.length >= 2 && suggestionState.query === trimmed ? suggestionState.items : [];
+
+  return { suggestions };
 }

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 import DeliveryInfoTile from '../../components/delivery/DeliveryInfoTile';
+import DeliveryBottomNav from '../../components/delivery/DeliveryBottomNav';
 import DeliveryStatusConfirmModal from '../../components/admin/delivery/DeliveryStatusConfirmModal';
 import {
   getDeliveryStatusBadgeClass,
@@ -144,7 +145,7 @@ export default function DeliveryOrderDetailsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 pb-28">
+    <div className="min-h-screen bg-[#f5f7f6] pb-44 md:pb-36">
       <DeliveryStatusConfirmModal
         isOpen={Boolean(pendingStatusUpdate)}
         title={pendingStatusUpdate === 'RETURNED' ? 'Confirm Return' : 'Confirm Delivery'}
@@ -160,23 +161,23 @@ export default function DeliveryOrderDetailsPage() {
         onConfirm={handleConfirmStatusUpdate}
       />
 
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-        <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
+      <header className="sticky top-0 z-20 border-b border-[#e4ebe8] bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleBack}
-            className="h-10 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className="inline-flex h-10 items-center rounded-xl border border-[#d3ddd9] bg-white px-4 text-sm font-semibold text-[#3f5f54] transition hover:bg-[#eef4f1]"
           >
             Back
           </button>
           <div className="text-right">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Order</p>
-            <h1 className="text-lg font-bold text-slate-900 sm:text-xl">#{orderId}</h1>
+            <p className="text-xs font-medium tracking-[0.08em] text-[#6d847d]">Delivery Order</p>
+            <h1 className="text-xl font-semibold text-[#0d4a38] sm:text-2xl">#{orderId}</h1>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 sm:px-6 sm:py-6">
+      <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 sm:py-6">
         {loading && (
           <div className="space-y-3">
             {[...Array(3)].map((_, index) => (
@@ -209,18 +210,18 @@ export default function DeliveryOrderDetailsPage() {
 
         {!loading && !errorState && order && (
           <>
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <section className="rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Delivery Status</h2>
                   <p className="mt-1 text-sm text-slate-500">Track current progress for this assignment.</p>
                 </div>
-                <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${statusClassName}`}>
+                <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-medium ${statusClassName}`}>
                   {getDeliveryStatusLabel(order.status)}
                 </span>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <DeliveryInfoTile label="Items" value={itemCount} />
                 <DeliveryInfoTile label="Total" value={formatAmount(order.totalAmount ?? orderValue)} />
                 <DeliveryInfoTile label="Payment" value={order.paymentMethod || 'ONLINE (STRIPE)'} />
@@ -228,7 +229,7 @@ export default function DeliveryOrderDetailsPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <section className="rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
               <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Customer Details</h2>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <DeliveryInfoTile label="Customer" value={order.customerName || 'Customer'} />
@@ -236,7 +237,7 @@ export default function DeliveryOrderDetailsPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <section className="rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
               <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Customer Address</h2>
               <p className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-800 sm:text-base">
                 {order.deliveryAddress}
@@ -252,14 +253,14 @@ export default function DeliveryOrderDetailsPage() {
                 <button
                   type="button"
                   onClick={handleOpenMap}
-                  className="h-11 rounded-xl border border-emerald-300 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                  className="h-11 rounded-xl bg-[#01412d] px-4 text-sm font-semibold text-white transition hover:bg-[#083a2c]"
                 >
                   Open in Maps
                 </button>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <section className="rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
               <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Order Items</h2>
               <ul className="mt-3 space-y-3">
                 {order.items?.map((item, index) => (
@@ -294,25 +295,25 @@ export default function DeliveryOrderDetailsPage() {
       </main>
 
       {!loading && !errorState && order && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-          <div className="mx-auto w-full max-w-3xl space-y-2">
+        <div className="fixed bottom-17 left-0 right-0 z-20 border-t border-[#dfe7e3] bg-white/95 px-4 py-3 backdrop-blur md:bottom-0 sm:px-6">
+          <div className="mx-auto w-full max-w-6xl space-y-2">
             {canUpdateStatus && (
-              <div className="grid grid-cols-2 gap-2 sm:col-span-3">
-                <button
-                  type="button"
-                  disabled={isActionBusy}
-                  onClick={() => requestStatusUpdate('DELIVERED')}
-                  className="h-11 rounded-xl border border-emerald-300 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Mark Delivered
-                </button>
+              <div className="mx-auto grid grid-cols-2 gap-2 md:max-w-xl">
                 <button
                   type="button"
                   disabled={isActionBusy}
                   onClick={() => requestStatusUpdate('RETURNED')}
-                  className="h-11 rounded-xl border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-12 rounded-2xl border-2 border-[#c92d2d] bg-white px-4 text-sm font-medium text-[#c92d2d] transition hover:bg-[#fff4f4] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Mark Returned
+                </button>
+                <button
+                  type="button"
+                  disabled={isActionBusy}
+                  onClick={() => requestStatusUpdate('DELIVERED')}
+                  className="h-12 rounded-2xl bg-[#01412d] px-4 text-sm font-medium text-white transition hover:bg-[#083a2c] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Mark Delivered
                 </button>
               </div>
             )}
@@ -322,14 +323,14 @@ export default function DeliveryOrderDetailsPage() {
                 type="button"
                 onClick={handleRefresh}
                 disabled={isActionBusy}
-                className="h-11 min-w-40 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-11 min-w-40 rounded-xl border border-[#cfdad5] bg-white px-4 text-sm font-medium text-[#3f5f54] transition hover:bg-[#eef4f1] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isActionBusy ? 'Refreshing...' : 'Refresh Details'}
               </button>
               <button
                 type="button"
                 onClick={handleBack}
-                className="h-11 min-w-40 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="h-11 min-w-40 rounded-xl bg-[#01412d] px-4 text-sm font-medium text-white transition hover:bg-[#083a2c]"
               >
                 Back to Dashboard
               </button>
@@ -337,6 +338,8 @@ export default function DeliveryOrderDetailsPage() {
           </div>
         </div>
       )}
+
+      <DeliveryBottomNav activeKey="orders" />
     </div>
   );
 }

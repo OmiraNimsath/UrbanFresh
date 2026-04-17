@@ -1,58 +1,55 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { getProfile, updateProfile } from '../../services/profileService';
+import { getLoyaltyPoints } from '../../services/orderService';
+import CustomerAccountLayout from '../../components/customer/CustomerAccountLayout';
 
-/**
- * Presentation Layer – Customer profile view and edit page.
- * Loads the current user's profile on mount, allows editing name / phone / address,
- * and persists changes via PUT /api/profile.
- * Email is shown read-only because it is the account identifier.
- */
 export default function ProfilePage() {
-  const { updateUser } = useAuth();
+  const { updateUser, user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [form, setForm] = useState({ name: '', phone: '', address: '' });
-  // email is display-only; kept in separate state to avoid accidental submission
   const [email, setEmail] = useState('');
-
-  // Field-level validation errors returned by the backend (400)
   const [fieldErrors, setFieldErrors] = useState({});
 
-  /** Fetch profile once on mount. */
   useEffect(() => {
-    getProfile()
-      .then(({ data }) => {
-        setEmail(data.email);
-        setForm({
-          name: data.name ?? '',
-          phone: data.phone ?? '',
-          address: data.address ?? '',
-        });
+    Promise.allSettled([getProfile(), getLoyaltyPoints()])
+      .then(([profileResult, loyaltyResult]) => {
+        if (profileResult.status === 'fulfilled') {
+          const { data } = profileResult.value;
+          setEmail(data.email);
+          setForm({
+            name: data.name ?? '',
+            phone: data.phone ?? '',
+            address: data.address ?? '',
+          });
+        } else {
+          toast.error('Failed to load profile. Please try again.');
+        }
+
+        if (loyaltyResult.status === 'fulfilled') {
+          setLoyaltyPoints(Number(loyaltyResult.value?.data?.totalPoints || 0));
+        }
       })
-      .catch(() => toast.error('Failed to load profile. Please try again.'))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const handleChange = (event) => {
+    const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    // Clear the field error as the user types so feedback is timely
     if (fieldErrors[name]) {
       setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setFieldErrors({});
     setSaving(true);
 
-    // Send null for optional fields that were cleared to preserve existing DB value
     const payload = {
       name: form.name,
       phone: form.phone || null,
@@ -61,12 +58,10 @@ export default function ProfilePage() {
 
     try {
       const { data } = await updateProfile(payload);
-      // Keep navbar name in sync – only patch, do not re-trigger the expiry timer
       updateUser({ name: data.name });
       toast.success('Profile updated successfully!');
     } catch (err) {
-      const status = err.response?.status;
-      if (status === 400 && err.response.data?.errors) {
+      if (err.response?.status === 400 && err.response.data?.errors) {
         setFieldErrors(err.response.data.errors);
       } else {
         toast.error(err.response?.data?.message ?? 'Failed to save changes. Please try again.');
@@ -76,119 +71,121 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Loading your profile…</p>
+  const aside = (
+    <>
+      <div className="rounded-2xl bg-[#0d4a38] p-4 text-white shadow-sm">
+        <p className="text-xs uppercase tracking-wide text-[#b6d4c7]">Impact points</p>
+        <p className="mt-1 text-3xl font-semibold">{loyaltyPoints}</p>
+        <p className="mt-1 text-xs text-[#d5e7de]">Keep your account details up to date for faster checkout.</p>
       </div>
-    );
-  }
+
+      <div className="rounded-2xl border border-[#e4ebe8] bg-white p-4 shadow-sm">
+        <p className="text-sm font-semibold text-[#163a2f]">Weekly Harvest</p>
+        <p className="mt-2 text-xs text-[#6f817b]">Fresh arrivals and seasonal bundles appear in your store feed every week.</p>
+        <div className="mt-3 rounded-lg bg-[#eef4f1] p-3 text-center text-3xl" aria-hidden="true">🥕</div>
+      </div>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-green-50 p-6">
-      <div className="max-w-lg mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-green-700">My Profile</h1>
-          <Link
-            to="/dashboard"
-            className="text-sm text-green-600 hover:text-green-800 font-medium"
-          >
-            ← Back to Dashboard
-          </Link>
+    <CustomerAccountLayout
+      userName={user?.name}
+      activeSection="settings"
+      mobileActiveKey="profile"
+      title="My Profile"
+      subtitle="Manage your personal information and delivery preferences."
+      breadcrumbItems={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Settings' }]}
+      rightAside={aside}
+    >
+      <section className="rounded-2xl border border-[#e4ebe8] bg-white p-5 shadow-sm md:p-6">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-[#163a2f]">Profile information</h2>
+          {loading && <span className="text-xs text-[#7c8b85]">Loading...</span>}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-md p-8">
-          <form onSubmit={handleSubmit} noValidate>
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#7c8b85]">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              disabled
+              className="w-full rounded-lg border border-[#dfe7e3] bg-[#f3f6f4] px-3 py-2.5 text-sm text-[#6f817b]"
+            />
+          </div>
 
-            {/* Email – read only */}
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                disabled
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 text-sm cursor-not-allowed"
-              />
-              <p className="text-xs text-gray-400 mt-1">Email cannot be changed.</p>
-            </div>
+          <div>
+            <label htmlFor="name" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#7c8b85]">
+              Full Name
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              value={form.name}
+              onChange={handleChange}
+              required
+              className={`w-full rounded-lg border px-3 py-2.5 text-sm text-[#1d3a2f] focus:outline-none focus:ring-2 focus:ring-[#c6ded2] ${
+                fieldErrors.name ? 'border-[#e2a7ac]' : 'border-[#dfe7e3]'
+              }`}
+            />
+            {fieldErrors.name && <p className="mt-1 text-xs text-[#b63a3a]">{fieldErrors.name}</p>}
+          </div>
 
-            {/* Name */}
-            <div className="mb-5">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                value={form.name}
-                onChange={handleChange}
-                required
-                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 transition ${
-                  fieldErrors.name ? 'border-red-400' : 'border-gray-300'
-                }`}
-                placeholder="Your full name"
-              />
-              {fieldErrors.name && (
-                <p className="text-xs text-red-500 mt-1">{fieldErrors.name}</p>
-              )}
-            </div>
+          <div>
+            <label htmlFor="phone" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#7c8b85]">
+              Phone
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              value={form.phone}
+              onChange={handleChange}
+              className={`w-full rounded-lg border px-3 py-2.5 text-sm text-[#1d3a2f] focus:outline-none focus:ring-2 focus:ring-[#c6ded2] ${
+                fieldErrors.phone ? 'border-[#e2a7ac]' : 'border-[#dfe7e3]'
+              }`}
+            />
+            {fieldErrors.phone && <p className="mt-1 text-xs text-[#b63a3a]">{fieldErrors.phone}</p>}
+          </div>
 
-            {/* Phone */}
-            <div className="mb-5">
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                Phone
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={form.phone}
-                onChange={handleChange}
-                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 transition ${
-                  fieldErrors.phone ? 'border-red-400' : 'border-gray-300'
-                }`}
-                placeholder="e.g. 0712345678"
-              />
-              {fieldErrors.phone && (
-                <p className="text-xs text-red-500 mt-1">{fieldErrors.phone}</p>
-              )}
-            </div>
+          <div>
+            <label htmlFor="address" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#7c8b85]">
+              Address
+            </label>
+            <textarea
+              id="address"
+              name="address"
+              rows={3}
+              value={form.address}
+              onChange={handleChange}
+              className={`w-full resize-none rounded-lg border px-3 py-2.5 text-sm text-[#1d3a2f] focus:outline-none focus:ring-2 focus:ring-[#c6ded2] ${
+                fieldErrors.address ? 'border-[#e2a7ac]' : 'border-[#dfe7e3]'
+              }`}
+            />
+            {fieldErrors.address && <p className="mt-1 text-xs text-[#b63a3a]">{fieldErrors.address}</p>}
+          </div>
 
-            {/* Address */}
-            <div className="mb-7">
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-                Delivery Address
-              </label>
-              <textarea
-                id="address"
-                name="address"
-                rows={3}
-                value={form.address}
-                onChange={handleChange}
-                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 transition resize-none ${
-                  fieldErrors.address ? 'border-red-400' : 'border-gray-300'
-                }`}
-                placeholder="Street, city, postal code"
-              />
-              {fieldErrors.address && (
-                <p className="text-xs text-red-500 mt-1">{fieldErrors.address}</p>
-              )}
-            </div>
-
+          <div className="flex flex-wrap gap-2 pt-2">
             <button
               type="submit"
-              disabled={saving}
-              className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white text-sm font-semibold rounded-lg transition-colors"
+              disabled={saving || loading}
+              className="rounded-lg bg-[#0d4a38] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#083a2c] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saving ? 'Saving…' : 'Save Changes'}
+              {saving ? 'Saving...' : 'Save Changes'}
             </button>
-          </form>
-        </div>
-      </div>
-    </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg border border-[#d9e4df] bg-white px-4 py-2 text-sm font-medium text-[#3d6254]"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </section>
+    </CustomerAccountLayout>
   );
 }

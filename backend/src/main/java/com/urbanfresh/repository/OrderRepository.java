@@ -86,6 +86,23 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByAssignedDeliveryPersonIdOrderByCreatedAtDesc(Long assignedDeliveryPersonId, Pageable pageable);
 
     /**
+     * Counts all orders currently or historically assigned to the given delivery person.
+     *
+     * @param assignedDeliveryPersonId delivery person user ID
+     * @return total assigned order count
+     */
+    long countByAssignedDeliveryPersonId(Long assignedDeliveryPersonId);
+
+    /**
+     * Counts assigned orders by a specific status for the given delivery person.
+     *
+     * @param assignedDeliveryPersonId delivery person user ID
+     * @param status order status to filter by
+     * @return assigned order count for the requested status
+     */
+    long countByAssignedDeliveryPersonIdAndStatus(Long assignedDeliveryPersonId, OrderStatus status);
+
+    /**
      * Finds stale PENDING orders older than the given cutoff time.
      * Used by the scheduler to auto-cancel orders where payment was never confirmed.
      *

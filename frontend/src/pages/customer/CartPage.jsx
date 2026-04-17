@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCart } from '../../context/CartContext';
 import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import Breadcrumbs from '../../components/customer/Breadcrumbs';
+import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import { formatAmount, formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
 import { getLoyaltyPoints } from '../../services/orderService';
 
@@ -20,16 +23,23 @@ export default function CartPage() {
   if (loading) return <CartLoadingScreen />;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#f5f7f6] flex flex-col">
       <Navbar />
 
-      <div className="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
+      <div className="flex-1 w-full pb-24 md:pb-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
+        <Breadcrumbs
+          items={[
+            { label: 'Products', to: '/products' },
+            { label: 'Cart' },
+          ]}
+        />
         {/* ── Header ── */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Your Cart</h1>
+          <h1 className="text-3xl font-bold text-[#163a2f] md:text-4xl">Your Cart</h1>
           <Link
             to="/products"
-            className="text-sm text-green-600 hover:underline"
+            className="text-sm font-medium text-[#0d4a38] hover:underline"
           >
             ← Continue Shopping
           </Link>
@@ -80,11 +90,11 @@ export default function CartPage() {
             <OrderSummary cart={cart} navigate={navigate} />
           </div>
         )}
+        </div>
       </div>
 
-      <footer className="bg-gray-100 border-t border-gray-200 text-gray-500 text-center py-6 text-sm">
-        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
-      </footer>
+      <MobileBottomNav activeKey="cart" />
+      <Footer />
     </div>
   );
 }
@@ -130,9 +140,9 @@ function CartItemRow({ item, onUpdate, onRemove }) {
   };
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm p-4 flex gap-4 transition-opacity ${busy ? 'opacity-50' : ''}`}>
+    <div className={`bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-4 flex gap-4 transition-opacity ${busy ? 'opacity-50' : ''}`}>
       {/* Product image */}
-      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-green-50">
+      <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-green-50">
         {item.imageUrl ? (
           <img
             src={item.imageUrl}
@@ -275,8 +285,8 @@ function OrderSummary({ cart, navigate }) {
   const cannotCheckout    = hasOutOfStockItem || isBelowMinimum;
 
   return (
-    <div className="lg:w-80 flex-shrink-0">
-      <div className="bg-white rounded-xl shadow-sm p-6 lg:sticky lg:top-24 space-y-4">
+    <div className="lg:w-80 shrink-0">
+      <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-6 lg:sticky lg:top-24 space-y-4">
         <h2 className="text-lg font-bold text-gray-800">Order Summary</h2>
 
         <div className="space-y-2 text-sm text-gray-600">
@@ -388,7 +398,7 @@ function OrderSummary({ cart, navigate }) {
 /** Shown when the cart has no items. */
 function EmptyCart() {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+    <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-12 text-center">
       <p className="text-6xl mb-4">🛒</p>
       <h2 className="text-xl font-semibold text-gray-800 mb-2">Your cart is empty</h2>
       <p className="text-gray-500 text-sm mb-6">
@@ -411,7 +421,7 @@ function CartLoadingScreen() {
       <div className="max-w-5xl mx-auto px-4 py-10 space-y-4">
         {[1, 2, 3].map((n) => (
           <div key={n} className="bg-white rounded-xl shadow-sm p-4 flex gap-4 animate-pulse">
-            <div className="w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0" />
+            <div className="w-20 h-20 bg-gray-200 rounded-lg shrink-0" />
             <div className="flex-1 space-y-3 py-1">
               <div className="h-4 bg-gray-200 rounded w-2/5" />
               <div className="h-3 bg-gray-200 rounded w-1/4" />

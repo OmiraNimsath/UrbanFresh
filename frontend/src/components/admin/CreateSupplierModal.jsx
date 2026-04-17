@@ -186,40 +186,52 @@ export default function CreateSupplierModal({
   const passwordStrengthCount = PASSWORD_RULES.filter((rule) => rule.test(form.password)).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-        <div className="border-b border-slate-200 px-6 py-4">
-          <h2 className="text-xl font-bold text-slate-900">
-            {isEditMode ? 'Edit Supplier Account' : 'Create Supplier Account'}
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {isEditMode
-              ? 'Update supplier details and assigned brands.'
-              : 'Create supplier access and assign one or more brands.'}
-          </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#e4ebe8] bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-[#edf2f0] px-6 py-4">
+          <div>
+            <h2 className="text-xl font-bold text-[#153a30]">
+              {isEditMode ? 'Edit Supplier Account' : 'Create Supplier'}
+            </h2>
+            <p className="mt-1 text-sm text-[#6f817b]">
+              {isEditMode
+                ? 'Update supplier details and assigned brands.'
+                : 'Create supplier access and assign one or more brands.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#6f817b] transition hover:bg-[#f2f7f5]"
+            aria-label="Close supplier modal"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
           {apiError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="rounded-lg border border-[#f2cccc] bg-[#fdecee] px-3 py-2 text-sm text-[#b03a3a]">
               {apiError}
             </div>
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Name</label>
+            <label className="mb-1 block text-sm font-medium text-[#425d55]">Name</label>
             <input
               name="name"
               value={form.name}
               onChange={handleChange}
               onBlur={() => validateField('name')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200"
+              className="h-10 w-full rounded-xl border border-[#d6e0dc] bg-[#f5f8f7] px-3 text-sm text-[#28433b] focus:border-[#0d4a38] focus:outline-none focus:ring-2 focus:ring-[#d8eae3]"
             />
-            {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
+            {errors.name && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.name}</p>}
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+            <label className="mb-1 block text-sm font-medium text-[#425d55]">Email</label>
             <input
               type="email"
               name="email"
@@ -227,36 +239,36 @@ export default function CreateSupplierModal({
               onChange={handleChange}
               onBlur={() => validateField('email')}
               disabled={isEditMode}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="h-10 w-full rounded-xl border border-[#d6e0dc] bg-[#f5f8f7] px-3 text-sm text-[#28433b] focus:border-[#0d4a38] focus:outline-none focus:ring-2 focus:ring-[#d8eae3] disabled:cursor-not-allowed disabled:bg-[#eef3f1]"
             />
-            {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
+            {errors.email && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.email}</p>}
           </div>
 
           {!isEditMode && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
+                <label className="mb-1 block text-sm font-medium text-[#425d55]">Password</label>
                 <input
                   type="password"
                   name="password"
                   value={form.password}
                   onChange={handleChange}
                   onBlur={() => validateField('password')}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200"
+                  className="h-10 w-full rounded-xl border border-[#d6e0dc] bg-[#f5f8f7] px-3 text-sm text-[#28433b] focus:border-[#0d4a38] focus:outline-none focus:ring-2 focus:ring-[#d8eae3]"
                 />
-                {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password}</p>}
+                {errors.password && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.password}</p>}
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Confirm Password</label>
+                <label className="mb-1 block text-sm font-medium text-[#425d55]">Confirm Password</label>
                 <input
                   type="password"
                   name="confirmPassword"
                   value={form.confirmPassword}
                   onChange={handleChange}
                   onBlur={() => validateField('confirmPassword')}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200"
+                  className="h-10 w-full rounded-xl border border-[#d6e0dc] bg-[#f5f8f7] px-3 text-sm text-[#28433b] focus:border-[#0d4a38] focus:outline-none focus:ring-2 focus:ring-[#d8eae3]"
                 />
-                {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
+                {errors.confirmPassword && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.confirmPassword}</p>}
               </div>
 
               {form.password.length > 0 && (
@@ -266,7 +278,7 @@ export default function CreateSupplierModal({
                       <div
                         key={index}
                         className={`h-1 flex-1 rounded ${
-                          index < passwordStrengthCount ? 'bg-green-500' : 'bg-slate-200'
+                          index < passwordStrengthCount ? 'bg-[#2f7f5f]' : 'bg-[#dce6e2]'
                         }`}
                       />
                     ))}
@@ -275,7 +287,7 @@ export default function CreateSupplierModal({
                     {PASSWORD_RULES.map((rule) => (
                       <p
                         key={rule.label}
-                        className={rule.test(form.password) ? 'text-green-600' : 'text-slate-500'}
+                        className={rule.test(form.password) ? 'text-[#2f7f5f]' : 'text-[#6f817b]'}
                       >
                         {rule.test(form.password) ? '✓' : '○'} {rule.label}
                       </p>
@@ -287,22 +299,22 @@ export default function CreateSupplierModal({
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Phone (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-[#425d55]">Phone (optional)</label>
             <input
               name="phone"
               value={form.phone}
               onChange={handleChange}
               onBlur={() => validateField('phone')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200"
+              className="h-10 w-full rounded-xl border border-[#d6e0dc] bg-[#f5f8f7] px-3 text-sm text-[#28433b] focus:border-[#0d4a38] focus:outline-none focus:ring-2 focus:ring-[#d8eae3]"
             />
-            {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
+            {errors.phone && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.phone}</p>}
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-slate-700">Assign Brands</p>
-            <div className="max-h-44 space-y-2 overflow-y-auto rounded-lg border border-slate-300 p-3">
+            <p className="mb-2 text-sm font-medium text-[#425d55]">Assign Brands</p>
+            <div className="max-h-44 space-y-2 overflow-y-auto rounded-xl border border-[#d6e0dc] bg-[#f5f8f7] p-3">
               {brands.map((brand) => (
-                <label key={brand.id} className="flex items-center gap-2 text-sm text-slate-800">
+                <label key={brand.id} className="flex items-center gap-2 text-sm text-[#28433b]">
                   <input
                     type="checkbox"
                     checked={form.brandIds.includes(brand.id)}
@@ -314,25 +326,25 @@ export default function CreateSupplierModal({
               ))}
             </div>
             {(errors.brandIds || brands.length === 0) && (
-              <p className="text-xs text-red-600 mt-1">
+              <p className="mt-1 text-xs text-[#ba3a3a]">
                 {errors.brandIds || 'No active brands available for assignment'}
               </p>
             )}
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 -mx-6 -mb-5 mt-1">
+          <div className="-mx-6 -mb-5 mt-1 flex justify-end gap-2 border-t border-[#edf2f0] bg-[#f8fbf9] px-6 py-4">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-lg bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
+              className="rounded-lg border border-[#d5dfdb] bg-white px-4 py-2 text-sm font-medium text-[#526b64] transition hover:bg-[#f2f7f5]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || brands.length === 0 || !isFormValid}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-[#0d4a38] px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting
                 ? isEditMode
@@ -340,7 +352,7 @@ export default function CreateSupplierModal({
                   : 'Creating...'
                 : isEditMode
                   ? 'Save Changes'
-                  : 'Create Supplier'}
+                  : 'Add Supplier'}
             </button>
           </div>
         </form>

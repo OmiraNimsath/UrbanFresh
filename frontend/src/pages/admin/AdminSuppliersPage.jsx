@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import {
   createSupplier,
@@ -9,12 +8,12 @@ import {
   updateSupplierStatus,
 } from '../../services/adminSupplierService';
 import CreateSupplierModal from '../../components/admin/CreateSupplierModal';
+import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
 
 /**
  * Presentation Layer – Admin supplier management page.
  */
 export default function AdminSuppliersPage() {
-  const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -121,71 +120,61 @@ export default function AdminSuppliersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <AdminDeliveryLayout
+      title="Suppliers"
+      description="Manage supplier entities, account status, and associated brand partnerships."
+      breadcrumbCurrent="Manage Suppliers"
+      breadcrumbItems={[
+        { label: 'Admin', to: '/admin' },
+        { label: 'Manage Suppliers' },
+      ]}
+      actions={
         <button
-          onClick={() => navigate('/admin')}
-          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-green-700"
+          onClick={openCreateModal}
+          className="inline-flex items-center justify-center rounded-xl bg-[#0d4a38] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#083a2c]"
         >
-          <span aria-hidden="true">&larr;</span>
-          <span>Back to Dashboard</span>
+          + Create Supplier
         </button>
-
-        <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
-          <div className="flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-green-600">Admin Panel</p>
-              <h1 className="mt-1 text-3xl font-bold text-slate-900">Supplier Management</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                Create supplier accounts, keep profiles updated, and control brand ownership with clear validation.
-              </p>
-            </div>
-            <button
-              onClick={openCreateModal}
-              className="inline-flex items-center justify-center rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700"
-            >
-              + Create Supplier
-            </button>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl bg-slate-100 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Total Suppliers</p>
-              <p className="mt-1 text-2xl font-bold text-slate-800">{suppliers.length}</p>
-            </div>
-            <div className="rounded-xl bg-green-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-green-700">Active Suppliers</p>
-              <p className="mt-1 text-2xl font-bold text-green-700">
-                {suppliers.filter((supplier) => supplier.isActive).length}
-              </p>
-            </div>
-            <div className="rounded-xl bg-blue-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-blue-700">Active Brands Available</p>
-              <p className="mt-1 text-2xl font-bold text-blue-700">{brands.length}</p>
-            </div>
-          </div>
+      }
+    >
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-[#e4ebe8] bg-[#f4f7f6] px-4 py-3">
+          <p className="text-xs uppercase tracking-wide text-[#6f817b]">Total Suppliers</p>
+          <p className="mt-1 text-2xl font-bold text-[#153a30]">{suppliers.length}</p>
         </div>
+        <div className="rounded-xl border border-[#e4ebe8] bg-[#eaf5ef] px-4 py-3">
+          <p className="text-xs uppercase tracking-wide text-[#0d4a38]">Active Suppliers</p>
+          <p className="mt-1 text-2xl font-bold text-[#0d4a38]">
+            {suppliers.filter((supplier) => supplier.isActive).length}
+          </p>
+        </div>
+        <div className="rounded-xl border border-[#e4ebe8] bg-[#dff4e8] px-4 py-3">
+          <p className="text-xs uppercase tracking-wide text-[#0d4a38]">Active Brands Available</p>
+          <p className="mt-1 text-2xl font-bold text-[#0d4a38]">{brands.length}</p>
+        </div>
+      </section>
 
-        {showCreateModal && (
-          <CreateSupplierModal
-            brands={brands}
-            initialSupplier={editingSupplier}
-            apiError={modalError}
-            onClose={closeModal}
-            onSubmit={editingSupplier ? handleUpdateSupplier : handleCreateSupplier}
-            isSubmitting={isSubmitting}
-          />
-        )}
+      {showCreateModal && (
+        <CreateSupplierModal
+          brands={brands}
+          initialSupplier={editingSupplier}
+          apiError={modalError}
+          onClose={closeModal}
+          onSubmit={editingSupplier ? handleUpdateSupplier : handleCreateSupplier}
+          isSubmitting={isSubmitting}
+        />
+      )}
 
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-          {loading ? (
-            <div className="p-10 text-center text-slate-500">Loading supplier accounts...</div>
-          ) : suppliers.length === 0 ? (
-            <div className="p-10 text-center text-slate-500">No suppliers found. Create one to get started.</div>
-          ) : (
-            <div className="overflow-x-auto">
+      <section className="overflow-hidden rounded-2xl border border-[#e4ebe8] bg-white shadow-sm">
+        {loading ? (
+          <div className="p-10 text-center text-[#6f817b]">Loading supplier accounts...</div>
+        ) : suppliers.length === 0 ? (
+          <div className="p-10 text-center text-[#6f817b]">No suppliers found. Create one to get started.</div>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
+                <thead className="bg-[#f5f8f7] text-xs uppercase tracking-wide text-[#7a8a85]">
                   <tr>
                     <th className="px-4 py-3 text-left">Name</th>
                     <th className="px-4 py-3 text-left">Email</th>
@@ -196,10 +185,10 @@ export default function AdminSuppliersPage() {
                 </thead>
                 <tbody>
                   {suppliers.map((supplier) => (
-                    <tr key={supplier.id} className="border-t border-slate-200">
-                      <td className="px-4 py-3 font-medium text-slate-900">{supplier.name}</td>
-                      <td className="px-4 py-3 text-slate-700">{supplier.email}</td>
-                      <td className="px-4 py-3 text-slate-700">
+                    <tr key={supplier.id} className="border-t border-[#edf2f0]">
+                      <td className="px-4 py-3 font-semibold text-[#1f3b32]">{supplier.name}</td>
+                      <td className="px-4 py-3 text-[#425d55]">{supplier.email}</td>
+                      <td className="px-4 py-3 text-[#425d55]">
                         {supplier.brands?.length
                           ? supplier.brands.map((brand) => brand.name).join(', ')
                           : 'No brands assigned'}
@@ -207,7 +196,7 @@ export default function AdminSuppliersPage() {
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            supplier.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            supplier.isActive ? 'bg-[#c8f0da] text-[#1f6a4d]' : 'bg-[#e8efec] text-[#526b64]'
                           }`}
                         >
                           {supplier.isActive ? 'Active' : 'Inactive'}
@@ -217,14 +206,14 @@ export default function AdminSuppliersPage() {
                         <div className="flex gap-3">
                           <button
                             onClick={() => openEditModal(supplier)}
-                            className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                            className="text-xs font-semibold text-[#526b64] hover:text-[#0d4a38]"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleToggleStatus(supplier)}
                             className={`text-xs font-semibold ${
-                              supplier.isActive ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'
+                              supplier.isActive ? 'text-[#ba3a3a] hover:text-[#a22f2f]' : 'text-[#0d4a38] hover:text-[#083a2c]'
                             }`}
                           >
                             {supplier.isActive ? 'Deactivate' : 'Activate'}
@@ -236,9 +225,50 @@ export default function AdminSuppliersPage() {
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
-      </div>
-    </div>
+
+            <div className="space-y-3 p-4 md:hidden">
+              {suppliers.map((supplier) => (
+                <article key={supplier.id} className="rounded-xl border border-[#edf2ef] bg-[#fbfdfc] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[#1f3b32]">{supplier.name}</p>
+                      <p className="mt-1 text-xs text-[#6f817b]">{supplier.email}</p>
+                    </div>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        supplier.isActive ? 'bg-[#c8f0da] text-[#1f6a4d]' : 'bg-[#e8efec] text-[#526b64]'
+                      }`}
+                    >
+                      {supplier.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-xs text-[#526b64]">
+                    Brands: {supplier.brands?.length
+                      ? supplier.brands.map((brand) => brand.name).join(', ')
+                      : 'No brands assigned'}
+                  </p>
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      onClick={() => openEditModal(supplier)}
+                      className="text-xs font-semibold text-[#526b64] hover:text-[#0d4a38]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleToggleStatus(supplier)}
+                      className={`text-xs font-semibold ${
+                        supplier.isActive ? 'text-[#ba3a3a] hover:text-[#a22f2f]' : 'text-[#0d4a38] hover:text-[#083a2c]'
+                      }`}
+                    >
+                      {supplier.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    </AdminDeliveryLayout>
   );
 }

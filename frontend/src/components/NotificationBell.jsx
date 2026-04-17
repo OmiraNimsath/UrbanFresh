@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FiBell } from 'react-icons/fi';
 import useNotifications from '../hooks/useNotifications';
 
 /**
@@ -25,43 +26,39 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Bell trigger button */}
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="relative px-3 py-2 text-sm font-medium text-green-700 border border-green-600 rounded-lg hover:bg-green-50 transition-colors"
+        className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#e4ebe8] bg-white text-[#0d4a38] shadow-sm transition-colors hover:bg-[#f8fbf9]"
         aria-label="Notifications"
         aria-expanded={open}
       >
-        🔔
+        <FiBell className="h-4 w-4" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-0.5">
+          <span className="absolute -right-1.5 -top-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-xs font-bold text-white">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown panel */}
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 z-50">
-          {/* Header row */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-800">Notifications</h3>
+        <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-[#e4ebe8] bg-white shadow-lg">
+          <div className="flex items-center justify-between border-b border-[#e4ebe8] bg-[#f8fbf9] px-4 py-3">
+            <h3 className="text-sm font-semibold text-[#163a2f]">Notifications</h3>
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
-                className="text-xs text-green-600 hover:text-green-800 font-medium transition-colors"
+                className="text-xs font-semibold text-[#0d4a38] transition-colors hover:text-[#083a2c]"
               >
                 Mark all as read
               </button>
             )}
           </div>
 
-          {/* Notification list */}
-          <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
+          <div className="max-h-72 overflow-y-auto divide-y divide-[#eef3f0]">
             {loading ? (
-              <p className="text-center text-xs text-gray-400 py-8">Loading…</p>
+              <p className="py-8 text-center text-xs text-[#6f817b]">Loading...</p>
             ) : notifications.length === 0 ? (
-              <p className="text-center text-xs text-gray-400 py-8">No notifications yet</p>
+              <p className="py-8 text-center text-xs text-[#6f817b]">No notifications yet</p>
             ) : (
               notifications.map((n) => (
                 <NotificationItem key={n.id} notification={n} onMarkRead={markRead} />
@@ -78,8 +75,8 @@ export default function NotificationBell() {
 function NotificationItem({ notification, onMarkRead }) {
   return (
     <div
-      className={`px-4 py-3 flex items-start gap-3 ${
-        notification.read ? 'bg-white' : 'bg-green-50'
+      className={`flex items-start gap-3 px-4 py-3 ${
+        notification.read ? 'bg-white' : 'bg-[#eaf5ef]'
       }`}
     >
       <span className="text-base mt-0.5" aria-hidden="true">
@@ -87,8 +84,8 @@ function NotificationItem({ notification, onMarkRead }) {
       </span>
 
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-700 leading-snug">{notification.message}</p>
-        <p className="text-[10px] text-gray-400 mt-1">
+        <p className="text-xs leading-snug text-[#163a2f]">{notification.message}</p>
+        <p className="mt-1 text-[10px] text-[#6f817b]">
           {formatRelativeTime(notification.createdAt)}
         </p>
       </div>
@@ -96,7 +93,7 @@ function NotificationItem({ notification, onMarkRead }) {
       {!notification.read && (
         <button
           onClick={() => onMarkRead(notification.id)}
-          className="text-[10px] text-green-600 hover:text-green-800 font-medium whitespace-nowrap mt-0.5 transition-colors"
+          className="mt-0.5 whitespace-nowrap text-[10px] font-semibold text-[#0d4a38] transition-colors hover:text-[#083a2c]"
         >
           Mark read
         </button>

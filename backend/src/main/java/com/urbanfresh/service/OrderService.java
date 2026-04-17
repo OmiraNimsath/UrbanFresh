@@ -10,6 +10,7 @@ import com.urbanfresh.dto.response.AdminOrderResponse;
 import com.urbanfresh.dto.response.AdminOrderReviewResponse;
 import com.urbanfresh.dto.response.DeliveryAssignedOrderResponse;
 import com.urbanfresh.dto.response.DeliveryOrderDetailsResponse;
+import com.urbanfresh.dto.response.DeliveryProfileSummaryResponse;
 import com.urbanfresh.dto.response.OrderResponse;
 
 /**
@@ -117,6 +118,14 @@ public interface OrderService {
             OrderStatusUpdateRequest request,
             String deliveryEmail
     );
+
+        /**
+         * Returns aggregate delivery profile metrics for the authenticated delivery user.
+         *
+         * @param deliveryEmail email extracted from the JWT principal
+         * @return delivery profile summary counters used in the delivery profile page
+         */
+        DeliveryProfileSummaryResponse getDeliveryProfileSummary(String deliveryEmail);
 
     /**
      * Finds all PENDING orders older than 24 hours and cancels them automatically,
