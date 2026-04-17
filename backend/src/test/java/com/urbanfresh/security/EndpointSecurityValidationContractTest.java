@@ -270,6 +270,13 @@ class EndpointSecurityValidationContractTest {
                 .andExpect(status().isOk());
     }
 
+        @Test
+        void profileEndpoint_withSupplierRole_returns200() throws Exception {
+                mockMvc.perform(get("/api/profile")
+                                                .with(user("supplier@urbanfresh.com").roles("SUPPLIER")))
+                                .andExpect(status().isOk());
+        }
+
     @Test
     void paymentTrackingEndpoint_withCustomerRole_returns200() throws Exception {
         mockMvc.perform(get("/api/payments/orders/1/status")

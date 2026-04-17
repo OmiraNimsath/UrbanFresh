@@ -162,6 +162,9 @@ public class SupplierPurchaseOrderServiceImpl implements SupplierPurchaseOrderSe
                         .productName(item.getProduct().getName())
                         .quantity(item.getQuantity())
                         .unitPrice(item.getUnitPrice())
+                    .batchNumber(item.getBatchNumber())
+                    .manufacturingDate(item.getManufacturingDate())
+                    .supplierExpiryDate(item.getSupplierExpiryDate())
                         .build())
                 .collect(Collectors.toList());
 
