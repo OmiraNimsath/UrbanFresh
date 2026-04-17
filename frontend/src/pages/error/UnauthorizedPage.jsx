@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
@@ -11,20 +11,28 @@ import Footer from '../../components/Footer';
  */
 export default function UnauthorizedPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useAuth();
+
+  const ROLE_DASHBOARD = {
+    CUSTOMER: '/dashboard',
+    ADMIN: '/admin',
+    SUPPLIER: '/supplier',
+    DELIVERY: '/delivery',
+  };
+
+  const backPath = ROLE_DASHBOARD[user?.role] || '/';
+  const backLabel = user?.role ? 'Go to My Dashboard' : 'Go to Homepage';
 
   useEffect(() => {
     const redirectTimer = window.setTimeout(() => {
-      navigate('/', { replace: true });
+      navigate(backPath, { replace: true });
     }, 3000);
 
     return () => {
       window.clearTimeout(redirectTimer);
     };
-  }, [navigate]);
-
-  const backPath = '/';
-  const backLabel = 'Go to Homepage';
+  }, [backPath, navigate]);
 
   return (
     <div className="min-h-screen bg-[#f5f7f6] text-[#163a2f]">
@@ -46,8 +54,14 @@ export default function UnauthorizedPage() {
             )}
           </p>
 
+          {location.state?.attemptedPath && (
+            <p className="mt-2 text-xs text-[#7f8f89]">
+              Attempted route: <strong>{location.state.attemptedPath}</strong>
+            </p>
+          )}
+
           <p className="mt-4 text-xs text-[#6f817b]">
-            You will be redirected to the homepage in a few seconds.
+            You will be redirected in a few seconds.
           </p>
 
           <div className="mt-6">

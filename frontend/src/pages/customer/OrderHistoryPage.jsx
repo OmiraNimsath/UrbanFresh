@@ -31,6 +31,8 @@ export default function OrderHistoryPage() {
     return orders.filter((order) => String(order.status || '').toUpperCase() === activeFilter);
   }, [activeFilter, orders]);
 
+  const hasFilterApplied = activeFilter !== 'ALL';
+
   const handleRetryPayment = (order) => {
     setSelectedOrderForPayment(order);
     setPaymentModalOpen(true);
@@ -67,7 +69,9 @@ export default function OrderHistoryPage() {
             <p className="text-sm text-[#6f817b]">Loading order history...</p>
           ) : filteredOrders.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[#d8e3de] bg-[#f8fbf9] p-8 text-center text-sm text-[#6f817b]">
-              No orders found for this filter.
+              {hasFilterApplied
+                ? 'No orders found for this filter.'
+                : 'No orders yet. Place your first order to see it here.'}
             </div>
           ) : (
             <div className="space-y-3">

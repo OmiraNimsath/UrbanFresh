@@ -31,6 +31,7 @@ import {
   waitForChargeUpdatedAndFetchLatest,
 } from '../../services/paymentService';
 import { formatAmount } from '../../utils/priceUtils';
+import { getApiErrorMessage } from '../../utils/errorMessageUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page root
@@ -100,7 +101,7 @@ export default function CheckoutPage() {
       // Cart cleared after step flip (stock already reserved)
       await clearCart();
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Something went wrong. Please try again.';
+      const msg = getApiErrorMessage(err);
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -294,7 +295,7 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
         },
       });
     } catch (err) {
-      const message = err?.response?.data?.message || 'Unable to finalize payment status. Please try again.';
+      const message = getApiErrorMessage(err, 'Unable to finalize payment status. Please try again.');
       setStripeError(message);
       toast.error(message);
       setPaying(false);

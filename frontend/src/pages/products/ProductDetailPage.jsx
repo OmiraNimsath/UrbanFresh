@@ -9,6 +9,7 @@ import Footer from '../../components/Footer';
 import Breadcrumbs from '../../components/customer/Breadcrumbs';
 import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import { formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
+import { getApiErrorMessage } from '../../utils/errorMessageUtils';
 
 /**
  * Page Layer – Public product detail page.
@@ -254,7 +255,7 @@ function ProductDetail({ product }) {
                     await addToCart(product.id, quantity);
                     toast.success(`${product.name} × ${quantity} added to cart`);
                   } catch (err) {
-                    toast.error(err?.response?.data?.message || 'Could not add to cart');
+                    toast.error(getApiErrorMessage(err, 'Could not add to cart. Please try again.'));
                   } finally {
                     setAdding(false);
                   }

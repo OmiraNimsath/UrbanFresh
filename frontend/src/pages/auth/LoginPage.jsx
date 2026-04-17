@@ -5,6 +5,7 @@ import { FiAlertCircle, FiClock, FiEye, FiEyeOff, FiMail, FiArrowRight } from 'r
 import { loginUser } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import AuthShell from '../../components/auth/AuthShell';
+import { getApiErrorMessage } from '../../utils/errorMessageUtils';
 
 /**
  * Presentation Layer – Login form.
@@ -77,16 +78,17 @@ export default function LoginPage() {
       navigate(destination, { replace: true });
     } catch (err) {
       const status = err.response?.status;
-      const message = err.response?.data?.message;
+      const message = getApiErrorMessage(err);
 
       if (status === 401) {
-        setError(message || 'Invalid email or password');
+        setError(getApiErrorMessage(err, 'Invalid email or password'));
       } else if (status === 403) {
-        setError(message || 'Access denied for this account');
+        setError(getApiErrorMessage(err, 'Access denied for this account'));
       } else if (status === 400) {
-        setError(message || 'Please fill in all fields correctly');
+        setError(getApiErrorMessage(err, 'Please fill in all fields correctly'));
       } else {
-        toast.error('Something went wrong. Please try again.');
+        setError(getApiErrorMessage(err, 'Something went wrong. Please try again.'));
+        toast.error(message);
       }
     } finally {
       setLoading(false);

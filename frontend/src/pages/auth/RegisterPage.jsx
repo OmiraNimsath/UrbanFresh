@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { FiArrowRight, FiCircle, FiEye, FiEyeOff, FiUser, FiMail, FiCheckCircle } from 'react-icons/fi';
 import { registerCustomer } from '../../services/authService';
 import AuthShell from '../../components/auth/AuthShell';
+import { getApiErrorMessage } from '../../utils/errorMessageUtils';
 
 /**
  * Presentation Layer – Customer registration form.
@@ -79,9 +80,9 @@ export default function RegisterPage() {
         // Map backend field-level validation errors back to the form
         setFieldErrors(data.errors);
       } else if (status === 409) {
-        setFieldErrors({ email: data?.message || 'Email already registered' });
+        setFieldErrors({ email: getApiErrorMessage(err, 'Email already registered') });
       } else {
-        toast.error('Something went wrong. Please try again.');
+        toast.error(getApiErrorMessage(err));
       }
     } finally {
       setLoading(false);
