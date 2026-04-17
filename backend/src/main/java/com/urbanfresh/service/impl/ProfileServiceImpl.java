@@ -1,14 +1,16 @@
 package com.urbanfresh.service.impl;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.urbanfresh.dto.request.UpdateProfileRequest;
 import com.urbanfresh.dto.response.ProfileResponse;
 import com.urbanfresh.exception.UserNotFoundException;
 import com.urbanfresh.model.User;
 import com.urbanfresh.repository.UserRepository;
 import com.urbanfresh.service.ProfileService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service Layer – Implements ProfileService.

@@ -25,6 +25,7 @@ import com.urbanfresh.dto.response.AdminOrderReviewResponse;
 import com.urbanfresh.dto.response.BatchAllocationDto;
 import com.urbanfresh.dto.response.DeliveryAssignedOrderResponse;
 import com.urbanfresh.dto.response.DeliveryOrderDetailsResponse;
+import com.urbanfresh.dto.response.DeliveryProfileSummaryResponse;
 import com.urbanfresh.dto.response.OrderItemResponse;
 import com.urbanfresh.dto.response.OrderResponse;
 import com.urbanfresh.exception.InsufficientStockException;
@@ -415,6 +416,41 @@ public class OrderServiceImpl implements OrderService {
 
                                 return toDeliveryOrderDetailsResponse(detailedUpdatedOrder);
                 }
+
+        /**
+         * Returns delivery profile summary counters for the authenticated delivery user.
+         *
+         * @param deliveryEmail email from JWT principal
+         * @return delivery profile summary metrics
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public DeliveryProfileSummaryResponse getDeliveryProfileSummary(String deliveryEmail) {
+                User deliveryPerson = userRepository.findByEmailAndRoleAndIsActiveTrue(deliveryEmail, Role.DELIVERY)
+                                .orElseThrow(() -> new UserNotFoundException("Delivery personnel not found: " + deliveryEmail));
+
+                Long assignedCount = orderRepository.countByAssignedDeliveryPersonId(deliveryPerson.getId());
+                Long outForDeliveryCount = orderRepository.countByAssignedDeliveryPersonIdAndStatus(
+                                deliveryPerson.getId(),
+                                OrderStatus.OUT_FOR_DELIVERY
+                );
+                Long deliveredCount = orderRepository.countByAssignedDeliveryPersonIdAndStatus(
+                                deliveryPerson.getId(),
+                                OrderStatus.DELIVERED
+                );
+                Long returnedCount = orderRepository.countByAssignedDeliveryPersonIdAndStatus(
+                                deliveryPerson.getId(),
+                                OrderStatus.RETURNED
+                );
+
+                return DeliveryProfileSummaryResponse.builder()
+                                .assignedOrderCount(assignedCount)
+                                .outForDeliveryCount(outForDeliveryCount)
+                                .deliveredCount(deliveredCount)
+                                .returnedCount(returnedCount)
+                                .completedOrderCount(deliveredCount + returnedCount)
+                                .build();
+        }
 
         /**
          * Returns paginated orders assigned to the authenticated delivery user.

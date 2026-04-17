@@ -298,7 +298,7 @@ export default function DeliveryOrderDetailsPage() {
         <div className="fixed bottom-17 left-0 right-0 z-20 border-t border-[#dfe7e3] bg-white/95 px-4 py-3 backdrop-blur md:bottom-0 sm:px-6">
           <div className="mx-auto w-full max-w-6xl space-y-2">
             {canUpdateStatus && (
-              <div className="grid grid-cols-2 gap-2 md:max-w-xl">
+              <div className="mx-auto grid grid-cols-2 gap-2 md:max-w-xl">
                 <button
                   type="button"
                   disabled={isActionBusy}
@@ -318,7 +318,7 @@ export default function DeliveryOrderDetailsPage() {
               </div>
             )}
 
-            <div className="flex items-center justify-start gap-2">
+            <div className="flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={handleRefresh}

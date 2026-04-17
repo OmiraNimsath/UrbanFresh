@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.urbanfresh.dto.request.OrderStatusUpdateRequest;
 import com.urbanfresh.dto.response.DeliveryAssignedOrderResponse;
 import com.urbanfresh.dto.response.DeliveryOrderDetailsResponse;
+import com.urbanfresh.dto.response.DeliveryProfileSummaryResponse;
 import com.urbanfresh.service.OrderService;
 
 import jakarta.validation.Valid;
@@ -31,6 +32,22 @@ import lombok.RequiredArgsConstructor;
 public class DeliveryController {
 
     private final OrderService orderService;
+
+        /**
+         * Returns delivery profile summary metrics for the authenticated delivery person.
+         *
+         * @param authentication authenticated delivery principal
+         * @return delivery profile summary counters
+         */
+        @GetMapping("/profile/summary")
+        public ResponseEntity<DeliveryProfileSummaryResponse> getDeliveryProfileSummary(Authentication authentication) {
+                String deliveryEmail = authentication.getName();
+                DeliveryProfileSummaryResponse response = orderService.getDeliveryProfileSummary(deliveryEmail);
+
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(response);
+        }
 
     /**
      * Returns paginated orders assigned to the authenticated delivery person.

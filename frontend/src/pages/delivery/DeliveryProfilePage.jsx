@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { FiCreditCard, FiEdit2, FiShield } from 'react-icons/fi';
+import { FiUser } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
 import DeliveryPageLayout from '../../components/delivery/DeliveryPageLayout';
-import { getProfile, updateProfile } from '../../services/profileService';
+import {
+  getDeliveryProfileSummary,
+  getProfile,
+  updateProfile,
+} from '../../services/profileService';
 
 /**
  * Delivery profile page for viewing and updating personal information.
@@ -16,23 +20,52 @@ export default function DeliveryProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [profileId, setProfileId] = useState(null);
+  const [role, setRole] = useState('DELIVERY');
   const [email, setEmail] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', address: '' });
+  const [summary, setSummary] = useState({
+    assignedOrderCount: 0,
+    outForDeliveryCount: 0,
+    deliveredCount: 0,
+    returnedCount: 0,
+    completedOrderCount: 0,
+  });
   const [fieldErrors, setFieldErrors] = useState({});
 
-  useEffect(() => {
-    getProfile()
-      .then(({ data }) => {
-        setEmail(data.email || '');
-        setForm({
-          name: data.name ?? '',
-          phone: data.phone ?? '',
-          address: data.address ?? '',
-        });
-      })
-      .catch(() => toast.error('Failed to load profile.'))
-      .finally(() => setLoading(false));
+  const loadProfileData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [{ data: profileData }, { data: summaryData }] = await Promise.all([
+        getProfile(),
+        getDeliveryProfileSummary(),
+      ]);
+
+      setProfileId(profileData.id ?? null);
+      setRole(profileData.role || 'DELIVERY');
+      setEmail(profileData.email || '');
+      setForm({
+        name: profileData.name ?? '',
+        phone: profileData.phone ?? '',
+        address: profileData.address ?? '',
+      });
+      setSummary({
+        assignedOrderCount: Number(summaryData?.assignedOrderCount || 0),
+        outForDeliveryCount: Number(summaryData?.outForDeliveryCount || 0),
+        deliveredCount: Number(summaryData?.deliveredCount || 0),
+        returnedCount: Number(summaryData?.returnedCount || 0),
+        completedOrderCount: Number(summaryData?.completedOrderCount || 0),
+      });
+    } catch {
+      toast.error('Failed to load profile data.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadProfileData();
+  }, [loadProfileData]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -77,10 +110,15 @@ export default function DeliveryProfilePage() {
     navigate('/login', { replace: true });
   };
 
+  const handleRefresh = async () => {
+    await loadProfileData();
+    toast.success('Profile refreshed.');
+  };
+
   return (
     <DeliveryPageLayout
       activeKey="profile"
-      onRefresh={() => window.location.reload()}
+      onRefresh={handleRefresh}
       onLogout={handleLogout}
     >
       <section className="rounded-[26px] bg-linear-to-r from-[#114f39] to-[#1b5a42] p-6 text-white shadow-sm sm:p-8">
@@ -92,33 +130,37 @@ export default function DeliveryProfilePage() {
 
       <section className="mt-4 rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-center gap-4">
-          <div className="relative h-24 w-24 rounded-2xl bg-[#f68a54]">
-            <button
-              type="button"
-              className="absolute -bottom-2 -right-2 inline-flex h-9 w-9 items-center justify-center rounded-xl border-2 border-white bg-[#01412d] text-white"
-              aria-label="Edit profile image"
-            >
-              <FiEdit2 size={15} />
-            </button>
+          <div className="inline-flex h-24 w-24 items-center justify-center rounded-2xl bg-[#dff5ea] text-[#0f5a41]">
+            <FiUser size={44} />
           </div>
           <div>
             <p className="text-2xl font-semibold text-[#202827] sm:text-3xl">{form.name || 'Delivery Partner'}</p>
-            <p className="text-base text-[#5d6865] sm:text-lg">Partner ID: #UF-88291</p>
+            <p className="text-base text-[#5d6865] sm:text-lg">
+              Partner ID: {profileId ? `#UF-DLV-${profileId}` : 'Not available'}
+            </p>
             <span className="mt-2 inline-flex rounded-full bg-[#daf5e7] px-3 py-1 text-xs font-semibold text-[#0b6f4a]">
-              ☆ 4.9 RATING
+              {role}
             </span>
           </div>
         </div>
       </section>
 
-      <section className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+      <section className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-3xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Total Deliveries</p>
-          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">1,284</p>
+          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Assigned Orders</p>
+          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">{summary.assignedOrderCount}</p>
         </div>
         <div className="rounded-3xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Earnings Today</p>
-          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">Rs. 2,450</p>
+          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Out For Delivery</p>
+          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">{summary.outForDeliveryCount}</p>
+        </div>
+        <div className="rounded-3xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
+          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Completed Orders</p>
+          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">{summary.completedOrderCount}</p>
+        </div>
+        <div className="rounded-3xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
+          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Returned Orders</p>
+          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">{summary.returnedCount}</p>
         </div>
       </section>
 
@@ -195,42 +237,15 @@ export default function DeliveryProfilePage() {
               </button>
               <button
                 type="button"
-                onClick={() => window.location.reload()}
+                onClick={loadProfileData}
+                disabled={loading}
                 className="h-14 w-full rounded-2xl bg-[#dde2df] px-4 text-base font-medium text-[#202827] transition hover:bg-[#d4dad7]"
               >
-                Cancel
+                {loading ? 'Resetting...' : 'Cancel'}
               </button>
             </div>
           </form>
         )}
-      </section>
-
-      <section className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <button type="button" className="flex items-center justify-between rounded-3xl border border-[#e4ebe8] bg-white p-5 text-left shadow-sm">
-          <span className="flex items-center gap-3 text-[#183f32]">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#a7ecc6]">
-                <FiCreditCard size={22} />
-            </span>
-            <span>
-              <span className="block text-xl font-semibold">Payout Settings</span>
-                <span className="block text-base text-[#60706a]">Linked to bank account</span>
-            </span>
-          </span>
-          <span className="text-3xl text-[#8ea59d]">›</span>
-        </button>
-
-        <button type="button" className="flex items-center justify-between rounded-3xl border border-[#e4ebe8] bg-white p-5 text-left shadow-sm">
-          <span className="flex items-center gap-3 text-[#183f32]">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#a7ecc6]">
-              <FiShield size={22} />
-            </span>
-            <span>
-                <span className="block text-xl font-semibold">Security & PIN</span>
-                <span className="block text-base text-[#60706a]">Last updated recently</span>
-            </span>
-          </span>
-          <span className="text-3xl text-[#8ea59d]">›</span>
-        </button>
       </section>
     </DeliveryPageLayout>
   );
