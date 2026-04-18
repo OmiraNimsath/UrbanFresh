@@ -158,11 +158,23 @@ function ProductCard({ product, showExpiry = false }) {
     >
       {/* Product image or placeholder */}
       {product.imageUrl ? (
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          className="h-36 w-full object-cover sm:h-44"
-        />
+        <>
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="h-36 w-full object-cover sm:h-44"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling.style.display = 'flex';
+            }}
+          />
+          <div
+            style={{ display: 'none' }}
+            className="h-36 w-full items-center justify-center bg-[#e8f1eb] text-4xl text-[#6f8f80] sm:h-44"
+          >
+            🥦
+          </div>
+        </>
       ) : (
         <div className="flex h-36 w-full items-center justify-center bg-[#e8f1eb] text-4xl text-[#6f8f80] sm:h-44">
           🥦

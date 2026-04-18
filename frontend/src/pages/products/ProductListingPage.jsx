@@ -287,11 +287,23 @@ function ProductCard({ product }) {
       className="group overflow-hidden rounded-2xl border border-[#dde3df] bg-white transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_24px_rgba(14,54,37,0.12)]"
     >
       {product.imageUrl ? (
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          className="h-36 w-full object-cover transition-opacity group-hover:opacity-95 sm:h-44"
-        />
+        <>
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="h-36 w-full object-cover transition-opacity group-hover:opacity-95 sm:h-44"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling.style.display = 'flex';
+            }}
+          />
+          <div
+            style={{ display: 'none' }}
+            className="h-36 w-full items-center justify-center bg-[#e8f1eb] text-4xl text-[#6f8f80] sm:h-44"
+          >
+            🥦
+          </div>
+        </>
       ) : (
         <div className="flex h-36 w-full items-center justify-center bg-[#e8f1eb] text-4xl text-[#6f8f80] sm:h-44">
           🥦

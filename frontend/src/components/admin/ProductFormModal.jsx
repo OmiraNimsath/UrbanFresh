@@ -118,8 +118,8 @@ export default function ProductFormModal({ product, brands, onSubmit, onClose, l
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/35 px-4 py-8 backdrop-blur-sm">
-      <div className="my-auto w-full max-w-md rounded-2xl border border-[#e4ebe8] bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/35 px-2 pb-0 pt-4 backdrop-blur-sm sm:items-start sm:px-4 sm:py-8">
+      <div className="my-auto w-full max-w-md rounded-t-2xl border border-[#e4ebe8] bg-white shadow-xl sm:rounded-2xl">
         <div className="flex items-start justify-between border-b border-[#edf2ef] px-6 pb-4 pt-5">
           <div>
             <h2 className="text-base font-semibold text-slate-900">{isEdit ? 'Edit Product' : 'Create Product'}</h2>
@@ -137,7 +137,7 @@ export default function ProductFormModal({ product, brands, onSubmit, onClose, l
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="max-h-[75vh] space-y-4 overflow-y-auto px-6 py-5">
+        <form onSubmit={handleSubmit} className="max-h-[70dvh] space-y-4 overflow-y-auto px-6 py-5 sm:max-h-[75vh]">
           <Field label="PRODUCT NAME">
             <input
               name="name"

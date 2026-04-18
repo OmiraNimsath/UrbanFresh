@@ -38,6 +38,8 @@ const DeliveryOrderHistoryPage = lazy(() => import('./pages/delivery/DeliveryOrd
 const DeliveryOrderDetailsPage = lazy(() => import('./pages/delivery/DeliveryOrderDetailsPage'));
 const DeliveryProfilePage = lazy(() => import('./pages/delivery/DeliveryProfilePage'));
 const UnauthorizedPage = lazy(() => import('./pages/error/UnauthorizedPage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
 
 /**
  * App – Root component.
@@ -65,6 +67,8 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
 
           {/* ── Protected customer routes ── */}
           <Route

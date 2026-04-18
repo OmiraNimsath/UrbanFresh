@@ -10,7 +10,7 @@ import Footer from '../Footer';
 export default function AuthShell({ title, subtitle, children }) {
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#e2e5e3] text-[#123e2f]">
-      <div className="pointer-events-none absolute inset-0 md:hidden" aria-hidden="true">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden md:hidden" aria-hidden="true">
         <div className="absolute -left-20 top-32 h-72 w-72 rounded-full bg-[#9ff3ca]/45 blur-3xl" />
         <div className="absolute -right-20 top-16 h-80 w-80 rounded-full bg-[#abf7d1]/40 blur-3xl" />
         <div className="absolute -left-24 bottom-24 h-72 w-72 rounded-full bg-[#bbffd9]/35 blur-3xl" />
