@@ -1,0 +1,185 @@
+package com.urbanfresh.service.impl;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.urbanfresh.dto.response.WasteMonthSummaryResponse;
+import com.urbanfresh.dto.response.WasteReportResponse;
+import com.urbanfresh.dto.response.WastedProductResponse;
+import com.urbanfresh.model.Brand;
+import com.urbanfresh.model.WasteRecord;
+import com.urbanfresh.repository.ProductRepository;
+import com.urbanfresh.repository.WasteRecordRepository;
+import com.urbanfresh.service.WasteReportService;
+
+import lombok.RequiredArgsConstructor;
+
+/**
+ * Waste Report Service Implementation
+ * Layer: Service (Business Logic)
+ * Fetches all approved products that expired with remaining stock in a single DB query,
+ * then computes monthly summaries and ranks the top wasted products entirely in-memory
+ * to avoid multiple round-trips.
+ */
+@Service
+@RequiredArgsConstructor
+public class WasteReportServiceImpl implements WasteReportService {
+
+    /** Maximum number of products shown in the "top wasted" ranking. */
+    private static final int TOP_WASTED_LIMIT = 10;
+
+    /** Scale used for all BigDecimal division operations. */
+    private static final int SCALE = 2;
+
+    /** Formatter for ISO year-month keys used in grouping (e.g. "2026-01"). */
+    private static final DateTimeFormatter MONTH_KEY_FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM");
+
+    /** Formatter for human-readable month labels on chart axes (e.g. "Jan 2026"). */
+    private static final DateTimeFormatter MONTH_LABEL_FMT =
+            DateTimeFormatter.ofPattern("MMM yyyy");
+
+    private final ProductRepository productRepository;
+    private final WasteRecordRepository wasteRecordRepository;
+
+    /**
+     * Builds the full waste report.
+     * Steps:
+     *  1. Load all APPROVED products with expiryDate < today and stockQuantity > 0.
+     *  2. Map each to a WastedProductResponse (wasteValue = price × wastedQuantity).
+     *  3. Compute total waste value and total wasted units.
+     *  4. Group by month and compute per-month summaries with waste percentages.
+     *  5. Rank all wasted products by wastedValue DESC; take top-10.
+     *  6. Compute overall waste % against total approved inventory value.
+     *
+     * @return WasteReportResponse fully populated report
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public WasteReportResponse getWasteReport() {
+        // Read from the waste_records audit table — written by BatchExpiryScheduler
+        // at the moment each batch is expired, so stock quantity is irrelevant here.
+        List<WasteRecord> records = wasteRecordRepository.findAllByOrderByExpiryDateAsc();
+
+        List<WastedProductResponse> wastedProducts = records.stream()
+                .map(this::toWastedProductResponse)
+                .collect(Collectors.toList());
+
+        BigDecimal totalWasteValue = wastedProducts.stream()
+                .map(WastedProductResponse::getWastedValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        int totalWastedUnits = wastedProducts.stream()
+                .mapToInt(WastedProductResponse::getWastedQuantity)
+                .sum();
+
+        List<WasteMonthSummaryResponse> monthlySummaries =
+                buildMonthlySummaries(wastedProducts, totalWasteValue);
+
+        List<WastedProductResponse> topWasted = wastedProducts.stream()
+                .sorted(Comparator.comparing(WastedProductResponse::getWastedValue).reversed())
+                .limit(TOP_WASTED_LIMIT)
+                .collect(Collectors.toList());
+
+        return WasteReportResponse.builder()
+                .totalWasteValue(totalWasteValue)
+                .totalWastedUnits(totalWastedUnits)
+                .monthlySummaries(monthlySummaries)
+                .topWastedProducts(topWasted)
+                .generatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    // ── Private helpers ────────────────────────────────────────────────────────
+
+    /** Maps a WasteRecord to WastedProductResponse using the snapshotted waste data. */
+    private WastedProductResponse toWastedProductResponse(WasteRecord record) {
+        Brand brand = record.getProduct().getBrand();
+        String monthYear = record.getExpiryDate().format(MONTH_KEY_FMT);
+        BigDecimal wastedValue = record.getWastedValue()
+                .setScale(SCALE, RoundingMode.HALF_UP);
+
+        return new WastedProductResponse(
+                record.getProduct().getId(),
+                record.getProduct().getName(),
+                record.getProduct().getCategory(),
+                brand != null ? brand.getName() : null,
+                record.getPricePerUnit(),
+                record.getProduct().getUnit(),
+                record.getWastedQuantity(),
+                wastedValue,
+                record.getExpiryDate(),
+                monthYear
+        );
+    }
+
+    /**
+     * Groups wasted products by their monthYear key and builds a sorted summary list.
+     * Each month's wastePercentage is this month's share of the ALL-TIME total waste value
+     * (not a percentage of inventory consumed). A value of 60% means 60% of all recorded
+     * waste occurred in that month, not that 60% of that month's inventory was wasted.
+     * Months are sorted chronologically (oldest first) for chart display.
+     *
+     * @param wastedProducts  all wasted product rows
+     * @param totalWasteValue grand total to use as percentage denominator
+     * @return list of WasteMonthSummaryResponse sorted by monthYear ASC
+     */
+    private List<WasteMonthSummaryResponse> buildMonthlySummaries(
+            List<WastedProductResponse> wastedProducts,
+            BigDecimal totalWasteValue) {
+
+        // Group by "yyyy-MM" key so months are correctly ordered lexicographically
+        Map<String, List<WastedProductResponse>> byMonth = wastedProducts.stream()
+                .collect(Collectors.groupingBy(WastedProductResponse::getMonthYear));
+
+        return byMonth.entrySet().stream()
+                .map(entry -> {
+                    String key = entry.getKey();
+                    List<WastedProductResponse> monthly = entry.getValue();
+
+                    BigDecimal monthWasteValue = monthly.stream()
+                            .map(WastedProductResponse::getWastedValue)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    double wastePercentage = computePercentage(monthWasteValue, totalWasteValue);
+
+                    // Convert "yyyy-MM" key to human-readable label "MMM yyyy"
+                    String monthLabel = LocalDate.parse(key + "-01").format(MONTH_LABEL_FMT);
+
+                    return new WasteMonthSummaryResponse(
+                            key,
+                            monthLabel,
+                            monthWasteValue,
+                            monthly.size(),
+                            wastePercentage
+                    );
+                })
+                // Lexicographic sort on "yyyy-MM" is identical to chronological order
+                .sorted(Comparator.comparing(WasteMonthSummaryResponse::getMonthYear))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Computes (numerator / denominator) × 100, rounded to 2 decimal places.
+     * Returns 0.0 when denominator is zero to prevent ArithmeticException.
+     */
+    private double computePercentage(BigDecimal numerator, BigDecimal denominator) {
+        if (denominator.compareTo(BigDecimal.ZERO) == 0) {
+            return 0.0;
+        }
+        return numerator
+                .multiply(BigDecimal.valueOf(100))
+                .divide(denominator, SCALE, RoundingMode.HALF_UP)
+                .doubleValue();
+    }
+}

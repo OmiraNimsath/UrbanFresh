@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { FiArrowRight, FiCircle, FiEye, FiEyeOff, FiUser, FiMail, FiCheckCircle } from 'react-icons/fi';
 import { registerCustomer } from '../../services/authService';
+import AuthShell from '../../components/auth/AuthShell';
+import { getApiErrorMessage } from '../../utils/errorMessageUtils';
 
 /**
  * Presentation Layer – Customer registration form.
@@ -77,9 +80,9 @@ export default function RegisterPage() {
         // Map backend field-level validation errors back to the form
         setFieldErrors(data.errors);
       } else if (status === 409) {
-        setFieldErrors({ email: data?.message || 'Email already registered' });
+        setFieldErrors({ email: getApiErrorMessage(err, 'Email already registered') });
       } else {
-        toast.error('Something went wrong. Please try again.');
+        toast.error(getApiErrorMessage(err));
       }
     } finally {
       setLoading(false);
@@ -89,148 +92,161 @@ export default function RegisterPage() {
   const passwordStrengthCount = PASSWORD_RULES.filter((r) => r.test(form.password)).length;
 
   return (
-    <div className="min-h-screen bg-green-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-md p-8">
-
-        {/* Header */}
-        <div className="mb-6 text-center">
-          <h1 className="text-3xl font-bold text-green-700">UrbanFresh</h1>
-          <p className="text-gray-500 text-sm mt-1">Create your account</p>
-        </div>
-
-        <form onSubmit={handleSubmit} noValidate className="space-y-4">
-
-          {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name <span className="text-red-500">*</span>
-            </label>
+    <AuthShell title="Create your account" subtitle="Join the digital greenhouse for premium produce.">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <div>
+          <label htmlFor="register-name" className="mb-1.5 block text-[14px] font-semibold text-[#3f5049]">
+            Full Name
+          </label>
+          <div className="relative">
             <input
+              id="register-name"
               type="text"
               name="name"
               value={form.name}
               onChange={handleChange}
-              placeholder="Jane Doe"
-              className={`w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 ${
-                fieldErrors.name ? 'border-red-400' : 'border-gray-300'
+              placeholder="Enter your full name"
+              className={`h-12 w-full rounded-[10px] border px-4 pr-11 text-[15px] text-[#21372f] placeholder:text-[#8d9893] outline-none transition ${
+                fieldErrors.name
+                  ? 'border-[#cf5252] bg-[#f6d3d0]'
+                  : 'border-transparent bg-[#d8ddda] focus:border-[#9fb6ac]'
               }`}
             />
-            {fieldErrors.name && (
-              <p className="text-red-500 text-xs mt-1">{fieldErrors.name}</p>
-            )}
+            <FiUser
+              className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8a9590]"
+              size={17}
+              aria-hidden="true"
+            />
           </div>
+          {fieldErrors.name && <p className="mt-1 text-[12px] text-[#b22c2c]">{fieldErrors.name}</p>}
+        </div>
 
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email <span className="text-red-500">*</span>
-            </label>
+        <div>
+          <label htmlFor="register-email" className="mb-1.5 block text-[14px] font-semibold text-[#3f5049]">
+            Email Address
+          </label>
+          <div className="relative">
             <input
+              id="register-email"
               type="email"
               name="email"
               value={form.email}
               onChange={handleChange}
-              placeholder="jane@example.com"
-              className={`w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 ${
-                fieldErrors.email ? 'border-red-400' : 'border-gray-300'
+              placeholder="you@example.com"
+              className={`h-12 w-full rounded-[10px] border px-4 pr-11 text-[15px] text-[#21372f] placeholder:text-[#8d9893] outline-none transition ${
+                fieldErrors.email
+                  ? 'border-[#cf5252] bg-[#f6d3d0]'
+                  : 'border-transparent bg-[#d8ddda] focus:border-[#9fb6ac]'
               }`}
             />
-            {fieldErrors.email && (
-              <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>
-            )}
+            <FiMail
+              className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8a9590]"
+              size={17}
+              aria-hidden="true"
+            />
           </div>
+          {fieldErrors.email && <p className="mt-1 text-[12px] text-[#b22c2c]">{fieldErrors.email}</p>}
+        </div>
 
-          {/* Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                value={form.password}
-                onChange={handleChange}
-                placeholder="Min. 8 characters"
-                className={`w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 pr-16 ${
-                  fieldErrors.password ? 'border-red-400' : 'border-gray-300'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-green-600"
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
-            {fieldErrors.password && (
-              <p className="text-red-500 text-xs mt-1">{fieldErrors.password}</p>
-            )}
-
-            {/* Password strength checklist — shown while typing */}
-            {form.password.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {/* Strength bar */}
-                <div className="flex gap-1">
-                  {PASSWORD_RULES.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-1 flex-1 rounded ${
-                        i < passwordStrengthCount ? 'bg-green-500' : 'bg-gray-200'
-                      }`}
-                    />
-                  ))}
-                </div>
-                {PASSWORD_RULES.map((rule) => (
-                  <p
-                    key={rule.label}
-                    className={`text-xs ${rule.test(form.password) ? 'text-green-600' : 'text-gray-400'}`}
-                  >
-                    {rule.test(form.password) ? '✓' : '○'} {rule.label}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Phone (optional) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone <span className="text-gray-400 text-xs">(optional)</span>
-            </label>
+        <div>
+          <label htmlFor="register-password" className="mb-1.5 block text-[14px] font-semibold text-[#3f5049]">
+            Password
+          </label>
+          <div className="relative">
             <input
+              id="register-password"
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              value={form.password}
+              onChange={handleChange}
+              placeholder="Create a strong password"
+              className={`h-12 w-full rounded-[10px] border px-4 pr-11 text-[15px] text-[#21372f] placeholder:text-[#8d9893] outline-none transition ${
+                fieldErrors.password
+                  ? 'border-[#cf5252] bg-[#f6d3d0]'
+                  : 'border-transparent bg-[#d8ddda] focus:border-[#9fb6ac]'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7f8d86] hover:text-[#355748]"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <FiEyeOff size={17} /> : <FiEye size={17} />}
+            </button>
+          </div>
+          {fieldErrors.password && <p className="mt-1 text-[12px] text-[#b22c2c]">{fieldErrors.password}</p>}
+
+          {form.password.length > 0 && (
+            <div className="mt-2.5 space-y-2">
+              <div className="h-1.5 w-full overflow-hidden rounded bg-[#cfd6d2]">
+                <div
+                  className="h-full rounded bg-[#cb2424] transition-all"
+                  style={{ width: `${(passwordStrengthCount / PASSWORD_RULES.length) * 100}%` }}
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-1 text-[12px] sm:grid-cols-2 sm:gap-x-3">
+                {PASSWORD_RULES.map((rule) => {
+                  const passed = rule.test(form.password);
+                  return (
+                    <p
+                      key={rule.label}
+                      className={`inline-flex items-center gap-1.5 ${passed ? 'text-[#67746e]' : 'text-[#b22c2c]'}`}
+                    >
+                      {passed ? <FiCheckCircle size={12} aria-hidden="true" /> : <FiCircle size={11} aria-hidden="true" />}
+                      {rule.label}
+                    </p>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label htmlFor="register-phone" className="block text-[14px] font-semibold text-[#3f5049]">
+              Phone Number
+            </label>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8a9590]">Optional</span>
+          </div>
+          <div className="flex gap-2.5">
+            <div className="inline-flex h-12 w-18 items-center justify-center rounded-[10px] bg-[#d8ddda] text-[15px] font-semibold text-[#51645c]">
+              +94
+            </div>
+            <input
+              id="register-phone"
               type="tel"
               name="phone"
               value={form.phone}
               onChange={handleChange}
-              placeholder="10–15 digits"
-              className={`w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 ${
-                fieldErrors.phone ? 'border-red-400' : 'border-gray-300'
+              placeholder="98765 43210"
+              className={`h-12 flex-1 rounded-[10px] border px-4 text-[15px] text-[#21372f] placeholder:text-[#8d9893] outline-none transition ${
+                fieldErrors.phone
+                  ? 'border-[#cf5252] bg-[#f6d3d0]'
+                  : 'border-transparent bg-[#d8ddda] focus:border-[#9fb6ac]'
               }`}
             />
-            {fieldErrors.phone && (
-              <p className="text-red-500 text-xs mt-1">{fieldErrors.phone}</p>
-            )}
           </div>
+          {fieldErrors.phone && <p className="mt-1 text-[12px] text-[#b22c2c]">{fieldErrors.phone}</p>}
+        </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
-          >
-            {loading ? 'Creating account...' : 'Create Account'}
-          </button>
-        </form>
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[10px] bg-linear-to-r from-[#014d31] to-[#18553f] text-[17px] font-semibold text-white shadow-[0_10px_18px_rgba(1,77,49,0.22)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <span>{loading ? 'Creating account...' : 'Create account'}</span>
+          <FiArrowRight size={17} aria-hidden="true" />
+        </button>
+      </form>
 
-        <p className="text-center text-sm text-gray-500 mt-5">
-          Already have an account?{' '}
-          <Link to="/login" className="text-green-600 hover:underline font-medium">
-            Sign in
-          </Link>
-        </p>
-      </div>
-    </div>
+      <p className="mt-6 text-center text-[14px] text-[#586964]">
+        Already have an account?{' '}
+        <Link to="/login" className="font-semibold text-[#1a4a39] hover:underline">
+          Log In
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

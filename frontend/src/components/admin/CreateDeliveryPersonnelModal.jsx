@@ -133,20 +133,32 @@ export default function CreateDeliveryPersonnelModal({
   }, [isEditMode, isViewMode]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-10 backdrop-blur-sm sm:pt-14">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        <div className="border-b border-slate-200 px-6 py-4">
-          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {isViewMode
-              ? 'View account information and operational metadata.'
-              : 'Capture account details and operational readiness settings.'}
-          </p>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/35 p-4 pt-10 backdrop-blur-sm sm:pt-14">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#e4ebe8] bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-[#edf2f0] px-6 py-4">
+          <div>
+            <h2 className="text-xl font-bold text-[#153a30]">{title}</h2>
+            <p className="mt-1 text-sm text-[#6f817b]">
+              {isViewMode
+                ? 'View account information and operational metadata.'
+                : 'Capture account details and operational readiness settings.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#6f817b] transition hover:bg-[#f2f7f5]"
+            aria-label="Close delivery personnel modal"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
           <div>
-            <label htmlFor="name" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="name" className="mb-1 block text-sm font-medium text-[#425d55]">
               Name *
             </label>
             <input
@@ -157,17 +169,17 @@ export default function CreateDeliveryPersonnelModal({
               onChange={handleChange}
               disabled={isViewMode || isEditMode}
               placeholder="e.g. John Doe"
-              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+              className={`h-10 w-full rounded-xl border px-3 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-[#eef3f1] ${
                 errors.name
-                  ? 'border-red-500 focus:ring-red-300'
-                  : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                  ? 'border-[#e5a6ad] focus:ring-[#f2cccc]'
+                  : 'border-[#d6e0dc] bg-[#f5f8f7] text-[#28433b] focus:border-[#0d4a38] focus:ring-[#d8eae3]'
               }`}
             />
-            {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+            {errors.name && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.name}</p>}
           </div>
 
           <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-[#425d55]">
               Email *
             </label>
             <input
@@ -178,19 +190,19 @@ export default function CreateDeliveryPersonnelModal({
               onChange={handleChange}
               disabled={isViewMode || isEditMode}
               placeholder="e.g. john@delivery.com"
-              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+              className={`h-10 w-full rounded-xl border px-3 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-[#eef3f1] ${
                 errors.email
-                  ? 'border-red-500 focus:ring-red-300'
-                  : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                  ? 'border-[#e5a6ad] focus:ring-[#f2cccc]'
+                  : 'border-[#d6e0dc] bg-[#f5f8f7] text-[#28433b] focus:border-[#0d4a38] focus:ring-[#d8eae3]'
               }`}
             />
-            {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+            {errors.email && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.email}</p>}
           </div>
 
           {!isEditMode && !isViewMode && (
             <>
               <div>
-                <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
+                <label htmlFor="password" className="mb-1 block text-sm font-medium text-[#425d55]">
                   Password *
                 </label>
                 <input
@@ -200,23 +212,23 @@ export default function CreateDeliveryPersonnelModal({
                   value={form.password}
                   onChange={handleChange}
                   placeholder="At least 8 characters"
-                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  className={`h-10 w-full rounded-xl border px-3 text-sm focus:outline-none focus:ring-2 ${
                     errors.password
-                      ? 'border-red-500 focus:ring-red-300'
-                      : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                      ? 'border-[#e5a6ad] focus:ring-[#f2cccc]'
+                      : 'border-[#d6e0dc] bg-[#f5f8f7] text-[#28433b] focus:border-[#0d4a38] focus:ring-[#d8eae3]'
                   }`}
                 />
                 {form.password && (
                   <div className="mt-2 flex items-center gap-2">
                     <div className={`h-2 w-16 rounded ${getPasswordStrengthColor()}`} />
-                    <span className="text-xs font-semibold text-slate-600">{getPasswordStrengthLabel()}</span>
+                    <span className="text-xs font-semibold text-[#6f817b]">{getPasswordStrengthLabel()}</span>
                   </div>
                 )}
-                {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
+                {errors.password && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.password}</p>}
               </div>
 
               <div>
-                <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-slate-700">
+                <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-[#425d55]">
                   Confirm Password *
                 </label>
                 <input
@@ -226,20 +238,20 @@ export default function CreateDeliveryPersonnelModal({
                   value={form.confirmPassword}
                   onChange={handleChange}
                   placeholder="Repeat password"
-                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  className={`h-10 w-full rounded-xl border px-3 text-sm focus:outline-none focus:ring-2 ${
                     errors.confirmPassword
-                      ? 'border-red-500 focus:ring-red-300'
-                      : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                      ? 'border-[#e5a6ad] focus:ring-[#f2cccc]'
+                      : 'border-[#d6e0dc] bg-[#f5f8f7] text-[#28433b] focus:border-[#0d4a38] focus:ring-[#d8eae3]'
                   }`}
                 />
-                {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
+                {errors.confirmPassword && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.confirmPassword}</p>}
               </div>
             </>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="phone" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="phone" className="mb-1 block text-sm font-medium text-[#425d55]">
                 Phone
               </label>
               <input
@@ -250,18 +262,18 @@ export default function CreateDeliveryPersonnelModal({
                 onChange={handleChange}
                 disabled={isViewMode || isEditMode}
                 placeholder="10-15 digits"
-                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+                className={`h-10 w-full rounded-xl border px-3 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-[#eef3f1] ${
                   errors.phone
-                    ? 'border-red-500 focus:ring-red-300'
-                    : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                    ? 'border-[#e5a6ad] focus:ring-[#f2cccc]'
+                    : 'border-[#d6e0dc] bg-[#f5f8f7] text-[#28433b] focus:border-[#0d4a38] focus:ring-[#d8eae3]'
                 }`}
               />
-              {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
+              {errors.phone && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.phone}</p>}
             </div>
           </div>
 
           <div>
-            <label htmlFor="status" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="status" className="mb-1 block text-sm font-medium text-[#425d55]">
               Status *
             </label>
             <select
@@ -270,30 +282,30 @@ export default function CreateDeliveryPersonnelModal({
               value={form.status}
               onChange={handleChange}
               disabled={isViewMode}
-              className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+              className={`h-10 w-full rounded-xl border px-3 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-[#eef3f1] ${
                 errors.status
-                  ? 'border-red-500 focus:ring-red-300'
-                  : 'border-slate-300 focus:border-green-500 focus:ring-green-200'
+                  ? 'border-[#e5a6ad] focus:ring-[#f2cccc]'
+                  : 'border-[#d6e0dc] bg-[#f5f8f7] text-[#28433b] focus:border-[#0d4a38] focus:ring-[#d8eae3]'
               }`}
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-            {errors.status && <p className="mt-1 text-xs text-red-600">{errors.status}</p>}
+            {errors.status && <p className="mt-1 text-xs text-[#ba3a3a]">{errors.status}</p>}
           </div>
 
           {isEditMode && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Core account fields are read-only because update APIs are not available yet. You can still update active or inactive status.
+            <div className="rounded-lg border border-[#cde8d8] bg-[#eaf5ef] px-3 py-2 text-xs text-[#2f7f5f]">
+              Personal details (Name, Email, Phone) are read-only in edit mode. Contact regional HQ to modify core profile credentials.
             </div>
           )}
         </form>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-[#edf2f0] bg-[#f8fbf9] px-6 py-4">
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+            className="rounded-lg border border-[#d5dfdb] bg-white px-4 py-2 text-sm font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-60"
           >
             {isViewMode ? 'Close' : 'Cancel'}
           </button>
@@ -301,7 +313,7 @@ export default function CreateDeliveryPersonnelModal({
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-[#0d4a38] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a2c] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? 'Saving...' : isEditMode ? 'Update Status' : 'Create Account'}
             </button>

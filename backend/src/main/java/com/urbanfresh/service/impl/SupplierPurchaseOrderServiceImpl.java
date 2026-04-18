@@ -1,19 +1,24 @@
 package com.urbanfresh.service.impl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.urbanfresh.dto.request.UpdatePurchaseOrderStatusDto;
+import com.urbanfresh.dto.request.UpdatePurchaseOrderStatusDto.ItemBatchData;
 import com.urbanfresh.dto.response.PurchaseOrderDto;
 import com.urbanfresh.dto.response.PurchaseOrderItemDto;
 import com.urbanfresh.exception.PurchaseOrderAccessException;
 import com.urbanfresh.exception.PurchaseOrderNotFoundException;
 import com.urbanfresh.model.Brand;
 import com.urbanfresh.model.PurchaseOrder;
+import com.urbanfresh.model.PurchaseOrderItem;
+import com.urbanfresh.model.PurchaseOrderStatus;
 import com.urbanfresh.model.SupplierBrand;
+import com.urbanfresh.repository.PurchaseOrderItemRepository;
 import com.urbanfresh.repository.PurchaseOrderRepository;
 import com.urbanfresh.repository.SupplierBrandRepository;
 import com.urbanfresh.service.SupplierPurchaseOrderService;
@@ -31,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SupplierPurchaseOrderServiceImpl implements SupplierPurchaseOrderService {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
+    private final PurchaseOrderItemRepository purchaseOrderItemRepository;
     private final SupplierBrandRepository supplierBrandRepository;
     private final com.urbanfresh.repository.UserRepository userRepository;
 
@@ -73,6 +79,31 @@ public class SupplierPurchaseOrderServiceImpl implements SupplierPurchaseOrderSe
         }
         if (updateDto.getRejectionReason() != null) {
             order.setRejectionReason(updateDto.getRejectionReason());
+        }
+
+        // If marking as DELIVERED, persist any batch metadata the supplier provided per item
+        if (updateDto.getStatus() == PurchaseOrderStatus.DELIVERED
+                && updateDto.getItems() != null && !updateDto.getItems().isEmpty()) {
+            Map<Long, ItemBatchData> batchMap = updateDto.getItems().stream()
+                    .filter(i -> i.getItemId() != null)
+                    .collect(Collectors.toMap(ItemBatchData::getItemId, i -> i));
+
+            for (PurchaseOrderItem item : order.getItems()) {
+                ItemBatchData data = batchMap.get(item.getId());
+                if (data != null) {
+                    if (data.getBatchNumber() != null && !data.getBatchNumber().isBlank()) {
+                        item.setBatchNumber(data.getBatchNumber());
+                    }
+                    if (data.getManufacturingDate() != null) {
+                        item.setManufacturingDate(data.getManufacturingDate());
+                    }
+                    if (data.getSupplierExpiryDate() != null) {
+                        item.setSupplierExpiryDate(data.getSupplierExpiryDate());
+                    }
+                    purchaseOrderItemRepository.save(item);
+                }
+            }
+            log.info("Supplier saved batch metadata for {} items on PO ID {}", batchMap.size(), orderId);
         }
 
         PurchaseOrder updatedOrder = purchaseOrderRepository.save(order);
@@ -131,6 +162,9 @@ public class SupplierPurchaseOrderServiceImpl implements SupplierPurchaseOrderSe
                         .productName(item.getProduct().getName())
                         .quantity(item.getQuantity())
                         .unitPrice(item.getUnitPrice())
+                    .batchNumber(item.getBatchNumber())
+                    .manufacturingDate(item.getManufacturingDate())
+                    .supplierExpiryDate(item.getSupplierExpiryDate())
                         .build())
                 .collect(Collectors.toList());
 

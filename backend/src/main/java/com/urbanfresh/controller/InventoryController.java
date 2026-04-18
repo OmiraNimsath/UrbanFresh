@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.urbanfresh.dto.request.InventoryUpdateRequest;
+import com.urbanfresh.dto.response.BatchResponse;
 import com.urbanfresh.dto.response.InventoryResponse;
 import com.urbanfresh.service.InventoryService;
 
@@ -60,5 +61,17 @@ public class InventoryController {
             Authentication auth) {
         return ResponseEntity.ok(
                 inventoryService.updateInventory(productId, request, auth.getName()));
+    }
+
+    /**
+     * Returns all batches for a product ordered by expiry date (oldest first).
+     * Allows admin to inspect batch composition and identify near-expiry batches.
+     *
+     * @param productId product ID whose batches to list
+     * @return 200 OK with list of BatchResponse
+     */
+    @GetMapping("/{productId}/batches")
+    public ResponseEntity<List<BatchResponse>> getProductBatches(@PathVariable Long productId) {
+        return ResponseEntity.ok(inventoryService.getProductBatches(productId));
     }
 }

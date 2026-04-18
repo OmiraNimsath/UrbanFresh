@@ -63,6 +63,22 @@ public class Order {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
+    /**
+     * Discount applied via loyalty point redemption (Rs. 5 per point redeemed).
+     * Zero when no points were used. totalAmount already reflects this deduction.
+     */
+    @Column(nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    /**
+     * Number of loyalty points redeemed on this order.
+     * Zero when no points were used.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private int pointsRedeemed = 0;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)

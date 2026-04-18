@@ -83,7 +83,7 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <form onSubmit={handleFormSubmit} className="relative flex flex-1 gap-2">
+    <form onSubmit={handleFormSubmit} className="relative flex w-full flex-1 gap-2">
       <div className="relative flex-1">
         <input
           ref={inputRef}
@@ -98,14 +98,14 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
           aria-label="Search products"
           aria-autocomplete="list"
           aria-expanded={showDropdown}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          className="h-10 w-full rounded-lg border border-[#dce3de] bg-white px-3 text-sm text-[#1b2d25] placeholder:text-[#8a9690] focus:outline-none focus:ring-2 focus:ring-[#9ac8b1]"
         />
 
         {/* Rich suggestions dropdown */}
         {showDropdown && (
           <ul
             role="listbox"
-            className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
+            className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-[#dce3de] bg-white shadow-xl"
           >
             {suggestions.map((suggestion, idx) => (
               <SuggestionItem
@@ -122,7 +122,7 @@ export default function SearchBar({ value, onChange, onCommit, placeholder = 'Se
 
       <button
         type="submit"
-        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+        className="h-10 rounded-lg bg-[#0f5b3f] px-4 text-sm font-medium text-white transition-colors hover:bg-[#0a4831]"
       >
         Search
       </button>
@@ -151,12 +151,12 @@ function SuggestionItem({ suggestion, highlighted, onMouseDown, onMouseEnter }) 
       aria-selected={highlighted}
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
-      className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
-        highlighted ? 'bg-green-50' : 'hover:bg-gray-50'
+      className={`flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors ${
+        highlighted ? 'bg-[#ebf4ef]' : 'hover:bg-[#f4f7f5]'
       }`}
     >
       {/* Thumbnail */}
-      <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-green-100 flex items-center justify-center">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#e8f0eb]">
         {suggestion.imageUrl ? (
           <img
             src={suggestion.imageUrl}
@@ -171,19 +171,19 @@ function SuggestionItem({ suggestion, highlighted, onMouseDown, onMouseEnter }) 
       {/* Text */}
       <div className="flex flex-col min-w-0 flex-1">
         <span
-          className={`text-sm font-medium truncate ${
-            highlighted ? 'text-green-800' : 'text-gray-800'
+          className={`truncate text-sm font-medium ${
+            highlighted ? 'text-[#1f5a42]' : 'text-[#22352d]'
           }`}
         >
           {suggestion.name}
         </span>
-        <span className="text-xs text-green-600 font-semibold mt-0.5">
+        <span className="mt-0.5 text-xs font-semibold text-[#2f7757]">
           {formatPrice(suggestion.price, suggestion.unit)}
         </span>
       </div>
 
       {/* Chevron hint */}
-      <span className="text-gray-300 text-xs shrink-0">↵</span>
+      <span className="shrink-0 text-xs text-[#9aa8a1]">↵</span>
     </li>
   );
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import Breadcrumbs from '../../components/customer/Breadcrumbs';
 import { getProducts, getCategories } from '../../services/productService';
 import Navbar from '../../components/Navbar';
 import SearchBar from '../../components/SearchBar';
-import { formatPrice } from '../../utils/priceUtils';
+import Footer from '../../components/Footer';
+import { formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
 
 /**
  * Page Layer – Public product listing page.
@@ -42,9 +44,17 @@ export default function ProductListingPage() {
   const prevCommittedRef = useRef(committedSearch);
   useEffect(() => {
     if (committedSearch !== prevCommittedRef.current) {
-      setInputValue(committedSearch);
+      const syncTimer = window.setTimeout(() => {
+        setInputValue(committedSearch);
+      }, 0);
       prevCommittedRef.current = committedSearch;
+
+      return () => {
+        window.clearTimeout(syncTimer);
+      };
     }
+
+    return undefined;
   }, [committedSearch]);
 
   const [result, setResult]         = useState(null);   // ProductPageResponse
@@ -63,12 +73,36 @@ export default function ProductListingPage() {
   // inputValue is intentionally absent from this dependency array.
   // Typing updates inputValue only; the fetch only fires when the URL changes.
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    getProducts({ search: committedSearch, category, sortBy, page, size: 12 })
-      .then(setResult)
-      .catch(() => setError('Could not load products. Please try again.'))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    Promise.resolve()
+      .then(() => {
+        if (cancelled) return null;
+
+        setLoading(true);
+        setError(null);
+
+        return getProducts({ search: committedSearch, category, sortBy, page, size: 8 });
+      })
+      .then((data) => {
+        if (!cancelled && data) {
+          setResult(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Could not load products. Please try again.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [committedSearch, category, sortBy, page]);
 
   // ── URL mutation helpers ────────────────────────────────────────────────────
@@ -115,15 +149,25 @@ export default function ProductListingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f3f4f3] flex flex-col text-[#14261f]">
       {/* ── Navigation (auth-aware via shared Navbar) ── */}
       <Navbar />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">All Products</h1>
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-10">
+        <Breadcrumbs
+          items={[
+            { label: 'Home', to: '/' },
+            { label: 'Products', to: '/products' },
+            { label: 'Shop All' },
+          ]}
+        />
+        <h1 className="text-5xl font-medium leading-[1.02] text-[#183127]">The Fresh Market</h1>
+        <p className="mt-3 max-w-xl text-sm leading-6 text-[#6b7c74]">
+          Hand-picked seasonal fruits and vegetables from local farms. Find what you need quickly and filter by value.
+        </p>
 
         {/* ── Search + Filter + Sort bar ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-col sm:flex-row gap-3">
+        <div className="mt-6 mb-6 flex flex-col gap-3 rounded-2xl border border-[#dce3de] bg-white p-4 sm:flex-row sm:items-center">
           {/* Search — uses SearchBar which keeps inputValue separate from the fetch */}
           <SearchBar
             value={inputValue}
@@ -135,7 +179,7 @@ export default function ProductListingPage() {
           <select
             value={category}
             onChange={(e) => handleCategoryChange(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+            className="h-10 rounded-lg border border-[#dce3de] bg-white px-3 text-sm text-[#1b2d25] focus:outline-none focus:ring-2 focus:ring-[#9ac8b1]"
           >
             <option value="">All Categories</option>
             {categories.map((cat) => (
@@ -147,7 +191,7 @@ export default function ProductListingPage() {
           <select
             value={sortBy}
             onChange={(e) => handleSortChange(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+            className="h-10 rounded-lg border border-[#dce3de] bg-white px-3 text-sm text-[#1b2d25] focus:outline-none focus:ring-2 focus:ring-[#9ac8b1]"
           >
             <option value="">Sort: Name A–Z</option>
             <option value="price_asc">Sort: Price Low–High</option>
@@ -157,7 +201,7 @@ export default function ProductListingPage() {
 
         {/* ── Results summary ── */}
         {result && !loading && (
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="mb-4 text-sm text-[#6f8078]">
             {result.totalElements === 0
               ? 'No products found.'
               : `Showing ${result.products.length} of ${result.totalElements} products`}
@@ -168,19 +212,19 @@ export default function ProductListingPage() {
         {loading && <ProductGridSkeleton />}
 
         {error && (
-          <div className="text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm">
+          <div className="rounded-lg border border-[#f1caca] bg-[#fff2f2] px-4 py-3 text-sm text-[#b63a3a]">
             {error}
           </div>
         )}
 
         {!loading && !error && result?.products.length === 0 && (
-          <div className="text-gray-400 bg-white border border-dashed border-gray-200 rounded-lg px-4 py-16 text-sm text-center">
+          <div className="rounded-lg border border-dashed border-[#d8dfda] bg-white px-4 py-16 text-center text-sm text-[#7a8781]">
             No products match your search. Try different keywords or clear the filters.
           </div>
         )}
 
         {!loading && !error && result?.products.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 md:gap-5">
             {result.products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -189,21 +233,51 @@ export default function ProductListingPage() {
 
         {/* ── Pagination ── */}
         {result && result.totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-8">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+            {/* Prev */}
             <button
               onClick={() => handlePageChange(Math.max(0, page - 1))}
               disabled={page === 0}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+              className="rounded-lg border border-[#ccd7d1] bg-white px-4 py-2 text-sm text-[#2a4d3f] transition-colors hover:bg-[#f3f7f5] disabled:opacity-40"
             >
               ← Prev
             </button>
-            <span className="text-sm text-gray-600">
-              Page {page + 1} of {result.totalPages}
-            </span>
+
+            {/* Numbered buttons — show up to 5 around the current page */}
+            {Array.from({ length: result.totalPages }, (_, i) => i)
+              .filter((i) => {
+                if (result.totalPages <= 7) return true;
+                if (i === 0 || i === result.totalPages - 1) return true;
+                return Math.abs(i - page) <= 2;
+              })
+              .reduce((acc, i, idx, arr) => {
+                if (idx > 0 && i - arr[idx - 1] > 1) acc.push('...');
+                acc.push(i);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-sm text-[#8fa89f]">&hellip;</span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => handlePageChange(item)}
+                    className={`min-w-9 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      item === page
+                        ? 'border-[#0d4a38] bg-[#0d4a38] text-white'
+                        : 'border-[#ccd7d1] bg-white text-[#2a4d3f] hover:bg-[#f3f7f5]'
+                    }`}
+                  >
+                    {item + 1}
+                  </button>
+                ),
+              )}
+
+            {/* Next */}
             <button
               onClick={() => handlePageChange(Math.min(result.totalPages - 1, page + 1))}
               disabled={page >= result.totalPages - 1}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+              className="rounded-lg border border-[#ccd7d1] bg-white px-4 py-2 text-sm text-[#2a4d3f] transition-colors hover:bg-[#f3f7f5] disabled:opacity-40"
             >
               Next →
             </button>
@@ -212,9 +286,7 @@ export default function ProductListingPage() {
       </div>
 
       {/* ── Footer ── */}
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
-        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
-      </footer>
+      <Footer />
     </div>
   );
 }
@@ -230,52 +302,84 @@ export default function ProductListingPage() {
  * @param {Object} product - ProductResponse from the API
  */
 function ProductCard({ product }) {
-  // A product is near-expiry when its expiryDate is within 7 days from today
-  const isNearExpiry = product.expiryDate
-    ? Math.ceil((new Date(product.expiryDate) - new Date()) / 86400000) <= 7
-    : false;
+  // Prefer the batch-aware flag from the API; fall back to the legacy single expiryDate
+  const isNearExpiry = product.hasNearExpiryBatches
+    ?? (product.expiryDate
+      ? Math.ceil((new Date(product.expiryDate) - new Date()) / 86400000) <= 7
+      : false);
+
+  // Show the earliest batch expiry date when available, otherwise the legacy field
+  const expiryLabel = product.earliestExpiryDate ?? product.expiryDate;
 
   return (
     <Link
       to={`/products/${product.id}`}
-      className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col group"
+      className="group overflow-hidden rounded-2xl border border-[#dde3df] bg-white transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_24px_rgba(14,54,37,0.12)]"
     >
       {product.imageUrl ? (
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          className="w-full h-44 object-cover group-hover:opacity-95 transition-opacity"
-        />
+        <>
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="h-36 w-full object-cover transition-opacity group-hover:opacity-95 sm:h-44"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling.style.display = 'flex';
+            }}
+          />
+          <div
+            style={{ display: 'none' }}
+            className="h-36 w-full items-center justify-center bg-[#e8f1eb] text-4xl text-[#6f8f80] sm:h-44"
+          >
+            🥦
+          </div>
+        </>
       ) : (
-        <div className="w-full h-44 bg-green-100 flex items-center justify-center text-green-400 text-4xl">
+        <div className="flex h-36 w-full items-center justify-center bg-[#e8f1eb] text-4xl text-[#6f8f80] sm:h-44">
           🥦
         </div>
       )}
 
-      <div className="p-4 flex flex-col flex-1">
+      <div className="flex min-h-37 flex-col p-3 sm:p-4">
         {product.category && (
-          <span className="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">
+          <span className="mb-1 inline-flex w-fit rounded-full bg-[#e9f2ec] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#2d664d]">
             {product.category}
           </span>
         )}
-        <h3 className="font-semibold text-gray-800 text-sm mb-1 line-clamp-2">
+        <h3 className="line-clamp-2 text-sm font-semibold text-[#1d3128] sm:text-[15px]">
           {product.name}
         </h3>
         {product.description && (
-          <p className="text-xs text-gray-500 line-clamp-2 mb-2">{product.description}</p>
+          <p className="mt-1 line-clamp-1 text-xs text-[#7a8b83]">{product.description}</p>
         )}
 
-        <div className="mt-auto space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-green-700 font-bold">{formatPrice(product.price, product.unit)}</span>
+        <div className="mt-auto space-y-1 pt-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-col">
+              {product.discountPercentage ? (
+                <>
+                  <div className="text-xs text-[#ad3d3d] line-through">
+                    {formatPrice(product.price, product.unit)}
+                  </div>
+                  <div className="text-base font-bold text-[#123f2f]">
+                    {formatPrice(calculateDiscountedPrice(product.price, product.discountPercentage), product.unit)}
+                  </div>
+                  <div className="mt-1 inline-flex w-fit rounded bg-[#f6dede] px-1.5 py-0.5 text-[10px] font-semibold text-[#af3434]">
+                    {product.discountPercentage}% OFF
+                  </div>
+                </>
+              ) : (
+                <span className="text-base font-bold text-[#123f2f]">{formatPrice(product.price, product.unit)}</span>
+              )}
+            </div>
             {!product.inStock && (
-              <span className="text-xs text-red-500 font-medium">Out of stock</span>
+              <span className="rounded-full bg-[#f0f0f0] px-2 py-0.5 text-[10px] font-semibold text-[#8a8a8a]">Out of stock</span>
             )}
           </div>
           {/* Near-expiry badge — highlights discount opportunity */}
           {isNearExpiry && (
-            <div className="text-xs bg-amber-100 text-amber-700 rounded px-2 py-1 text-center font-medium">
-              🕐 Expires {product.expiryDate}
+            <div className="rounded bg-[#f5d8d8] px-2 py-1 text-center text-[11px] font-semibold text-[#b02e2e]">
+              🕐 Expires {expiryLabel}
             </div>
           )}
         </div>
@@ -287,15 +391,15 @@ function ProductCard({ product }) {
 /** Skeleton grid shown while products are loading. */
 function ProductGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 md:gap-5">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden animate-pulse">
-          <div className="w-full h-44 bg-gray-200" />
-          <div className="p-4 space-y-2">
-            <div className="h-3 bg-gray-200 rounded w-1/3" />
-            <div className="h-4 bg-gray-200 rounded w-2/3" />
-            <div className="h-3 bg-gray-200 rounded w-full" />
-            <div className="h-4 bg-gray-200 rounded w-1/4 mt-2" />
+        <div key={i} className="overflow-hidden rounded-2xl border border-[#dde3df] bg-white animate-pulse">
+          <div className="h-36 w-full bg-[#e7ebe8] sm:h-44" />
+          <div className="space-y-2 p-4">
+            <div className="h-3 w-1/3 rounded bg-[#e7ebe8]" />
+            <div className="h-4 w-2/3 rounded bg-[#e7ebe8]" />
+            <div className="h-3 w-full rounded bg-[#e7ebe8]" />
+            <div className="mt-2 h-4 w-1/4 rounded bg-[#e7ebe8]" />
           </div>
         </div>
       ))}

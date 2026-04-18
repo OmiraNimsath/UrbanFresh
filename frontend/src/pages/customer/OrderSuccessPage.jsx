@@ -12,6 +12,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import Breadcrumbs from '../../components/customer/Breadcrumbs';
+import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import PaymentModal from '../../components/PaymentModal';
 import { useAuth } from '../../context/AuthContext';
 import { resolveOrderForSuccess } from '../../services/orderService';
@@ -184,17 +187,25 @@ export default function OrderSuccessPage() {
     }
   };
 
-  const handlePaymentModalSuccess = (result) => {
+  const handlePaymentModalSuccess = () => {
     toast.success('Payment completed successfully!');
     setIsPaymentModalOpen(false);
     loadOrder({ preserveCurrentView: false });
   };
 
   return (
-    <div className={`min-h-screen ${tone.pageBg}`}>
+    <div className={`min-h-screen flex flex-col ${tone.pageBg}`}>
       <Navbar />
 
-      <main className="max-w-5xl mx-auto px-4 py-10 sm:py-14" aria-live="polite">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 pb-24 sm:py-10 md:px-8 md:pb-8" aria-live="polite">
+        <Breadcrumbs
+          items={[
+            { label: 'Products', to: '/products' },
+            { label: 'Orders', to: '/dashboard' },
+            { label: order?.orderId ? `Order #${order.orderId}` : 'Order Status' },
+          ]}
+        />
+
         {pageState === PAGE_STATE.LOADING && <LoadingSkeleton />}
 
         {pageState === PAGE_STATE.ERROR && (
@@ -215,19 +226,20 @@ export default function OrderSuccessPage() {
 
             <div className={`bg-white rounded-2xl shadow-sm border p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${tone.orderCardBorder}`}>
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Order ID</p>
-                <p className={`text-2xl font-extrabold ${tone.orderIdText}`}>#{order.orderId}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Payment status: <span className="font-semibold text-gray-700">{formatPaymentStatus(order)}</span>
+                <p className="text-xs uppercase tracking-widest text-[#7e8d87] font-semibold">Order ID</p>
+                <p className={`text-3xl font-extrabold ${tone.orderIdText}`}>#{order.orderId}</p>
+                <p className="text-xs text-[#7e8d87] mt-1">
+                  Payment status: <span className="font-semibold text-[#163a2f]">{formatPaymentStatus(order)}</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleCopyOrderId}
-                className={`inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors ${tone.primaryButton}`}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors ${tone.primaryButton}`}
                 aria-label="Copy order id"
               >
-                {copied ? 'Copied' : 'Copy Order ID'}
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="9" width="13" height="13" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+                {copied ? 'Copied!' : 'Copy Order ID'}
               </button>
             </div>
 
@@ -246,16 +258,10 @@ export default function OrderSuccessPage() {
             <div className="flex flex-wrap gap-3">
               {paymentView === PAYMENT_VIEW.FAILED ? (
                 <>
-                  <Link
-                    to="/checkout"
-                    className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
-                  >
-                    Go Back to Checkout
-                  </Link>
                   <button
                     type="button"
                     onClick={() => setIsPaymentModalOpen(true)}
-                    className="px-6 py-2.5 border border-red-200 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-lg transition-colors"
+                    className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl transition-colors"
                   >
                     Retry Payment
                   </button>
@@ -263,14 +269,14 @@ export default function OrderSuccessPage() {
               ) : (
                 <Link
                   to="/dashboard"
-                  className={`px-6 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors ${tone.primaryButton}`}
+                  className={`px-6 py-2.5 text-white text-sm font-semibold rounded-xl transition-colors ${tone.primaryButton}`}
                 >
                   View Orders
                 </Link>
               )}
               <Link
                 to="/products"
-                className="px-6 py-2.5 border border-gray-300 hover:bg-white text-gray-700 text-sm font-semibold rounded-lg transition-colors"
+                className="px-6 py-2.5 border border-[#e4ebe8] hover:bg-white text-[#163a2f] text-sm font-semibold rounded-xl transition-colors"
               >
                 Continue Shopping
               </Link>
@@ -289,9 +295,8 @@ export default function OrderSuccessPage() {
         )}
       </main>
 
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
-        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
-      </footer>
+      <MobileBottomNav activeKey="profile" />
+      <Footer />
     </div>
   );
 }
@@ -307,7 +312,7 @@ function StatusBanner({ title, subtitle, tone }) {
         </span>
         <div>
           <h1 id="order-success-heading" className={`text-2xl sm:text-3xl font-bold ${styles.titleText}`}>{title}</h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">{subtitle}</p>
+          <p className="text-sm sm:text-base text-[#7e8d87] mt-1">{subtitle}</p>
         </div>
       </div>
     </div>
@@ -316,33 +321,76 @@ function StatusBanner({ title, subtitle, tone }) {
 
 function OrderSummary({ order }) {
   const items = Array.isArray(order?.items) ? order.items : [];
+  const discount     = Number(order?.discountAmount ?? 0);
+  const pointsUsed   = Number(order?.pointsRedeemed ?? 0);
+  const subtotal     = Number(order?.totalAmount ?? 0) + discount;
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6" aria-label="Order summary">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">Order Summary</h2>
+    <section className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-5 sm:p-6" aria-label="Order summary">
+      <h2 className="text-lg font-bold text-[#163a2f] mb-4">Order Summary</h2>
 
       {items.length === 0 ? (
         <p className="text-sm text-gray-500">No line items available.</p>
       ) : (
         <ul className="space-y-3">
-          {items.map((item, index) => (
-            <li key={`${item.productName}-${index}`} className="border border-gray-100 rounded-xl p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-gray-800">{item.productName || 'Unnamed item'}</p>
-                <p className="text-sm font-bold text-green-700">{formatAmount(item.lineTotal ?? 0)}</p>
-              </div>
-              <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-                <span>Qty: {item.quantity ?? 0}</span>
-                <span>Unit: {formatAmount(item.unitPrice ?? 0)}</span>
-              </div>
-            </li>
-          ))}
+          {items.map((item, index) => {
+            // lineTotal is always the discounted total (effectiveUnitPrice × qty).
+            // Derive effective unit price to avoid unitPrice × qty ≠ lineTotal confusion.
+            const effectiveUnitPrice =
+              item.quantity > 0
+                ? Number(item.lineTotal) / item.quantity
+                : Number(item.unitPrice);
+            const hasProductDiscount = (item.productDiscountPercentage ?? 0) > 0;
+
+            return (
+              <li key={`${item.productName}-${index}`} className="border border-[#e4ebe8] rounded-xl p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#163a2f]">{item.productName || 'Unnamed item'}</p>
+                    {hasProductDiscount && (
+                      <span className="text-xs bg-[#eaf3ee] text-[#0d4a38] font-semibold px-1.5 py-0.5 rounded">
+                        {item.productDiscountPercentage}% OFF
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-bold text-[#0d4a38]">{formatAmount(item.lineTotal ?? 0)}</p>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-[#7e8d87]">
+                  <span>Qty: {item.quantity ?? 0}</span>
+                  <span>
+                    {hasProductDiscount ? (
+                      <>
+                        <span className="line-through text-[#7e8d87] mr-1">{formatAmount(item.unitPrice ?? 0)}</span>
+                        <span className="text-[#0d4a38] font-medium">{formatAmount(effectiveUnitPrice)}</span>
+                      </>
+                    ) : (
+                      <span>Unit: {formatAmount(item.unitPrice ?? 0)}</span>
+                    )}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
-      <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
-        <span className="text-sm font-semibold text-gray-700">Total Amount</span>
-        <span className="text-lg font-extrabold text-green-700">{formatAmount(order.totalAmount ?? 0)}</span>
+      <div className="mt-5 pt-4 border-t border-[#e4ebe8] space-y-2">
+        {discount > 0 && (
+          <>
+            <div className="flex items-center justify-between text-sm text-[#7e8d87]">
+              <span>Items subtotal</span>
+              <span>{formatAmount(subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-[#0d4a38] font-medium">
+              <span>Loyalty discount ({pointsUsed} pts)</span>
+              <span>− {formatAmount(discount)}</span>
+            </div>
+          </>
+        )}
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-sm font-semibold text-[#163a2f]">Total Amount Paid</span>
+          <span className="text-lg font-extrabold text-[#0d4a38]">{formatAmount(order.totalAmount ?? 0)}</span>
+        </div>
       </div>
     </section>
   );
@@ -351,18 +399,18 @@ function OrderSummary({ order }) {
 function StatusInfoCard({ paymentView, deliveryEstimate, deliveryAddress }) {
   if (paymentView === PAYMENT_VIEW.SUCCESS) {
     return (
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6" aria-label="Delivery information">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Delivery Information</h2>
+      <section className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-5 sm:p-6" aria-label="Delivery information">
+        <h2 className="text-lg font-bold text-[#163a2f] mb-4">Delivery Info</h2>
 
         <div className="space-y-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Estimated Delivery</p>
-            <p className="text-sm text-gray-700 mt-1">{deliveryEstimate || 'Delivery estimate unavailable'}</p>
+            <p className="text-xs uppercase tracking-widest text-[#7e8d87] font-semibold">Estimated Arrival</p>
+            <p className="text-sm text-[#163a2f] font-medium mt-1">{deliveryEstimate || 'Delivery estimate unavailable'}</p>
           </div>
 
           <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Shipping Address</p>
-            <p className="text-sm text-gray-700 mt-1 wrap-break-word">
+            <p className="text-xs uppercase tracking-widest text-[#7e8d87] font-semibold">Shipping Address</p>
+            <p className="text-sm text-[#163a2f] mt-1 wrap-break-word">
               {deliveryAddress ? maskAddress(deliveryAddress) : 'Address unavailable'}
             </p>
           </div>
@@ -372,20 +420,20 @@ function StatusInfoCard({ paymentView, deliveryEstimate, deliveryAddress }) {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6" aria-label="Payment information">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">What Happens Next</h2>
+    <section className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-5 sm:p-6" aria-label="Payment information">
+      <h2 className="text-lg font-bold text-[#163a2f] mb-4">What Happens Next</h2>
 
       {paymentView === PAYMENT_VIEW.FAILED && (
-        <div className="space-y-3 text-sm text-gray-700">
+        <div className="space-y-3 text-sm text-[#163a2f]">
           <p>Payment failed. Please try again.</p>
-          <p className="text-gray-600">You can retry from checkout or from your orders page.</p>
+          <p className="text-[#7e8d87]">You can retry from checkout or from your orders page.</p>
         </div>
       )}
 
       {paymentView === PAYMENT_VIEW.NEUTRAL && (
-        <div className="space-y-3 text-sm text-gray-700">
+        <div className="space-y-3 text-sm text-[#163a2f]">
           <p>We are verifying your payment status.</p>
-          <p className="text-gray-600">Please check your orders in a moment for the latest payment update.</p>
+          <p className="text-[#7e8d87]">Please check your orders in a moment for the latest payment update.</p>
         </div>
       )}
     </section>
@@ -410,20 +458,18 @@ function OrderDetailsCard({ order }) {
   const orderStatus = order?.status ? String(order.status).toUpperCase() : 'UNKNOWN';
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6" aria-label="Order details">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">Order Details</h2>
+    <section className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-5 sm:p-6" aria-label="Order details">
+      <h2 className="text-lg font-bold text-[#163a2f] mb-4">Payment Details</h2>
 
       <dl className="space-y-3 text-sm">
-        <DetailRow label="Order ID" value={`#${order?.orderId ?? 'N/A'}`} />
-        <DetailRow label="Order Status" value={orderStatus} />
-        <DetailRow label="Payment Status" value={formatPaymentStatus(order)} />
-        <DetailRow label="Items" value={`${itemCount} item${itemCount === 1 ? '' : 's'}`} />
-        <DetailRow label="Placed On" value={orderPlacedAt} />
+        <DetailRow label="Order Date" value={orderPlacedAt} />
+        <DetailRow label="Payment Method" value={formatPaymentStatus(order)} />
+        <DetailRow label="Payment Reference" value={`#${order?.orderId ?? 'N/A'}`} />
       </dl>
 
-      <div className="mt-4 pt-4 border-t border-gray-100">
-        <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Delivery Address</p>
-        <p className="text-sm text-gray-700 mt-1 wrap-break-word">{order?.deliveryAddress || 'Address unavailable'}</p>
+      <div className="mt-4 pt-4 border-t border-[#e4ebe8]">
+        <p className="text-xs uppercase tracking-widest text-[#7e8d87] font-semibold">Delivery Address</p>
+        <p className="text-sm text-[#163a2f] mt-1 wrap-break-word">{order?.deliveryAddress || 'Address unavailable'}</p>
       </div>
     </section>
   );
@@ -432,8 +478,8 @@ function OrderDetailsCard({ order }) {
 function DetailRow({ label, value }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="text-gray-800 font-medium text-right wrap-break-word">{value}</dd>
+      <dt className="text-[#7e8d87]">{label}</dt>
+      <dd className="text-[#163a2f] font-medium text-right wrap-break-word">{value}</dd>
     </div>
   );
 }
@@ -563,19 +609,19 @@ function getStatusContent(paymentView) {
 function getToneStyles(paymentView) {
   if (paymentView === PAYMENT_VIEW.SUCCESS) {
     return {
-      pageBg: 'bg-green-50',
-      bannerBorder: 'border-green-100',
-      iconBadge: 'bg-green-100 text-green-700',
-      titleText: 'text-green-800',
-      orderCardBorder: 'border-green-100',
-      orderIdText: 'text-green-700',
-      primaryButton: 'bg-green-600 hover:bg-green-700',
+      pageBg: 'bg-[#f5f7f6]',
+      bannerBorder: 'border-[#e4ebe8]',
+      iconBadge: 'bg-[#eaf3ee] text-[#0d4a38]',
+      titleText: 'text-[#163a2f]',
+      orderCardBorder: 'border-[#e4ebe8]',
+      orderIdText: 'text-[#0d4a38]',
+      primaryButton: 'bg-[#0d4a38] hover:bg-[#083a2c]',
     };
   }
 
   if (paymentView === PAYMENT_VIEW.FAILED) {
     return {
-      pageBg: 'bg-rose-50',
+      pageBg: 'bg-[#f5f7f6]',
       bannerBorder: 'border-rose-100',
       iconBadge: 'bg-rose-100 text-rose-700',
       titleText: 'text-rose-800',
@@ -586,36 +632,35 @@ function getToneStyles(paymentView) {
   }
 
   return {
-    pageBg: 'bg-slate-50',
-    bannerBorder: 'border-slate-200',
-    iconBadge: 'bg-slate-100 text-slate-700',
-    titleText: 'text-slate-800',
-    orderCardBorder: 'border-slate-200',
-    orderIdText: 'text-slate-700',
-    primaryButton: 'bg-slate-700 hover:bg-slate-800',
+    pageBg: 'bg-[#f5f7f6]',
+    bannerBorder: 'border-[#e4ebe8]',
+    iconBadge: 'bg-[#e4ebe8] text-[#7e8d87]',
+    titleText: 'text-[#163a2f]',
+    orderCardBorder: 'border-[#e4ebe8]',
+    orderIdText: 'text-[#163a2f]',
+    primaryButton: 'bg-[#0d4a38] hover:bg-[#083a2c]',
   };
 }
 
 function EmptyState({ isAuthenticated }) {
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center" role="status">
-      <h1 className="text-2xl font-bold text-gray-800">No recent order found</h1>
-      <p className="text-sm text-gray-500 mt-2">
+    <section className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-8 text-center" role="status">
+      <h1 className="text-2xl font-bold text-[#163a2f]">No recent order found</h1>
+      <p className="text-sm text-[#7e8d87] mt-2">
         We could not find a recent completed order to display.
       </p>
-
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         {isAuthenticated && (
           <Link
             to="/dashboard"
-            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            className="px-6 py-2.5 bg-[#0d4a38] hover:bg-[#083a2c] text-white text-sm font-semibold rounded-xl transition-colors"
           >
             View Orders
           </Link>
         )}
         <Link
           to="/products"
-          className="px-6 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition-colors"
+          className="px-6 py-2.5 border border-[#e4ebe8] hover:bg-[#f5f7f6] text-[#163a2f] text-sm font-semibold rounded-xl transition-colors"
         >
           Continue Shopping
         </Link>
@@ -626,21 +671,21 @@ function EmptyState({ isAuthenticated }) {
 
 function UnauthorizedState() {
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-red-100 p-8 text-center" role="alert">
-      <h1 className="text-2xl font-bold text-red-700">Not authorized</h1>
-      <p className="text-sm text-gray-600 mt-2">
+    <section className="bg-white rounded-2xl border border-rose-100 shadow-sm p-8 text-center" role="alert">
+      <h1 className="text-2xl font-bold text-rose-700">Not authorized</h1>
+      <p className="text-sm text-[#7e8d87] mt-2">
         You do not have permission to view this order.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <Link
           to="/dashboard"
-          className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
+          className="px-6 py-2.5 bg-[#0d4a38] hover:bg-[#083a2c] text-white text-sm font-semibold rounded-xl transition-colors"
         >
           View Orders
         </Link>
         <Link
           to="/products"
-          className="px-6 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition-colors"
+          className="px-6 py-2.5 border border-[#e4ebe8] hover:bg-[#f5f7f6] text-[#163a2f] text-sm font-semibold rounded-xl transition-colors"
         >
           Continue Shopping
         </Link>
@@ -651,21 +696,21 @@ function UnauthorizedState() {
 
 function ErrorState({ message, onRetry }) {
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-yellow-100 p-8 text-center" role="alert">
-      <h1 className="text-2xl font-bold text-gray-800">Unable to load order details</h1>
-      <p className="text-sm text-gray-600 mt-2">{message}</p>
+    <section className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-8 text-center" role="alert">
+      <h1 className="text-2xl font-bold text-[#163a2f]">Unable to load order details</h1>
+      <p className="text-sm text-[#7e8d87] mt-2">{message}</p>
 
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button
           type="button"
           onClick={onRetry}
-          className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
+          className="px-6 py-2.5 bg-[#0d4a38] hover:bg-[#083a2c] text-white text-sm font-semibold rounded-xl transition-colors"
         >
           Retry
         </button>
         <Link
           to="/products"
-          className="px-6 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition-colors"
+          className="px-6 py-2.5 border border-[#e4ebe8] hover:bg-[#f5f7f6] text-[#163a2f] text-sm font-semibold rounded-xl transition-colors"
         >
           Continue Shopping
         </Link>
@@ -677,27 +722,27 @@ function ErrorState({ message, onRetry }) {
 function LoadingSkeleton() {
   return (
     <section aria-label="Loading order details" className="space-y-5 animate-pulse">
-      <div className="bg-white rounded-2xl shadow-sm p-8">
-        <div className="h-7 w-56 bg-gray-200 rounded" />
-        <div className="h-4 w-80 bg-gray-100 rounded mt-3" />
+      <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-8">
+        <div className="h-7 w-56 bg-[#e4ebe8] rounded" />
+        <div className="h-4 w-80 bg-[#f0f4f2] rounded mt-3" />
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <div className="h-5 w-32 bg-gray-200 rounded" />
-        <div className="h-8 w-44 bg-gray-100 rounded mt-4" />
+      <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-6">
+        <div className="h-5 w-32 bg-[#e4ebe8] rounded" />
+        <div className="h-8 w-44 bg-[#f0f4f2] rounded mt-4" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
-          <div className="h-5 w-36 bg-gray-200 rounded" />
-          <div className="h-16 bg-gray-100 rounded-xl" />
-          <div className="h-16 bg-gray-100 rounded-xl" />
-          <div className="h-10 bg-gray-100 rounded-xl" />
+        <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-6 space-y-3">
+          <div className="h-5 w-36 bg-[#e4ebe8] rounded" />
+          <div className="h-16 bg-[#f0f4f2] rounded-xl" />
+          <div className="h-16 bg-[#f0f4f2] rounded-xl" />
+          <div className="h-10 bg-[#f0f4f2] rounded-xl" />
         </div>
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
-          <div className="h-5 w-36 bg-gray-200 rounded" />
-          <div className="h-12 bg-gray-100 rounded-xl" />
-          <div className="h-12 bg-gray-100 rounded-xl" />
+        <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-6 space-y-3">
+          <div className="h-5 w-36 bg-[#e4ebe8] rounded" />
+          <div className="h-12 bg-[#f0f4f2] rounded-xl" />
+          <div className="h-12 bg-[#f0f4f2] rounded-xl" />
         </div>
       </div>
     </section>

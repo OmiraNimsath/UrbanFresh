@@ -63,10 +63,33 @@ public interface AdminProductService {
     AdminProductResponse rejectProduct(Long id);
 
     /**
+     * Applies or removes a near-expiry discount on a single product.
+     * Surgical PATCH: only {@code discountPercentage} is written; all other
+     * product attributes (name, price, brand, description, imageUrl, featured,
+     * unit, category, expiryDate, stockQuantity) are left exactly as they are.
+     *
+     * @param id                 product ID to update
+     * @param discountPercentage new discount percentage (0 = no discount, 1–100 = active)
+     * @return AdminProductResponse reflecting the updated discount
+     * @throws com.urbanfresh.exception.ProductNotFoundException if no product with that ID exists
+     * @throws IllegalArgumentException if discountPercentage is not in 0–100
+     */
+    AdminProductResponse applyDiscount(Long id, int discountPercentage);
+
+    /**
      * Permanently removes a product from the catalogue.
      *
      * @param id product ID to delete
      * @throws com.urbanfresh.exception.ProductNotFoundException if no product with that ID exists
      */
     void deleteProduct(Long id);
+
+    /**
+     * Toggles the hidden flag on a product.
+     * When hidden=true the product is excluded from all customer-facing queries.
+     *
+     * @param id product ID to toggle
+     * @return updated AdminProductResponse with the new hidden state
+     */
+    AdminProductResponse toggleHidden(Long id);
 }

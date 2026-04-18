@@ -1,5 +1,6 @@
 package com.urbanfresh.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -31,6 +32,9 @@ import lombok.RequiredArgsConstructor;
 @EnableMethodSecurity  // enables @PreAuthorize / @PostAuthorize on controllers
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    @Value("${cors.allowed-origin}")
+    private String corsAllowedOrigin;
 
     private final JwtAuthFilter jwtAuthFilter;
     private final JwtAuthEntryPoint jwtAuthEntryPoint;
@@ -92,6 +96,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/orders/**").authenticated()
                         // Customer dashboard endpoints (order history + loyalty) — CUSTOMER only via @PreAuthorize
                         .requestMatchers("/api/customer/**").authenticated()
+                        // In-app notification endpoints — CUSTOMER only via @PreAuthorize
+                        .requestMatchers("/api/notifications/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -102,14 +108,10 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * CORS configuration allowing the React dev server (port 5173) to call the API.
-     * In production, restrict origins to the deployed frontend domain.
-     */
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
-        var config = new org.springframework.web.cors.CorsConfiguration();      
-        config.addAllowedOrigin("http://localhost:5173");
+        var config = new org.springframework.web.cors.CorsConfiguration();
+        config.addAllowedOrigin(corsAllowedOrigin);
         config.addAllowedMethod("*");
         config.addAllowedHeader("*");
         config.setAllowCredentials(true);

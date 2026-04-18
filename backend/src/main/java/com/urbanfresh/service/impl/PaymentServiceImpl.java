@@ -32,6 +32,7 @@ import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.PaymentRepository;
 import com.urbanfresh.repository.UserRepository;
 import com.urbanfresh.service.LoyaltyService;
+import com.urbanfresh.service.NotificationService;
 import com.urbanfresh.service.PaymentService;
 
 import lombok.RequiredArgsConstructor;
@@ -78,6 +79,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final LoyaltyService loyaltyService;
+    private final NotificationService notificationService;
 
     /**
      * Creates a Stripe PaymentIntent for a customer-owned order.
@@ -401,9 +403,23 @@ public class PaymentServiceImpl implements PaymentService {
         order.setPaymentStatus(PaymentStatus.PAID);
         orderRepository.save(order);
 
-        // Award loyalty points only now — payment is confirmed and the order is CONFIRMED.
-        // Awarding here prevents customers from earning points on failed/cancelled payments.
-        loyaltyService.awardPoints(order.getCustomer(), order.getTotalAmount());
+        notificationService.createOrderStatusNotification(order, OrderStatus.CONFIRMED);
+
+        // Deduct loyalty points NOW — payment is confirmed so it's safe to consume them.
+        // Points were validated (but NOT deducted) at order placement in OrderServiceImpl.
+        // This two-phase approach ensures a failed payment never permanently burns a
+        // customer's loyalty balance.
+        // The idempotency guard above (already CONFIRMED check) prevents double-deduction
+        // if both payment_intent.succeeded and charge.updated fire for the same payment.
+        if (order.getPointsRedeemed() > 0) {
+            loyaltyService.deductRedeemedPoints(order.getCustomer(), order.getPointsRedeemed());
+        }
+
+        // Award loyalty points based on the product-discounted items subtotal (SCRUM-39 AC:
+        // "loyalty points calculate from discounted price"). itemsSubtotal restores the
+        // pre-loyalty-redemption total so redeeming points doesn't reduce what you earn.
+        java.math.BigDecimal itemsSubtotal = order.getTotalAmount().add(order.getDiscountAmount());
+        loyaltyService.awardPoints(order.getCustomer(), itemsSubtotal);
 
         log.info("Order confirmed from {}: orderId={}, paymentIntentId={}",
                 eventType, order.getId(), paymentIntentId);

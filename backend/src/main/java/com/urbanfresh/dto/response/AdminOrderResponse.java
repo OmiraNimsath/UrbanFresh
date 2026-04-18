@@ -20,6 +20,10 @@ public class AdminOrderResponse {
     private String paymentStatus;
     private BigDecimal totalAmount;
     private LocalDateTime orderDate;
+    /** Discount applied via loyalty point redemption (Rs. 5 per point). Zero when no points were used. */
+    private BigDecimal discountAmount;
+    /** Number of loyalty points redeemed on this order. Zero when no points were used. */
+    private int pointsRedeemed;
 
     /** ID of the delivery person assigned to this order; null if not yet assigned. */
     private Long deliveryPersonId;

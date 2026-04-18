@@ -1,17 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
+import { FiPackage, FiEye, FiEyeOff, FiSearch } from 'react-icons/fi';
 import {
   getAdminProducts,
   createProduct,
   updateProduct,
-  deleteProduct,
+  toggleHideProduct,
   getPendingProducts,
   approveProduct,
-  rejectProduct
+  rejectProduct,
 } from '../../services/adminProductService';
 import { getActiveBrands } from '../../services/adminBrandService';
 import ProductFormModal from '../../components/admin/ProductFormModal';
+import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
 import { formatPrice } from '../../utils/priceUtils';
 
 /**
@@ -20,29 +21,28 @@ import { formatPrice } from '../../utils/priceUtils';
  * Displays a second tab for new listing requests from suppliers.
  */
 export default function AdminProductsPage() {
-  const navigate = useNavigate();
-
-  // Tab state
   const [activeTab, setActiveTab] = useState('catalog');
 
-  // Table state
-  const [pageData, setPageData] = useState(null);
+  const [allProducts, setAllProducts] = useState([]);
   const [pendingData, setPendingData] = useState(null);
-  
-  const [currentPage, setCurrentPage] = useState(0);
   const [currentPendingPage, setCurrentPendingPage] = useState(0);
-  
   const [loadingTable, setLoadingTable] = useState(false);
   const [tableError, setTableError] = useState(null);
   const [brands, setBrands] = useState([]);
 
-  // Modal state
+  const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+  const [catalogPage, setCatalogPage] = useState(0);
+  const CATALOG_PAGE_SIZE = 10;
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // Status/Delete state
-  const [deletingId, setDeletingId] = useState(null);
+  const [hidingId, setHidingId] = useState(null);
   const [processingId, setProcessingId] = useState(null);
 
   const fetchPage = useCallback(async () => {
@@ -50,11 +50,11 @@ export default function AdminProductsPage() {
     setTableError(null);
     try {
       const [data, pData, activeBrands] = await Promise.all([
-        getAdminProducts(currentPage, 20),
+        getAdminProducts(0, 1000),
         getPendingProducts(currentPendingPage, 20),
         getActiveBrands(),
       ]);
-      setPageData(data);
+      setAllProducts(data.content || []);
       setPendingData(pData);
       setBrands(activeBrands);
     } catch {
@@ -62,7 +62,7 @@ export default function AdminProductsPage() {
     } finally {
       setLoadingTable(false);
     }
-  }, [currentPage, currentPendingPage]);
+  }, [currentPendingPage]);
 
   useEffect(() => {
     fetchPage();
@@ -103,18 +103,16 @@ export default function AdminProductsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    setDeletingId(id);
+  const handleToggleHide = async (product) => {
+    setHidingId(product.id);
     try {
-      await deleteProduct(id);
-      toast.success('Product deleted');
-      const isLastOnPage = pageData?.content?.length === 1 && currentPage > 0;
-      if (isLastOnPage) setCurrentPage((p) => p - 1);
-      else fetchPage();
+      const updated = await toggleHideProduct(product.id);
+      toast.success(updated.hidden ? 'Product hidden from store' : 'Product visible in store');
+      setAllProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } catch {
-      toast.error('Failed to delete product');
+      toast.error('Failed to update product visibility');
     } finally {
-      setDeletingId(null);
+      setHidingId(null);
     }
   };
 
@@ -144,203 +142,389 @@ export default function AdminProductsPage() {
     }
   };
 
+  const hiddenCount = allProducts.filter((p) => p.hidden).length;
+  const visibleCount = allProducts.length - hiddenCount;
+
+  const categories = useMemo(
+    () => [...new Set(allProducts.map((p) => p.category).filter(Boolean))].sort(),
+    [allProducts]
+  );
+
+  const filtered = useMemo(() => {
+    let list = allProducts;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name?.toLowerCase().includes(q) ||
+          p.category?.toLowerCase().includes(q) ||
+          p.brandName?.toLowerCase().includes(q)
+      );
+    }
+    if (filterCategory) list = list.filter((p) => p.category === filterCategory);
+    if (filterStatus === 'hidden') list = list.filter((p) => p.hidden);
+    else if (filterStatus === 'visible') list = list.filter((p) => !p.hidden);
+    return [...list].sort((a, b) => {
+      let va = a[sortField] ?? '';
+      let vb = b[sortField] ?? '';
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [allProducts, search, filterCategory, filterStatus, sortField, sortDir]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setCatalogPage(0); }, [search, filterCategory, filterStatus, sortField, sortDir]);
+
+  const totalCatalogPages = Math.max(1, Math.ceil(filtered.length / CATALOG_PAGE_SIZE));
+  const pagedProducts = filtered.slice(catalogPage * CATALOG_PAGE_SIZE, (catalogPage + 1) * CATALOG_PAGE_SIZE);
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortField(field); setSortDir('asc'); }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <button
-            onClick={() => navigate('/admin')}
-            className="text-sm text-gray-500 hover:text-gray-700 mb-1 flex items-center gap-1"
-          >
-            ← Back to Dashboard
-          </button>
-          <h1 className="text-2xl font-bold text-gray-800">Product Management</h1>
-        </div>
+    <AdminDeliveryLayout
+      title="Product Management"
+      description="Catalog operations, supplier listing review, and visibility controls."
+      breadcrumbCurrent="Products"
+      actions={
         <button
           onClick={openCreate}
-          className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-sm"
+          className="inline-flex items-center rounded-lg bg-[#0d4a38] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#083a2c]"
         >
           + Add Product
         </button>
-      </div>
-
+      }
+    >
       {tableError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-4 mb-4">
-          {tableError}
-        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{tableError}</div>
       )}
 
-      {/* Tabs */}
-      <div className="flex space-x-4 mb-6 border-b border-gray-200">
-        <button
-          onClick={() => setActiveTab('catalog')}
-          className={`pb-2 outline-none font-medium text-sm border-b-2 transition-colors ${
-            activeTab === 'catalog' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Product Management
-        </button>
-        <button
-          onClick={() => setActiveTab('pending')}
-          className={`pb-2 flex items-center gap-2 outline-none font-medium text-sm border-b-2 transition-colors ${
-            activeTab === 'pending' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          New Listing Requests
-          {pendingData?.totalElements > 0 && (
-            <span className="bg-yellow-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-              {pendingData.totalElements}
-            </span>
-          )}
-        </button>
-      </div>
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <SummaryCard label="Total Products" value={allProducts.length} tone="default" icon={FiPackage} />
+        <SummaryCard label="Visible in Store" value={visibleCount} tone="green" icon={FiEye} />
+        <SummaryCard label="Hidden from Store" value={hiddenCount} tone="slate" icon={FiEyeOff} />
+      </section>
 
-      {loadingTable && (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-200 rounded-lg animate-pulse" />
-          ))}
+      <section className="rounded-2xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#eef2f0] pb-4">
+          <button
+            onClick={() => setActiveTab('catalog')}
+            className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium transition ${
+              activeTab === 'catalog'
+                ? 'bg-[#eaf5ef] text-[#0d4a38]'
+                : 'bg-white text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Product Management
+          </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              activeTab === 'pending'
+                ? 'bg-[#eaf5ef] text-[#0d4a38]'
+                : 'bg-white text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            New Listing Requests
+            {pendingData?.totalElements > 0 && (
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                {pendingData.totalElements}
+              </span>
+            )}
+          </button>
         </div>
-      )}
 
-      {/* Catalog */}
-      {!loadingTable && activeTab === 'catalog' && pageData && (
-        <>
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className={th}>Name</th>
-                  <th className={th}>Category</th>
-                  <th className={th}>Brand</th>
-                  <th className={th}>Price</th>
-                  <th className={th}>Stock</th>
-                  <th className={th}>Status</th>
-                  <th className={th}>Expiry</th>
-                  <th className={th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageData.content?.length === 0 ? (
+        {loadingTable && (
+          <div className="mt-4 space-y-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />
+            ))}
+          </div>
+        )}
+
+        {!loadingTable && activeTab === 'catalog' && (
+          <>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-45 flex-1">
+                <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f7770]" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name, category or brand…"
+                  className="w-full rounded-xl border border-[#dce8e3] bg-[#f4f7f6] py-2 pl-9 pr-3 text-sm text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+                />
+              </div>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 py-2 text-sm font-semibold text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+              >
+                <option value="">All Categories</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 py-2 text-sm font-semibold text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+              >
+                <option value="">All Statuses</option>
+                <option value="visible">Visible only</option>
+                <option value="hidden">Hidden only</option>
+              </select>
+              <span className="ml-auto text-xs text-[#6f817b]">
+                {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            <div className="mt-4 hidden overflow-x-auto rounded-xl border border-[#edf2ef] md:block">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50">
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-gray-400">
-                      No products found.
-                    </td>
+                    <SortableHeader label="Name" field="name" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <SortableHeader label="Category" field="category" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <SortableHeader label="Brand" field="brandName" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <SortableHeader label="Price" field="price" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <SortableHeader label="Stock" field="stockQuantity" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <th className={th}>Status</th>
+                    <SortableHeader label="Expiry" field="earliestExpiryDate" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <th className={th}>Actions</th>
                   </tr>
-                ) : (
-                  pageData.content?.map((p) => (
-                    <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className={td}><span className="font-medium text-gray-800">{p.name}</span></td>
-                      <td className={td}>{p.category ?? '—'}</td>
-                      <td className={td}>{p.brandName ?? '—'}</td>
-                      <td className={td}>{formatPrice(p.price, p.unit)}</td>    
-                      <td className={td}>
-                        <span className={p.stockQuantity === 0 ? 'text-red-500 font-medium' : 'text-gray-700'}>
-                          {p.stockQuantity}
-                        </span>
-                      </td>
-                      <td className={td}>
-                        {p.approvalStatus === 'APPROVED' ? (
-                          <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">Approved</span>
-                        ) : p.approvalStatus === 'PENDING' ? (
-                          <span className="px-2 py-1 text-xs font-semibold text-yellow-700 bg-yellow-100 rounded-full">Pending</span>
-                        ) : p.approvalStatus === 'REJECTED' ? (
-                          <span className="px-2 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded-full">Rejected</span>
-                        ) : (
-                          <span className="text-gray-500">N/A</span>
-                        )}
-                      </td>
-                      <td className={td}>{p.expiryDate ?? '—'}</td>
-                      <td className={td}>
-                        <div className="flex gap-3">
-                          <button onClick={() => openEdit(p)} className="text-blue-600 hover:underline font-medium text-xs">Edit</button>
-                          <button onClick={() => handleDelete(p.id)} disabled={deletingId === p.id} className="text-red-500 hover:underline font-medium text-xs disabled:opacity-50">
-                            {deletingId === p.id ? 'Deleting...' : 'Delete'}    
-                          </button>
-                        </div>
+                </thead>
+                <tbody>
+                  {pagedProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
+                        No products found.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {pageData.totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-              <span>Page {pageData.number + 1} of {pageData.totalPages}</span>
-              <div className="flex gap-2">
-                <button onClick={() => setCurrentPage((p) => p - 1)} disabled={pageData.first} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100">Prev</button>
-                <button onClick={() => setCurrentPage((p) => p + 1)} disabled={pageData.last} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100">Next</button>
-              </div>
+                  ) : (
+                    pagedProducts.map((p) => (
+                      <tr key={p.id} className="border-t border-[#edf2ef]">
+                        <td className={td}><span className="font-medium text-slate-900">{p.name}</span></td>
+                        <td className={td}>{p.category ?? '—'}</td>
+                        <td className={td}>{p.brandName ?? '—'}</td>
+                        <td className={td}>{formatPrice(p.price, p.unit)}</td>
+                        <td className={td}>
+                          <span className={p.stockQuantity === 0 ? 'font-medium text-red-600' : 'text-slate-700'}>
+                            {p.stockQuantity}
+                          </span>
+                        </td>
+                        <td className={td}>
+                          {p.approvalStatus === 'APPROVED' ? (
+                            <StatusChip text="Approved" tone="green" />
+                          ) : p.approvalStatus === 'PENDING' ? (
+                            <StatusChip text="Pending" tone="amber" />
+                          ) : p.approvalStatus === 'REJECTED' ? (
+                            <StatusChip text="Rejected" tone="red" />
+                          ) : (
+                            <span className="text-slate-500">N/A</span>
+                          )}
+                        </td>
+                        <td className={td}>{p.earliestExpiryDate ?? p.expiryDate ?? '—'}</td>
+                        <td className={td}>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => openEdit(p)}
+                              className="text-xs font-semibold text-[#0d4a38] hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleToggleHide(p)}
+                              disabled={hidingId === p.id}
+                              className={`text-xs font-semibold hover:underline disabled:opacity-50 ${
+                                p.hidden ? 'text-[#0d4a38]' : 'text-slate-500'
+                              }`}
+                            >
+                              {hidingId === p.id ? '...' : p.hidden ? 'Show' : 'Hide'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </>
-      )}
 
-      {/* Pending Listing Requests */}
-      {!loadingTable && activeTab === 'pending' && pendingData && (
-        <>
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className={th}>Name</th>
-                  <th className={th}>Category</th>
-                  <th className={th}>Brand</th>
-                  <th className={th}>Price</th>
-                  <th className={th}>Image</th>
-                  <th className={th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingData.content?.length === 0 ? (
+            <div className="mt-4 space-y-3 md:hidden">
+              {pagedProducts.length === 0 ? (
+                <div className="rounded-xl border border-[#edf2ef] p-6 text-center text-sm text-slate-500">
+                  No products found.
+                </div>
+              ) : (
+                pagedProducts.map((p) => (
+                  <article key={p.id} className="rounded-xl border border-[#edf2ef] bg-[#fbfdfc] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{p.name}</p>
+                        <p className="mt-1 text-xs text-slate-500">{p.category ?? 'No category'} · {p.brandName ?? 'No brand'}</p>
+                      </div>
+                      {p.approvalStatus === 'APPROVED' ? (
+                        <StatusChip text="Approved" tone="green" />
+                      ) : p.approvalStatus === 'PENDING' ? (
+                        <StatusChip text="Pending" tone="amber" />
+                      ) : (
+                        <StatusChip text={p.approvalStatus || 'N/A'} tone="red" />
+                      )}
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
+                      <p>Price: <span className="font-medium text-slate-800">{formatPrice(p.price, p.unit)}</span></p>
+                      <p>Stock: <span className={p.stockQuantity === 0 ? 'font-medium text-red-600' : 'font-medium text-slate-800'}>{p.stockQuantity}</span></p>
+                      <p className="col-span-2">Expiry: <span className="font-medium text-slate-800">{p.earliestExpiryDate ?? p.expiryDate ?? '—'}</span></p>
+                    </div>
+                    <div className="mt-3 flex gap-3">
+                      <button onClick={() => openEdit(p)} className="text-xs font-semibold text-[#0d4a38] hover:underline">Edit</button>
+                      <button
+                        onClick={() => handleToggleHide(p)}
+                        disabled={hidingId === p.id}
+                        className={`text-xs font-semibold hover:underline disabled:opacity-50 ${p.hidden ? 'text-[#0d4a38]' : 'text-slate-500'}`}
+                      >
+                        {hidingId === p.id ? '...' : p.hidden ? 'Show' : 'Hide'}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+
+            {totalCatalogPages > 1 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                <span>Page {catalogPage + 1} of {totalCatalogPages} · {filtered.length} products</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCatalogPage((p) => p - 1)}
+                    disabled={catalogPage === 0}
+                    className="rounded-lg border border-[#d4dfdb] px-3 py-1.5 text-sm transition hover:bg-slate-50 disabled:opacity-40"
+                  >Prev</button>
+                  <button
+                    onClick={() => setCatalogPage((p) => p + 1)}
+                    disabled={catalogPage >= totalCatalogPages - 1}
+                    className="rounded-lg border border-[#d4dfdb] px-3 py-1.5 text-sm transition hover:bg-slate-50 disabled:opacity-40"
+                  >Next</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {!loadingTable && activeTab === 'pending' && pendingData && (
+          <>
+            <div className="mt-4 hidden overflow-x-auto rounded-xl border border-[#edf2ef] md:block">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50">
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-gray-400">
-                      No new listing requests at this time.
-                    </td>
+                    <th className={th}>Name</th>
+                    <th className={th}>Category</th>
+                    <th className={th}>Brand</th>
+                    <th className={th}>Price</th>
+                    <th className={th}>Image</th>
+                    <th className={th}>Actions</th>
                   </tr>
-                ) : (
-                  pendingData.content?.map((p) => (
-                    <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className={td}><span className="font-medium text-gray-800">{p.name}</span></td>
-                      <td className={td}>{p.category ?? '—'}</td>
-                      <td className={td}>{p.brandName ?? '—'}</td>
-                      <td className={td}>{formatPrice(p.price, p.unit)}</td>    
-                      <td className={td}>
-                        {p.imageUrl ? (
-                          <img src={p.imageUrl} alt="prod" className="w-10 h-10 object-cover rounded border border-gray-200 shadow-sm" />
-                        ) : '—'}
-                      </td>
-                      <td className={td}>
-                        <div className="flex gap-2 items-center">
-                          <button onClick={() => handleApprove(p.id)} disabled={processingId === p.id} className="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded font-semibold disabled:opacity-50 transition-colors">
-                            Approve
-                          </button>
-                          <button onClick={() => handleReject(p.id)} disabled={processingId === p.id} className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded font-semibold disabled:opacity-50 transition-colors">
-                            Reject
-                          </button>
-                        </div>
+                </thead>
+                <tbody>
+                  {pendingData.content?.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                        No new listing requests at this time.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {pendingData.totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-              <span>Page {pendingData.number + 1} of {pendingData.totalPages}</span>
-              <div className="flex gap-2">
-                <button onClick={() => setCurrentPendingPage((p) => p - 1)} disabled={pendingData.first} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100">Prev</button>
-                <button onClick={() => setCurrentPendingPage((p) => p + 1)} disabled={pendingData.last} className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100">Next</button>
-              </div>
+                  ) : (
+                    pendingData.content?.map((p) => (
+                      <tr key={p.id} className="border-t border-[#edf2ef]">
+                        <td className={td}><span className="font-medium text-slate-900">{p.name}</span></td>
+                        <td className={td}>{p.category ?? '—'}</td>
+                        <td className={td}>{p.brandName ?? '—'}</td>
+                        <td className={td}>{formatPrice(p.price, p.unit)}</td>
+                        <td className={td}>
+                          {p.imageUrl ? (
+                            <img src={p.imageUrl} alt={`${p.name} preview`} className="h-10 w-10 rounded-md border border-[#e4ebe8] object-cover" />
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className={td}>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleApprove(p.id)}
+                              disabled={processingId === p.id}
+                              className="rounded bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 transition hover:bg-green-200 disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(p.id)}
+                              disabled={processingId === p.id}
+                              className="rounded bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-200 disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </>
-      )}
+
+            <div className="mt-4 space-y-3 md:hidden">
+              {pendingData.content?.length === 0 ? (
+                <div className="rounded-xl border border-[#edf2ef] p-6 text-center text-sm text-slate-500">
+                  No new listing requests at this time.
+                </div>
+              ) : (
+                pendingData.content?.map((p) => (
+                  <article key={p.id} className="rounded-xl border border-[#edf2ef] bg-[#fbfdfc] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{p.name}</p>
+                        <p className="mt-1 text-xs text-slate-500">{p.category ?? 'No category'} · {p.brandName ?? 'No brand'}</p>
+                      </div>
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={`${p.name} preview`} className="h-10 w-10 rounded-md border border-[#e4ebe8] object-cover" />
+                      ) : null}
+                    </div>
+                    <p className="mt-3 text-xs text-slate-600">Price: <span className="font-medium text-slate-800">{formatPrice(p.price, p.unit)}</span></p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        onClick={() => handleApprove(p.id)}
+                        disabled={processingId === p.id}
+                        className="rounded bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 transition hover:bg-green-200 disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(p.id)}
+                        disabled={processingId === p.id}
+                        className="rounded bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-200 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+
+            <Pagination
+              pageData={pendingData}
+              onPrev={() => setCurrentPendingPage((p) => p - 1)}
+              onNext={() => setCurrentPendingPage((p) => p + 1)}
+            />
+          </>
+        )}
+      </section>
 
       {modalOpen && (
         <ProductFormModal
+          key={editProduct?.id ?? 'new-product'}
           product={editProduct}
           brands={brands}
           onSubmit={handleSubmit}
@@ -348,17 +532,81 @@ export default function AdminProductsPage() {
           loading={saving}
         />
       )}
+    </AdminDeliveryLayout>
+  );
+}
+
+function SummaryCard({ label, value, tone, icon: Icon }) {
+  const toneClass =
+    tone === 'green'
+      ? 'bg-[#eaf5ef] text-[#0d4a38]'
+      : tone === 'slate'
+        ? 'bg-slate-100 text-slate-700'
+        : 'bg-white text-slate-900';
+
+  return (
+    <article className={`rounded-xl border border-[#e4ebe8] px-4 py-3 ${toneClass}`}>
+      {Icon && <Icon className="mb-2 h-5 w-5 opacity-80" />}
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="mt-1 text-2xl font-bold">{value}</p>
+    </article>
+  );
+}
+
+function StatusChip({ text, tone }) {
+  const toneClass =
+    tone === 'green'
+      ? 'bg-green-100 text-green-700'
+      : tone === 'amber'
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-red-100 text-red-700';
+
+  return <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${toneClass}`}>{text}</span>;
+}
+
+function Pagination({ pageData, onPrev, onNext }) {
+  if (!pageData || pageData.totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+      <span>
+        Page {pageData.number + 1} of {pageData.totalPages}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onPrev}
+          disabled={pageData.first}
+          className="rounded-lg border border-[#d4dfdb] px-3 py-1.5 text-sm transition hover:bg-slate-50 disabled:opacity-40"
+        >
+          Prev
+        </button>
+        <button
+          onClick={onNext}
+          disabled={pageData.last}
+          className="rounded-lg border border-[#d4dfdb] px-3 py-1.5 text-sm transition hover:bg-slate-50 disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }
 
-const th = 'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide';
-const td = 'px-4 py-3 text-gray-700';
+function SortableHeader({ label, field, sortField, sortDir, onSort, className }) {
+  const active = sortField === field;
+  return (
+    <th className={`${className} cursor-pointer select-none`} onClick={() => onSort(field)}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className={active ? 'text-[#0d4a38]' : 'text-slate-300'}>
+          {active && sortDir === 'desc' ? '▼' : '▲'}
+        </span>
+      </span>
+    </th>
+  );
+}
 
-const UNIT_DISPLAY = {
-  PER_ITEM: 'per item',
-  PER_KG:   'per kg',
-  PER_G:    'per g',
-  PER_L:    'per L',
-  PER_ML:   'per ml',
-};
+const th = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500';
+const td = 'px-4 py-3 text-slate-700';

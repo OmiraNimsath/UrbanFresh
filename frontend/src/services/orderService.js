@@ -11,10 +11,11 @@ import api from './api';
  *
  * @param {string} deliveryAddress - confirmed delivery address
  * @param {Array<{productId: number, quantity: number}>} items - cart items to order
- * @returns {Promise<OrderResponse>} created order with orderId, status, totalAmount, items
+ * @param {number} [pointsToRedeem=0] - loyalty points to apply as discount (1 pt = Rs. 5)
+ * @returns {Promise<OrderResponse>} created order with orderId, status, totalAmount, discountAmount, pointsRedeemed, items
  */
-export const placeOrder = (deliveryAddress, items) =>
-  api.post('/api/orders', { deliveryAddress, items }).then((res) => res.data);
+export const placeOrder = (deliveryAddress, items, pointsToRedeem = 0) =>
+  api.post('/api/orders', { deliveryAddress, items, pointsToRedeem }).then((res) => res.data);
 
 /**
  * Fetch the authenticated customer's order history, newest first.
@@ -22,7 +23,16 @@ export const placeOrder = (deliveryAddress, items) =>
  *
  * @returns {Promise<OrderResponse[]>} list of orders; empty array when no orders exist
  */
-export const getMyOrders = () => api.get('/api/customer/orders');
+export const getMyOrders = () => api.get('/api/customer/orders').then((res) => res.data);
+
+/**
+ * Fetch up to 5 "Buy Again" product recommendations for the authenticated customer.
+ * Ranked by purchase frequency; excludes hidden and out-of-stock products.
+ * GET /api/customer/recommendations
+ *
+ * @returns {Promise<RecommendationResponse[]>} ordered recommendation list (empty when no history)
+ */
+export const getRecommendations = () => api.get('/api/customer/recommendations').then((res) => res.data);
 
 /**
  * Fetch one authenticated customer's order by ID.
@@ -97,7 +107,7 @@ export const resolveOrderForSuccess = async ({ orderId } = {}) => {
  *
  * @returns {Promise<LoyaltyPointsResponse>} totalPoints, earnedPoints, redeemedPoints, conversionRule
  */
-export const getLoyaltyPoints = () => api.get('/api/customer/loyalty');
+export const getLoyaltyPoints = () => api.get('/api/customer/loyalty').then((res) => res.data);
 
 /**
  * Fetches a paginated list of all customer orders for admin operations.

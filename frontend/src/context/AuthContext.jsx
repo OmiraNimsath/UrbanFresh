@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { isTokenExpired, msUntilExpiry } from '../utils/tokenUtils';
 import { setExpireSessionCallback } from '../services/api';
@@ -90,6 +91,7 @@ export function AuthProvider({ children }) {
 
     // If the stored token is already expired, expire immediately
     if (isTokenExpired(token)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       expireSession();
       return;
     }

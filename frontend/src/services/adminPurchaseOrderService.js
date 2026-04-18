@@ -19,9 +19,10 @@ export const getAllPurchaseOrders = () =>
 export const createPurchaseOrder = (data) =>
   api.post('/api/admin/purchase-orders', data).then((res) => res.data);
 /**
- * Confirm delivery and update inventory stock
+ * Confirm delivery and update inventory stock.
  * @param {number} orderId Purchase order ID
+ * @param {Object|null} batchData Optional: { items: [{ itemId, batchNumber, manufacturingDate, supplierExpiryDate }] }
  * @returns {Promise<Object>} The updated order
  */
-export const confirmDeliveryAndStock = (orderId) =>
-  api.put(`/api/admin/purchase-orders/${orderId}/confirm`).then((res) => res.data);
+export const confirmDeliveryAndStock = (orderId, batchData = null) =>
+  api.put(`/api/admin/purchase-orders/${orderId}/confirm`, batchData).then((res) => res.data);

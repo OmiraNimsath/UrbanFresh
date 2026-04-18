@@ -23,6 +23,7 @@ import com.urbanfresh.repository.CartRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
 import com.urbanfresh.service.CartService;
+import com.urbanfresh.service.ProductBatchService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -40,6 +41,7 @@ public class CartServiceImpl implements CartService {
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final ProductBatchService productBatchService;
 
     /**
      * Returns the customer's cart, or an empty cart response if none exists yet.
@@ -76,18 +78,35 @@ public class CartServiceImpl implements CartService {
                         Cart.builder().customer(customer).build()));
 
         // If the product is already in the cart, increment quantity rather than add a duplicate line.
+        // Validate that the resulting total does not exceed available stock.
         cart.getItems().stream()
                 .filter(item -> item.getProduct() != null
                         && item.getProduct().getId().equals(product.getId()))
                 .findFirst()
                 .ifPresentOrElse(
-                        existing -> existing.setQuantity(existing.getQuantity() + request.getQuantity()),
-                        () -> cart.getItems().add(
-                                CartItem.builder()
-                                        .cart(cart)
-                                        .product(product)
-                                        .quantity(request.getQuantity())
-                                        .build()));
+                        existing -> {
+                            int newQty = existing.getQuantity() + request.getQuantity();
+                            if (newQty > product.getStockQuantity()) {
+                                throw new InsufficientStockException(
+                                        "Cannot add " + request.getQuantity() + " more of '" + product.getName()
+                                        + "' — only " + (product.getStockQuantity() - existing.getQuantity())
+                                        + " additional unit(s) available");
+                            }
+                            existing.setQuantity(newQty);
+                        },
+                        () -> {
+                            if (request.getQuantity() > product.getStockQuantity()) {
+                                throw new InsufficientStockException(
+                                        "Requested " + request.getQuantity() + " unit(s) of '" + product.getName()
+                                        + "' but only " + product.getStockQuantity() + " available");
+                            }
+                            cart.getItems().add(
+                                    CartItem.builder()
+                                            .cart(cart)
+                                            .product(product)
+                                            .quantity(request.getQuantity())
+                                            .build());
+                        });
 
         cartRepository.save(cart);
         return toCartResponse(cart);
@@ -105,6 +124,13 @@ public class CartServiceImpl implements CartService {
         CartItem item = cartItemRepository
                 .findByIdAndCartCustomerId(cartItemId, customer.getId())
                 .orElseThrow(() -> new CartItemNotFoundException(cartItemId));
+
+        Product product = item.getProduct();
+        if (product != null && request.getQuantity() > product.getStockQuantity()) {
+            throw new InsufficientStockException(
+                    "Requested " + request.getQuantity() + " unit(s) of '" + product.getName()
+                    + "' but only " + product.getStockQuantity() + " available");
+        }
 
         item.setQuantity(request.getQuantity());
         cartItemRepository.save(item);
@@ -180,18 +206,35 @@ public class CartServiceImpl implements CartService {
 
     private CartItemResponse toCartItemResponse(CartItem item) {
         Product p = item.getProduct();
-        BigDecimal lineTotal = p.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+        
+        // Apply product discount if present, then calculate line total from discounted unit price
+        BigDecimal unitPrice = p.getPrice();
+        Integer discountPercentage = p.getDiscountPercentage() != null ? p.getDiscountPercentage() : 0;
+        BigDecimal discountedUnitPrice = unitPrice;
+        
+        if (discountPercentage > 0) {
+            // discountedUnitPrice = unitPrice * (1 - discount% / 100)
+            discountedUnitPrice = unitPrice.multiply(
+                BigDecimal.valueOf(100 - discountPercentage)
+            ).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+        }
+
+        BigDecimal lineTotal = discountedUnitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
 
         return CartItemResponse.builder()
                 .cartItemId(item.getId())
                 .productId(p.getId())
                 .productName(p.getName())
                 .imageUrl(p.getImageUrl())
-                .unitPrice(p.getPrice())
+                .unitPrice(unitPrice)
+                .productDiscountPercentage(discountPercentage)
                 .unit(p.getUnit().name())
                 .quantity(item.getQuantity())
                 .lineTotal(lineTotal)
                 .inStock(p.getStockQuantity() > 0)
+                .stockQuantity(productBatchService.getTotalAvailableQuantity(p.getId()) > 0
+                        ? productBatchService.getTotalAvailableQuantity(p.getId())
+                        : p.getStockQuantity())
                 .build();
     }
 

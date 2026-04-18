@@ -21,6 +21,8 @@ public class AdminOrderReviewResponse {
     private Long deliveryPersonId;
     private String deliveryPersonName;
     private LocalDateTime orderDate;
+    /** Number of loyalty points redeemed on this order. Zero when no points were used. */
+    private int pointsRedeemed;
     private LocalDateTime lastUpdatedDate;
     private CustomerInfo customer;
     private List<OrderItemInfo> items;

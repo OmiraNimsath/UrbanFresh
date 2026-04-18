@@ -21,6 +21,9 @@ public class CartItemResponse {
     private String imageUrl;
     private BigDecimal unitPrice;
 
+    /** Discount percentage (0-100) currently applied to this product; 0 means no discount. */
+    private Integer productDiscountPercentage;
+
     /** Human-readable pricing unit (e.g. "PER_KG", "PER_ITEM"). */
     private String unit;
 
@@ -29,4 +32,7 @@ public class CartItemResponse {
 
     /** True when at least 1 unit is in stock. Used to flag out-of-stock items in the cart UI. */
     private boolean inStock;
+
+    /** Available stock count — used by the cart UI to cap the quantity stepper. */
+    private int stockQuantity;
 }

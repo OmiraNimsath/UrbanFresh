@@ -1,6 +1,7 @@
 package com.urbanfresh.model;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,4 +48,16 @@ public class PurchaseOrderItem {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
+
+    // --- Batch metadata provided by the supplier at shipment time ---
+
+    /** Supplier-assigned batch or lot number for traceability. */
+    @Column(length = 100)
+    private String batchNumber;
+
+    /** Manufacturing date as declared by the supplier. */
+    private LocalDate manufacturingDate;
+
+    /** Expiry date declared by the supplier for this shipment. Used to create the ProductBatch. */
+    private LocalDate supplierExpiryDate;
 }

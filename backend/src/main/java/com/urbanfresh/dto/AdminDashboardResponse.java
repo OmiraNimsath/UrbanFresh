@@ -1,5 +1,7 @@
 package com.urbanfresh.dto;
 
+import java.math.BigDecimal;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,7 +24,7 @@ public class AdminDashboardResponse {
     // Alerts
     private int lowStockItemsCount;
     private int nearExpiryItemsCount;
-    private double wastePercentage;
+    private BigDecimal wastedValueThisMonth;
     
     // Summary
     private DashboardSummary summary;

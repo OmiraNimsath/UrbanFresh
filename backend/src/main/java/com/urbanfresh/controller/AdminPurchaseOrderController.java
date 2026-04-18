@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.urbanfresh.dto.request.ConfirmDeliveryRequest;
 import com.urbanfresh.dto.request.CreatePurchaseOrderRequest;
 import com.urbanfresh.dto.response.PurchaseOrderDto;
 import com.urbanfresh.service.AdminPurchaseOrderService;
@@ -51,12 +52,14 @@ public class AdminPurchaseOrderController {
     }
     /**
      * Confirm a sent purchase order has been received. Updates inventory stock.
+     * Accepts optional per-item batch metadata to enable batch tracking.
      */
     @PutMapping("/{id}/confirm")
     public ResponseEntity<PurchaseOrderDto> confirmDelivery(
             @PathVariable Long id,
+            @RequestBody(required = false) ConfirmDeliveryRequest request,
             Authentication authentication) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();  
         String username = userDetails.getUsername();
-        return ResponseEntity.ok(adminPurchaseOrderService.confirmDeliveryAndStock(id, username));
+        return ResponseEntity.ok(adminPurchaseOrderService.confirmDeliveryAndStock(id, username, request));
     }}

@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -20,6 +20,9 @@ import {
 import toast from 'react-hot-toast';
 
 import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import Breadcrumbs from '../../components/customer/Breadcrumbs';
+import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { placeOrder } from '../../services/orderService';
@@ -28,6 +31,7 @@ import {
   waitForChargeUpdatedAndFetchLatest,
 } from '../../services/paymentService';
 import { formatAmount } from '../../utils/priceUtils';
+import { getApiErrorMessage } from '../../utils/errorMessageUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page root
@@ -37,12 +41,17 @@ export default function CheckoutPage() {
   const { cart, clearCart, loading: cartLoading } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [deliveryAddress, setDeliveryAddress] = useState(user?.address || '');
   const [addressError, setAddressError] = useState('');
 
+  // Loyalty points passed from CartPage via navigation state
+  const pointsToRedeem = location.state?.pointsToRedeem ?? 0;
+
   const [orderId, setOrderId]             = useState(null);
   const [orderTotal, setOrderTotal]       = useState(0);   // snapshot before cart is cleared
+  const [orderDiscount, setOrderDiscount] = useState(0);   // snapshot of loyalty discount applied
   const [orderItemsSnapshot, setOrderItemsSnapshot] = useState([]); // snapshot of items
   const [orderSnapshot, setOrderSnapshot] = useState(null);
   const [stripePromise, setStripePromise] = useState(null);
@@ -72,8 +81,8 @@ export default function CheckoutPage() {
         quantity:  item.quantity,
       }));
 
-      // Place order first
-      const order = await placeOrder(deliveryAddress.trim(), orderItems);
+      // Place order first (pass loyalty points to redeem)
+      const order = await placeOrder(deliveryAddress.trim(), orderItems, pointsToRedeem);
 
       // Create PaymentIntent with the new orderId
       const { clientSecret: secret, publishableKey } = await createPaymentIntent(order.orderId);
@@ -83,15 +92,16 @@ export default function CheckoutPage() {
       setStripePromise(loadStripe(publishableKey));
       setClientSecret(secret);
       setOrderId(order.orderId);
-      setOrderTotal(order.totalAmount);   // ← captured from order, not cart
-      setOrderItemsSnapshot(order.items); // ← capture items from order response
+      setOrderTotal(order.totalAmount);     // ← already discounted
+      setOrderDiscount(order.discountAmount ?? 0);
+      setOrderItemsSnapshot(order.items);   // ← capture items from order response
       setOrderSnapshot(order);
       setStep('payment');
 
       // Cart cleared after step flip (stock already reserved)
       await clearCart();
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Something went wrong. Please try again.';
+      const msg = getApiErrorMessage(err);
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -99,23 +109,32 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="min-h-screen bg-green-50">
+    <div className="min-h-screen bg-[#f5f7f6] flex flex-col">
       <Navbar />
 
-      <div className="max-w-5xl mx-auto px-4 py-10">
+      <div className="flex-1 w-full pb-24 md:pb-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
+        <Breadcrumbs
+          items={[
+            { label: 'Products', to: '/products' },
+            { label: 'Cart', to: '/cart' },
+            { label: 'Checkout' },
+          ]}
+        />
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-green-700">Checkout</h1>
-          <Link to="/cart" className="text-sm text-green-600 hover:underline">
-            ← Back to Cart
+          <h1 className="text-3xl font-bold text-[#163a2f] md:text-4xl">Checkout</h1>
+          <Link to="/cart" className="text-sm text-[#0d4a38] hover:underline flex items-center gap-1">
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 12H5M12 5l-7 7 7 7" /></svg>
+            Back to Cart
           </Link>
         </div>
 
         {/* ── Step progress ── */}
         <div className="flex items-center gap-2 mb-8">
           <StepPill num={1} label="Delivery Address" active={step === 'address'} done={step === 'payment'} />
-          <div className={`flex-1 h-0.5 rounded ${step === 'payment' ? 'bg-green-500' : 'bg-gray-200'}`} />
+          <div className={`flex-1 h-0.5 rounded ${step === 'payment' ? 'bg-[#0d4a38]' : 'bg-[#e4ebe8]'}`} />
           <StepPill num={2} label="Payment" active={step === 'payment'} done={false} />
         </div>
 
@@ -150,17 +169,19 @@ export default function CheckoutPage() {
           <OrderSummaryPanel
             cart={cart}
             orderTotal={orderTotal}
-            orderItemsSnapshot={orderItemsSnapshot} // ← new prop
+            orderDiscount={orderDiscount}
+            orderSnapshot={orderSnapshot}
+            pointsToRedeem={pointsToRedeem}
+            orderItemsSnapshot={orderItemsSnapshot}
             deliveryAddress={deliveryAddress}
             showAddress={step === 'payment'}
           />
         </div>
       </div>
+      </div>
 
-
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm mt-10">
-        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
-      </footer>
+      <MobileBottomNav activeKey="cart" />
+      <Footer />
     </div>
   );
 }
@@ -171,15 +192,15 @@ export default function CheckoutPage() {
 
 function AddressStep({ deliveryAddress, setDeliveryAddress, addressError, loading, onProceed, cart }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-1">Delivery Address</h2>
-      <p className="text-sm text-gray-500 mb-5">
+    <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-6">
+      <h2 className="text-lg font-bold text-[#163a2f] mb-1">Delivery Address</h2>
+      <p className="text-sm text-[#7e8d87] mb-5">
         Confirm where your order should be delivered.
       </p>
 
       <div className="mb-5">
-        <label htmlFor="delivery-address" className="block text-sm font-medium text-gray-700 mb-1">
-          Address <span className="text-red-500">*</span>
+        <label htmlFor="delivery-address" className="block text-xs font-semibold uppercase tracking-widest text-[#7e8d87] mb-1">
+          Street Address <span className="text-red-400">*</span>
         </label>
         <textarea
           id="delivery-address"
@@ -187,24 +208,29 @@ function AddressStep({ deliveryAddress, setDeliveryAddress, addressError, loadin
           value={deliveryAddress}
           onChange={(e) => setDeliveryAddress(e.target.value)}
           disabled={loading}
-          placeholder="e.g. 42, Galle Road, Colombo 03"
-          className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 transition resize-none ${
-            addressError ? 'border-red-400' : 'border-gray-300'
+          placeholder="Enter your full apartment address, block number, and street name..."
+          className={`w-full px-4 py-3 border rounded-xl text-sm text-[#163a2f] focus:outline-none focus:ring-2 focus:ring-[#0d4a38] transition resize-none ${
+            addressError ? 'border-red-400' : 'border-[#e4ebe8]'
           }`}
         />
         {addressError && (
           <p className="text-xs text-red-500 mt-1">{addressError}</p>
         )}
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-[#7e8d87] mt-1">
           Pre-filled from your profile — edit if delivering elsewhere.
         </p>
+      </div>
+
+      <div className="mb-5 rounded-xl border border-[#eaf3ee] bg-[#f5f7f6] px-4 py-3 flex items-center gap-2 text-sm text-[#0d4a38]">
+        <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01" /></svg>
+        Your delivery will be made in 100% biodegradable packaging.
       </div>
 
       <button
         id="proceed-to-payment-btn"
         onClick={onProceed}
         disabled={loading || cart.items.length === 0}
-        className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold rounded-xl active:scale-95 transition-all"
+        className="w-full py-3 bg-[#0d4a38] hover:bg-[#083a2c] disabled:opacity-50 text-white font-semibold rounded-xl active:scale-95 transition-all"
       >
         {loading ? 'Placing order…' : 'Place Order & Pay'}
       </button>
@@ -275,7 +301,7 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
         },
       });
     } catch (err) {
-      const message = err?.response?.data?.message || 'Unable to finalize payment status. Please try again.';
+      const message = getApiErrorMessage(err, 'Unable to finalize payment status. Please try again.');
       setStripeError(message);
       toast.error(message);
       setPaying(false);
@@ -287,16 +313,16 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
   const isBusy = paying;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-1">Secure Payment</h2>
-      <p className="text-sm text-gray-500 mb-5">
+    <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-6">
+      <h2 className="text-lg font-bold text-[#163a2f] mb-1">Secure Payment</h2>
+      <p className="text-sm text-[#7e8d87] mb-5">
         Your card details are processed securely by Stripe. We never store them.
       </p>
 
       <form id="payment-form" onSubmit={handleSubmit}>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Card Details</label>
-          <div className="w-full px-4 py-3 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-green-400 focus-within:border-transparent transition">
+          <label className="block text-xs font-semibold uppercase tracking-widest text-[#7e8d87] mb-1">Card Details</label>
+          <div className="w-full px-4 py-3 border border-[#e4ebe8] rounded-xl focus-within:ring-2 focus-within:ring-[#0d4a38] focus-within:border-transparent transition">
             <CardElement
               id="card-element"
               options={{
@@ -324,14 +350,14 @@ function PaymentStep({ orderId, total, clientSecret, orderSnapshot }) {
           id="pay-now-btn"
           type="submit"
           disabled={!stripe || isBusy}
-          className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold rounded-xl active:scale-95 transition-all"
+          className="w-full py-3 bg-[#0d4a38] hover:bg-[#083a2c] disabled:opacity-50 text-white font-semibold rounded-xl active:scale-95 transition-all"
         >
           {resolvePayButtonLabel(paymentPhase, total)}
         </button>
 
         {isBusy && (
-          <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
-            <p className="text-sm font-semibold text-green-800">{progressLabel}</p>
+          <div className="mt-4 rounded-xl border border-[#e4ebe8] bg-[#f5f7f6] px-4 py-3">
+            <p className="text-sm font-semibold text-[#0d4a38]">{progressLabel}</p>
           </div>
         )}
       </form>
@@ -386,10 +412,19 @@ function buildOrderSuccessPath(orderId, paymentStatus) {
 // Order summary panel (right sidebar — mirrors CartPage layout)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OrderSummaryPanel({ cart, orderTotal, orderItemsSnapshot, deliveryAddress, showAddress }) {
+function OrderSummaryPanel({ cart, orderTotal, orderDiscount, orderSnapshot, pointsToRedeem, orderItemsSnapshot, deliveryAddress, showAddress }) {
+  const LKR_PER_POINT = 5;
+
   // Use orderTotal snapshot (set at order placement) so the total stays correct
   // after clearCart() zeroes cart.totalAmount in the payment step.
-  const displayTotal = orderTotal > 0 ? orderTotal : cart.totalAmount;
+  // During address step: discount is not yet confirmed — compute from pointsToRedeem.
+  // After order is placed: use the server-confirmed orderDiscount.
+  const pendingDiscount   = (orderDiscount <= 0 && pointsToRedeem > 0)
+    ? pointsToRedeem * LKR_PER_POINT
+    : 0;
+  const displayDiscount   = orderDiscount > 0 ? orderDiscount : pendingDiscount;
+  const subtotalBeforeDiscount = orderTotal > 0 ? orderTotal + displayDiscount : cart.totalAmount;
+  const displayTotal      = orderTotal > 0 ? orderTotal : Math.max(0, cart.totalAmount - displayDiscount); // rawTotal already reflects the confirmed discount post-placement
 
   // Use snapshot items if available (during payment step), else cart items
   const displayItems = (orderItemsSnapshot && orderItemsSnapshot.length > 0)
@@ -398,34 +433,47 @@ function OrderSummaryPanel({ cart, orderTotal, orderItemsSnapshot, deliveryAddre
 
   return (
     <div className="lg:w-80 shrink-0">
-      <div className="bg-white rounded-2xl shadow-sm p-6 lg:sticky lg:top-24 space-y-4">
-        <h2 className="text-lg font-bold text-gray-800">Order Summary</h2>
+      <div className="bg-white rounded-2xl border border-[#e4ebe8] shadow-sm p-6 lg:sticky lg:top-24 space-y-4">
+        <h2 className="text-lg font-bold text-[#163a2f]">Order Summary</h2>
 
         <div className="space-y-2">
           {displayItems.map((item, idx) => (
             <div key={item.cartItemId || item.productId || idx} className="flex justify-between text-sm text-gray-600">
-              <span className="truncate flex-1 mr-2">
+              <span className="truncate flex-1 mr-2 text-[#163a2f]">
                 {item.productName}
-                <span className="text-gray-400"> × {item.quantity}</span>
+                <span className="text-[#7e8d87]"> × {item.quantity}</span>
               </span>
-              <span className="font-medium text-gray-800 whitespace-nowrap">
+              <span className="font-semibold text-[#0d4a38] whitespace-nowrap">
                 {formatAmount(item.lineTotal)}
               </span>
             </div>
           ))}
         </div>
 
-        <div className="border-t border-gray-100 pt-4 flex justify-between font-bold text-gray-800">
-          <span>Total</span>
-          <span className="text-green-700">{formatAmount(displayTotal)}</span>
+        {displayDiscount > 0 && (
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between text-[#7e8d87]">
+              <span>Items subtotal</span>
+              <span>{formatAmount(subtotalBeforeDiscount)}</span>
+            </div>
+            <div className="flex justify-between text-[#0d4a38] font-medium">
+              <span>Loyalty discount ({orderDiscount > 0 ? (orderSnapshot?.pointsRedeemed ?? pointsToRedeem) : pointsToRedeem} pts)</span>
+              <span>− {formatAmount(displayDiscount)}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="border-t border-[#e4ebe8] pt-4 flex justify-between">
+          <span className="font-bold text-[#163a2f]">Total</span>
+          <span className="font-extrabold text-[#0d4a38] text-lg">{formatAmount(displayTotal)}</span>
         </div>
 
         {showAddress && deliveryAddress && (
           <div className="border-t border-gray-100 pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#7e8d87] mb-1">
               Delivering to
             </p>
-            <p className="text-sm text-gray-600">{deliveryAddress}</p>
+            <p className="text-sm text-[#163a2f]">{deliveryAddress}</p>
           </div>
         )}
       </div>
@@ -439,12 +487,12 @@ function OrderSummaryPanel({ cart, orderTotal, orderItemsSnapshot, deliveryAddre
 
 function StepPill({ num, label, active, done }) {
   const circleClass = done
-    ? 'bg-green-600 text-white'
+    ? 'bg-[#0d4a38] text-white'
     : active
-      ? 'bg-green-600 text-white'
-      : 'bg-gray-200 text-gray-500';
+      ? 'bg-[#0d4a38] text-white'
+      : 'bg-[#e4ebe8] text-[#7e8d87]';
 
-  const labelClass = active || done ? 'text-green-700 font-semibold' : 'text-gray-400';
+  const labelClass = active || done ? 'text-[#0d4a38] font-semibold' : 'text-[#7e8d87]';
 
   return (
     <div className="flex items-center gap-2">

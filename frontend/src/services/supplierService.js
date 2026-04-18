@@ -36,3 +36,20 @@ export const getSupplierProducts = () =>
  */
 export const requestNewProduct = (productData) =>
   api.post('/api/supplier/products', productData).then((res) => res.data);
+
+/**
+ * Uploads a product image via the supplier endpoint and returns its public URL.
+ * Calls POST /api/supplier/products/upload-image  (multipart/form-data)
+ *
+ * @param {File} file - image file (JPG, PNG, or WebP; max 5 MB)
+ * @returns {Promise<{url: string}>} object containing the public image URL
+ */
+export const uploadSupplierProductImage = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api
+    .post('/api/supplier/products/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((res) => res.data);
+};

@@ -35,7 +35,17 @@ public class AdminProductResponse {
     private String brandCode;
     private String imageUrl;
     private boolean featured;
+    private boolean hidden;
     private LocalDate expiryDate;
+
+    /**
+     * Earliest expiry date across all allocatable batches for this product.
+     * Null when no batches exist. Preferred over expiryDate for batch-tracked products.
+     */
+    private LocalDate earliestExpiryDate;
+
+    /** Discount percentage (0-100) applied to this product; 0 means no discount. */
+    private Integer discountPercentage;
 
     /** Raw warehouse count — visible to admins only to support inventory management. */
     private int stockQuantity;

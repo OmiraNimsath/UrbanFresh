@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
  */
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, user, sessionExpired } = useAuth();
+  const location = useLocation();
 
   // Session expired — redirect with a flag so LoginPage can show the banner
   if (sessionExpired) {
@@ -26,7 +27,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   // If allowedRoles specified, check user's role
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/unauthorized" replace state={{ attemptedPath: location.pathname }} />;
   }
 
   return children;

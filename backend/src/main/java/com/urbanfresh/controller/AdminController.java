@@ -228,6 +228,33 @@ public class AdminController {
     }
 
     /**
+     * Surgically applies or removes a near-expiry discount on a product.
+     * PATCH /api/admin/products/{id}/discount
+     *
+     * Only {@code discountPercentage} is updated. All other product fields
+     * (name, price, brand, description, imageUrl, featured, unit, category,
+     * expiryDate, stockQuantity) are left completely unchanged.
+     * This endpoint must be used exclusively for expiry-dashboard discount
+     * actions to preserve data integrity.
+     *
+     * @param id   product ID
+     * @param body JSON with a single {@code discountPercentage} key (0–100)
+     * @return 200 OK with the updated AdminProductResponse; 404 if not found;
+     *         400 if discountPercentage is outside 0–100
+     */
+    @PatchMapping("/products/{id}/discount")
+    public ResponseEntity<AdminProductResponse> applyProductDiscount(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, Integer> body) {
+
+        Integer discount = body.get("discountPercentage");
+        if (discount == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(adminProductService.applyDiscount(id, discount));
+    }
+
+    /**
      * Permanently deletes a product from the catalogue.
      * DELETE /api/admin/products/{id}
      *
@@ -238,6 +265,19 @@ public class AdminController {
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         adminProductService.deleteProduct(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Toggles the hidden flag on a product.
+     * When hidden, the product is excluded from customer-facing catalogue endpoints.
+     * PATCH /api/admin/products/{id}/hide
+     *
+     * @param id product ID to toggle
+     * @return 200 OK with updated AdminProductResponse
+     */
+    @PatchMapping("/products/{id}/hide")
+    public ResponseEntity<AdminProductResponse> toggleHidden(@PathVariable Long id) {
+        return ResponseEntity.ok(adminProductService.toggleHidden(id));
     }
 
     // ── Delivery Personnel Management ──────────────────────────────────────

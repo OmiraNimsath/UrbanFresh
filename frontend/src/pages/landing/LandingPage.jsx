@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getFeaturedProducts, getNearExpiryProducts } from '../../services/productService';
 import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
 import { useAuth } from '../../context/AuthContext';
 import { formatPrice } from '../../utils/priceUtils';
 
@@ -37,78 +38,86 @@ export default function LandingPage() {
   const heroDashboard = { CUSTOMER: '/dashboard', ADMIN: '/admin', SUPPLIER: '/supplier', DELIVERY: '/delivery' }[user?.role] || '/dashboard';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f3f4f3] text-[#15261f] flex flex-col">
       {/* ── Navigation (auth-aware via shared Navbar) ── */}
       <Navbar />
 
       {/* ── Hero ── */}
-      <section className="bg-green-600 text-white py-20 px-4 text-center">
-        <h1 className="text-4xl md:text-5xl font-extrabold mb-4">
-          Fresh Groceries, Smart Deals
-        </h1>
-        <p className="text-lg md:text-xl text-green-100 max-w-xl mx-auto mb-8">
-          Shop quality produce and save big on near-expiry offers — good for your wallet
-          and the planet.
-        </p>
-        <div className="flex gap-4 justify-center flex-wrap">
-          {isAuthenticated ? (
-            /* Authenticated hero CTAs — skip sign-in prompts */
-            <>
+      <section className="px-4 py-8 md:px-6 md:py-10">
+        <div className="mx-auto grid w-full max-w-6xl items-center gap-8 rounded-[28px] bg-[#eef2ef] p-6 sm:p-8 md:grid-cols-2 md:gap-12">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5f7269]">UrbanFresh</p>
+            <h1 className="mt-4 text-4xl font-extrabold leading-tight text-[#113326] sm:text-5xl">
+              Freshness Delivered to Your Doorstep.
+            </h1>
+            <p className="mt-4 max-w-md text-sm leading-6 text-[#5f7269] sm:text-base">
+              Experience the ultimate grocery shopping with UrbanFresh. Quality products, lightning-fast delivery.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-3">
               <Link
                 to="/products"
-                className="px-6 py-3 bg-white text-green-700 font-semibold rounded-lg hover:bg-green-50 transition-colors"
+                className="rounded-lg bg-[#0f5b3f] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0a4831]"
               >
-                Browse Products
+                Shop Now
               </Link>
-              <Link
-                to={heroDashboard}
-                className="px-6 py-3 border border-white text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
-              >
-                My Dashboard
-              </Link>
-            </>
-          ) : (
-            /* Guest hero CTAs */
-            <>
-              <Link
-                to="/register"
-                className="px-6 py-3 bg-white text-green-700 font-semibold rounded-lg hover:bg-green-50 transition-colors"
-              >
-                Get Started
-              </Link>
-              <Link
-                to="/login"
-                className="px-6 py-3 border border-white text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Log In
-              </Link>
-            </>
-          )}
+              {isAuthenticated ? (
+                <Link
+                  to={heroDashboard}
+                  className="rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#1f3e32] shadow-sm ring-1 ring-[#d4ddd8] transition-colors hover:bg-[#f8faf9]"
+                >
+                  My Dashboard
+                </Link>
+              ) : (
+                <Link
+                  to="/login"
+                  className="rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#1f3e32] shadow-sm ring-1 ring-[#d4ddd8] transition-colors hover:bg-[#f8faf9]"
+                >
+                  Learn More
+                </Link>
+              )}
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute -bottom-6 -left-4 h-24 w-24 rounded-full bg-[#dce8e1] blur-xl" aria-hidden="true" />
+            <div className="overflow-hidden rounded-2xl bg-white p-3 shadow-[0_16px_34px_rgba(15,56,38,0.12)]">
+              <img
+                src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=900&q=80"
+                alt="Fresh basket of vegetables"
+                className="h-64 w-full rounded-xl object-cover sm:h-72"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ── Featured Products ── */}
-      <section className="max-w-6xl mx-auto px-4 py-14">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">⭐ Featured Products</h2>
-        {loadingFeatured && <ProductGridSkeleton />}
-        {errorFeatured && <ErrorMessage message={errorFeatured} />}
-        {!loadingFeatured && !errorFeatured && featured.length === 0 && (
-          <EmptyState message="No featured products at the moment. Check back soon!" />
-        )}
-        {!loadingFeatured && !errorFeatured && featured.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {featured.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+      <section className="pb-12 pt-3 sm:pt-5">
+        <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
+          <div className="mb-5 flex items-end justify-between">
+            <h2 className="text-[30px] font-semibold leading-tight text-[#152f25]">Today&apos;s Featured Picks</h2>
+            <Link to="/products" className="text-sm font-medium text-[#2b5f49] hover:text-[#1b4736]">View all</Link>
           </div>
-        )}
+          {loadingFeatured && <ProductGridSkeleton />}
+          {errorFeatured && <ErrorMessage message={errorFeatured} />}
+          {!loadingFeatured && !errorFeatured && featured.length === 0 && (
+            <EmptyState message="No featured products at the moment. Check back soon!" />
+          )}
+          {!loadingFeatured && !errorFeatured && featured.length > 0 && (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
+              {featured.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── Near-Expiry Offers ── */}
-      <section className="bg-amber-50 py-14">
-        <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">🕐 Near-Expiry Offers</h2>
-          <p className="text-sm text-gray-500 mb-6">
+      <section className="pb-14">
+        <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
+          <h2 className="text-[30px] font-semibold leading-tight text-[#152f25]">Limited Time Offers (Near-Expiry)</h2>
+          <p className="mb-5 mt-2 text-sm text-[#687b72]">
             In-stock items expiring within 7 days — discounted to reduce waste.
           </p>
           {loadingNearExpiry && <ProductGridSkeleton />}
@@ -117,7 +126,7 @@ export default function LandingPage() {
             <EmptyState message="No near-expiry offers right now. Check back tomorrow!" />
           )}
           {!loadingNearExpiry && !errorNearExpiry && nearExpiry.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
               {nearExpiry.map((product) => (
                 <ProductCard key={product.id} product={product} showExpiry />
               ))}
@@ -127,9 +136,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 text-sm">
-        © {new Date().getFullYear()} UrbanFresh. Reducing food waste, one deal at a time.
-      </footer>
+      <Footer />
     </div>
   );
 }
@@ -147,44 +154,56 @@ function ProductCard({ product, showExpiry = false }) {
   return (
     <Link
       to={`/products/${product.id}`}
-      className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col"
+      className="group overflow-hidden rounded-2xl border border-[#dde3df] bg-white transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_24px_rgba(14,54,37,0.12)]"
     >
       {/* Product image or placeholder */}
       {product.imageUrl ? (
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          className="w-full h-44 object-cover"
-        />
+        <>
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="h-36 w-full object-cover sm:h-44"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling.style.display = 'flex';
+            }}
+          />
+          <div
+            style={{ display: 'none' }}
+            className="h-36 w-full items-center justify-center bg-[#e8f1eb] text-4xl text-[#6f8f80] sm:h-44"
+          >
+            🥦
+          </div>
+        </>
       ) : (
-        <div className="w-full h-44 bg-green-100 flex items-center justify-center text-green-400 text-4xl">
+        <div className="flex h-36 w-full items-center justify-center bg-[#e8f1eb] text-4xl text-[#6f8f80] sm:h-44">
           🥦
         </div>
       )}
 
-      <div className="p-4 flex flex-col flex-1">
+      <div className="flex min-h-33 flex-col p-3 sm:p-4">
         {product.category && (
-          <span className="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">
+          <span className="mb-1 inline-flex w-fit rounded-full bg-[#e9f2ec] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#2d664d]">
             {product.category}
           </span>
         )}
-        <h3 className="font-semibold text-gray-800 text-sm mb-1 line-clamp-2">
+        <h3 className="line-clamp-2 text-sm font-semibold text-[#1d3128] sm:text-[15px]">
           {product.name}
         </h3>
         {product.description && (
-          <p className="text-xs text-gray-500 line-clamp-2 mb-2">{product.description}</p>
+          <p className="mt-1 line-clamp-1 text-xs text-[#7a8b83]">{product.description}</p>
         )}
 
-        <div className="mt-auto flex items-center justify-between">
-          <span className="text-green-700 font-bold">{formatPrice(product.price, product.unit)}</span>
+        <div className="mt-auto flex items-center justify-between pt-2">
+          <span className="text-base font-bold text-[#123f2f]">{formatPrice(product.price, product.unit)}</span>
           {!product.inStock && (
-            <span className="text-xs text-red-500 font-medium">Out of stock</span>
+            <span className="rounded-full bg-[#f0f0f0] px-2 py-0.5 text-[10px] font-semibold text-[#8a8a8a]">Out of stock</span>
           )}
         </div>
 
         {/* Show expiry badge only in the near-expiry section */}
         {showExpiry && product.expiryDate && (
-          <div className="mt-2 text-xs bg-amber-100 text-amber-700 rounded px-2 py-1 text-center font-medium">
+          <div className="mt-2 rounded bg-[#f5d8d8] px-2 py-1 text-center text-[11px] font-semibold text-[#b02e2e]">
             Expires {product.expiryDate}
           </div>
         )}
@@ -198,15 +217,15 @@ function ProductCard({ product, showExpiry = false }) {
  */
 function ProductGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden animate-pulse">
-          <div className="w-full h-44 bg-gray-200" />
-          <div className="p-4 space-y-2">
-            <div className="h-3 bg-gray-200 rounded w-1/3" />
-            <div className="h-4 bg-gray-200 rounded w-2/3" />
-            <div className="h-3 bg-gray-200 rounded w-full" />
-            <div className="h-4 bg-gray-200 rounded w-1/4 mt-2" />
+        <div key={i} className="overflow-hidden rounded-2xl border border-[#dde3df] bg-white animate-pulse">
+          <div className="h-36 w-full bg-[#e7ebe8] sm:h-44" />
+          <div className="space-y-2 p-4">
+            <div className="h-3 w-1/3 rounded bg-[#e7ebe8]" />
+            <div className="h-4 w-2/3 rounded bg-[#e7ebe8]" />
+            <div className="h-3 w-full rounded bg-[#e7ebe8]" />
+            <div className="mt-2 h-4 w-1/4 rounded bg-[#e7ebe8]" />
           </div>
         </div>
       ))}
@@ -217,7 +236,7 @@ function ProductGridSkeleton() {
 /** Inline error message for a failed section. */
 function ErrorMessage({ message }) {
   return (
-    <div className="text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm">
+    <div className="rounded-lg border border-[#f1caca] bg-[#fff2f2] px-4 py-3 text-sm text-[#b63a3a]">
       {message}
     </div>
   );
@@ -226,7 +245,7 @@ function ErrorMessage({ message }) {
 /** Empty-state placeholder when a section returns no results. */
 function EmptyState({ message }) {
   return (
-    <div className="text-gray-400 bg-white border border-dashed border-gray-200 rounded-lg px-4 py-10 text-sm text-center">
+    <div className="rounded-lg border border-dashed border-[#d8dfda] bg-white px-4 py-10 text-center text-sm text-[#7a8781]">
       {message}
     </div>
   );

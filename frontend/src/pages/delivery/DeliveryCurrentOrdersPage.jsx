@@ -1,31 +1,44 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { FiMapPin } from 'react-icons/fi';
 
 import DeliveryOrderCard from '../../components/delivery/DeliveryOrderCard';
 import DeliveryPageLayout from '../../components/delivery/DeliveryPageLayout';
 import useDeliveryOrders from '../../hooks/useDeliveryOrders';
+import { useAuth } from '../../context/AuthContext';
 
 /**
  * Delivery current orders page focused on active fulfillment operations.
  */
 export default function DeliveryCurrentOrdersPage() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const { currentOrders, loading, error, refreshOrders } = useDeliveryOrders();
   const [searchValue, setSearchValue] = useState('');
+  const [sortDir, setSortDir] = useState('desc');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 8;
 
   const filteredOrders = useMemo(() => {
-    const normalizedSearch = searchValue.trim().toLowerCase();
-
-    return currentOrders.filter((order) => {
-      if (!normalizedSearch) return true;
-
+    const q = searchValue.trim().toLowerCase();
+    let result = currentOrders.filter((order) => {
+      if (!q) return true;
       return (
-        String(order.orderId).includes(normalizedSearch) ||
-        String(order.customerName || '').toLowerCase().includes(normalizedSearch)
+        String(order.orderId).includes(q) ||
+        String(order.customerName || '').toLowerCase().includes(q)
       );
     });
-  }, [currentOrders, searchValue]);
+    result = [...result].sort((a, b) =>
+      sortDir === 'desc' ? b.orderId - a.orderId : a.orderId - b.orderId,
+    );
+    return result;
+  }, [currentOrders, searchValue, sortDir]);
+
+  useEffect(() => { setPage(0); }, [searchValue]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const pagedOrders = filteredOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const handleOpenOrder = (orderId) => {
     navigate(`/delivery/orders/${orderId}`);
@@ -36,59 +49,77 @@ export default function DeliveryCurrentOrdersPage() {
     toast.success('Current orders refreshed.');
   };
 
+  const handleLogout = () => {
+    logout();
+    toast.success('Logged out successfully');
+    navigate('/login', { replace: true });
+  };
+
   return (
     <DeliveryPageLayout
-      title="Current Orders"
-      subtitle="Track active assignments and open details quickly."
-      actions={
-        <button
-          type="button"
-          onClick={handleRefresh}
-          className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-        >
-          Refresh
-        </button>
+      activeKey="orders"
+      pageTitle="Newly Assigned"
+      pageTitleRight={
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f2c500] text-base font-semibold text-[#173f2f]">
+          {Math.min(currentOrders.length, 9)}
+        </span>
       }
+      onRefresh={handleRefresh}
+      onLogout={handleLogout}
     >
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Newly Assigned Orders</h2>
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            {currentOrders.length} Out for Delivery
-          </span>
-        </div>
+      <section className="rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
+        <input
+          type="text"
+          value={searchValue}
+          onChange={(event) => setSearchValue(event.target.value)}
+          placeholder="Search by Order ID or Name"
+          className="h-14 w-full rounded-2xl border border-[#d6dfdb] bg-[#eef2f0] px-5 text-base text-[#214338] outline-none transition focus:border-[#9ad3b7] focus:bg-white"
+        />
 
-        {currentOrders.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">No newly assigned out-for-delivery orders right now.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {currentOrders.slice(0, 4).map((order) => (
+        <div className="mt-4 space-y-3">
+          {currentOrders.slice(0, 2).map((order) => (
+            <div key={order.orderId} className="rounded-3xl bg-[#f6f8f7] p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-2xl font-semibold text-[#202827]">{order.customerName || 'Customer'}</p>
+                  <p className="mt-1 text-base text-[#5f6f68]">{order.customerPhone || 'Phone not available'}</p>
+                </div>
+                <span className="rounded-full bg-[#9ee7c1] px-4 py-1 text-xs font-semibold text-[#1c6d4e]">
+                  {order.priority === 'URGENT' ? 'Urgent' : 'New'}
+                </span>
+              </div>
+
+              <p className="mt-4 flex items-start gap-2 text-base text-[#3f4c48]">
+                <FiMapPin className="mt-1 text-[#1c8b63]" />
+                <span>{order.shortDeliveryAddress || order.fullDeliveryAddress || 'Address not available'}</span>
+              </p>
+
               <button
-                key={order.orderId}
                 type="button"
                 onClick={() => handleOpenOrder(order.orderId)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:bg-slate-100"
+                className="mt-5 h-12 w-full rounded-2xl bg-[#01412d] text-base font-semibold text-white transition hover:bg-[#083a2c]"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">Order #{order.orderId}</p>
-                  <span className="text-xs font-medium text-emerald-700">Open</span>
-                </div>
-                <p className="mt-1 text-sm text-slate-600">{order.customerName || 'Customer'}</p>
+                Accept Order
               </button>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </section>
 
-      <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="grid grid-cols-1 gap-2">
-          <input
-            type="text"
-            value={searchValue}
-            onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="Search by order ID or customer"
-            className="h-11 w-full rounded-xl border border-slate-300 px-4 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-          />
+      <section className="mt-4 rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-2xl font-semibold leading-tight text-[#0d3f31] sm:text-3xl">Active Orders</h3>
+          <div className="flex items-center gap-2">
+            <select
+              value={sortDir}
+              onChange={(e) => { setSortDir(e.target.value); setPage(0); }}
+              className="h-9 rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 text-sm text-[#5f7770] focus:outline-none"
+            >
+              <option value="desc">Newest first</option>
+              <option value="asc">Oldest first</option>
+            </select>
+            <p className="text-sm font-medium text-[#8a9993]">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
 
         {loading && <p className="mt-4 text-sm text-slate-500">Loading orders...</p>}
@@ -96,17 +127,54 @@ export default function DeliveryCurrentOrdersPage() {
         {!loading && error === 'failed' && <p className="mt-4 text-sm text-slate-700">Failed to load orders. Please refresh.</p>}
 
         {!loading && !error && filteredOrders.length === 0 && (
-          <p className="mt-4 text-sm text-slate-500">No newly assigned orders match your search.</p>
+          <p className="mt-4 text-sm text-slate-500">
+            {currentOrders.length === 0 ? 'No active orders at the moment.' : 'No orders match your search.'}
+          </p>
         )}
 
         {!loading && !error && filteredOrders.length > 0 && (
           <ul className="mt-4 space-y-3">
-            {filteredOrders.map((delivery) => (
+            {pagedOrders.map((delivery) => (
               <li key={delivery.orderId}>
                 <DeliveryOrderCard delivery={delivery} onOpen={handleOpenOrder} showNewlyAssigned />
               </li>
             ))}
           </ul>
+        )}
+
+        {!loading && !error && totalPages > 1 && (
+          <div className="mt-5 flex items-center justify-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dce8e3] bg-white text-[#0d4a38] disabled:opacity-30"
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setPage(i)}
+                className={`flex h-10 min-w-10 items-center justify-center rounded-xl border px-2 text-sm font-semibold transition ${
+                  i === page
+                    ? 'border-[#0d4a38] bg-[#0d4a38] text-white'
+                    : 'border-[#dce8e3] bg-white text-[#4a6259] hover:bg-[#f1f6f4]'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dce8e3] bg-white text-[#0d4a38] disabled:opacity-30"
+            >
+              ›
+            </button>
+          </div>
         )}
       </section>
     </DeliveryPageLayout>

@@ -44,3 +44,42 @@ export function formatAmount(amount) {
     maximumFractionDigits: 2,
   })}`;
 }
+
+/**
+ * Calculates the discounted price given original price and discount percentage.
+ * Formula: discountedPrice = price * (1 - discount% / 100)
+ *
+ * Example: calculateDiscountedPrice(500, 15) → 425
+ *
+ * @param {number} price             - original product price
+ * @param {number} discountPercentage - discount as integer 0-100
+ * @returns {number} discounted price rounded to 2 decimals
+ */
+export function calculateDiscountedPrice(price, discountPercentage) {
+  if (!discountPercentage || discountPercentage === 0) {
+    return price;
+  }
+  const discounted = price * (1 - discountPercentage / 100);
+  return Math.round(discounted * 100) / 100;
+}
+
+/**
+ * Formats a discounted price display showing original → discounted (% OFF).
+ * Returns just the formatted discounted amount if no discount applied.
+ *
+ * @param {number} price             - original product price
+ * @param {number} discountPercentage - discount as integer 0-100
+ * @param {string} unit              - PricingUnit enum string
+ * @returns {string} formatted display of original and discounted prices
+ */
+export function formatDiscountedPrice(price, discountPercentage, unit) {
+  if (!discountPercentage || discountPercentage === 0) {
+    return formatPrice(price, unit);
+  }
+  
+  const originalFormatted = formatPrice(price, unit);
+  const discountedPrice = calculateDiscountedPrice(price, discountPercentage);
+  const discountedFormatted = formatPrice(discountedPrice, unit);
+  
+  return `${originalFormatted} → ${discountedFormatted} (${discountPercentage}% OFF)`;
+}

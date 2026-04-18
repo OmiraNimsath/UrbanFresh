@@ -3,7 +3,10 @@ package com.urbanfresh.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,6 +17,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -64,6 +68,14 @@ public class Product {
     private String imageUrl;
 
     /**
+     * When true the product is hidden from the customer-facing store.
+     * Admins can toggle this to remove a product from the catalogue without deleting it.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean hidden = false;
+
+    /**
      * When true the product appears in the "Featured Products" section on the landing page.
      * Defaults to false so only explicitly promoted items surface.
      */
@@ -84,6 +96,11 @@ public class Product {
     /** Expiry date used to surface near-expiry offers; null if the product does not expire. */
     private LocalDate expiryDate;
 
+    /** Discount percentage (0-100) applied to this product; null or 0 means no discount. */
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer discountPercentage = 0;
+
     @Column(nullable = false)
     @Builder.Default
     private int stockQuantity = 0;
@@ -96,6 +113,14 @@ public class Product {
     /** Email of the admin who last updated inventory fields (stockQuantity / reorderThreshold). */
     @Column(length = 150)
     private String inventoryUpdatedBy;
+
+    /**
+     * All shipment batches for this product. Used for FIFO allocation and batch-level admin views.
+     * CascadeType.ALL so batches are deleted when a product is removed.
+     */
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<ProductBatch> batches = new ArrayList<>();
 
     /** Indicates if the product listing is approved by an administrator. */
     @Enumerated(EnumType.STRING)

@@ -1,6 +1,7 @@
 package com.urbanfresh.service.impl;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,8 +22,10 @@ import com.urbanfresh.dto.request.OrderStatusUpdateRequest;
 import com.urbanfresh.dto.request.PlaceOrderRequest;
 import com.urbanfresh.dto.response.AdminOrderResponse;
 import com.urbanfresh.dto.response.AdminOrderReviewResponse;
+import com.urbanfresh.dto.response.BatchAllocationDto;
 import com.urbanfresh.dto.response.DeliveryAssignedOrderResponse;
 import com.urbanfresh.dto.response.DeliveryOrderDetailsResponse;
+import com.urbanfresh.dto.response.DeliveryProfileSummaryResponse;
 import com.urbanfresh.dto.response.OrderItemResponse;
 import com.urbanfresh.dto.response.OrderResponse;
 import com.urbanfresh.exception.InsufficientStockException;
@@ -32,25 +35,34 @@ import com.urbanfresh.exception.ProductNotFoundException;
 import com.urbanfresh.exception.UserNotFoundException;
 import com.urbanfresh.model.Order;
 import com.urbanfresh.model.OrderItem;
+import com.urbanfresh.model.OrderItemBatchAllocation;
 import com.urbanfresh.model.OrderStatus;
 import com.urbanfresh.model.OrderStatusHistory;
 import com.urbanfresh.model.PaymentStatus;
 import com.urbanfresh.model.Product;
+import com.urbanfresh.model.ProductBatch;
 import com.urbanfresh.model.Role;
 import com.urbanfresh.model.User;
+import com.urbanfresh.repository.OrderItemBatchAllocationRepository;
 import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.OrderStatusHistoryRepository;
+import com.urbanfresh.repository.ProductBatchRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
+import com.urbanfresh.service.LoyaltyService;
+import com.urbanfresh.service.NotificationService;
 import com.urbanfresh.service.OrderService;
+import com.urbanfresh.service.ProductBatchService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Service Layer – Implements order placement with transactional stock validation
  * and deduction. Uses pessimistic locking on Product rows to prevent overselling
  * when two customers compete for the last unit.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -66,8 +78,7 @@ public class OrderServiceImpl implements OrderService {
 		private static final Set<OrderStatus> ADMIN_MANAGEABLE_CURRENT_STATUSES = Set.of(
 				OrderStatus.CONFIRMED,   // admin can advance a paid order to PROCESSING
 				OrderStatus.PROCESSING,
-				OrderStatus.READY,
-				OrderStatus.CANCELLED
+				OrderStatus.READY
 		);
 
 		private static final Set<OrderStatus> ADMIN_ALLOWED_TARGET_STATUSES = Set.of(
@@ -88,8 +99,7 @@ public class OrderServiceImpl implements OrderService {
 		private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_ADMIN_TRANSITIONS = Map.of(
 				OrderStatus.CONFIRMED,  Set.of(OrderStatus.PROCESSING, OrderStatus.CANCELLED),
 				OrderStatus.PROCESSING, Set.of(OrderStatus.READY, OrderStatus.CANCELLED),
-				OrderStatus.READY, Set.of(OrderStatus.PROCESSING),
-				OrderStatus.CANCELLED, Set.of(OrderStatus.PROCESSING)
+				OrderStatus.READY, Set.of(OrderStatus.PROCESSING, OrderStatus.CANCELLED)
 		);
 
         		private static final Map<OrderStatus, Integer> ORDER_STATUS_PROGRESS_INDEX = Map.of(
@@ -107,6 +117,11 @@ public class OrderServiceImpl implements OrderService {
         private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final LoyaltyService loyaltyService;
+    private final NotificationService notificationService;
+    private final ProductBatchService productBatchService;
+    private final ProductBatchRepository productBatchRepository;
+    private final OrderItemBatchAllocationRepository allocationRepository;
 
     /**
      * Places an order for the authenticated customer.
@@ -169,17 +184,44 @@ public class OrderServiceImpl implements OrderService {
             // Deduct inventory
             product.setStockQuantity(product.getStockQuantity() - itemRequest.getQuantity());
 
-            BigDecimal lineTotal = product.getPrice()
+            // Apply product discount if present, then calculate line total from discounted unit price
+            BigDecimal unitPrice = product.getPrice();
+            Integer discountPercentage = product.getDiscountPercentage() != null ? product.getDiscountPercentage() : 0;
+            BigDecimal discountedUnitPrice = unitPrice;
+            
+            if (discountPercentage > 0) {
+                // discountedUnitPrice = unitPrice * (1 - discount% / 100)
+                discountedUnitPrice = unitPrice.multiply(
+                    BigDecimal.valueOf(100 - discountPercentage)
+                ).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+            }
+
+            BigDecimal lineTotal = discountedUnitPrice
                     .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             total = total.add(lineTotal);
 
             orderItems.add(OrderItem.builder()
                     .product(product)
                     .productName(product.getName())       // snapshot — survives product edits
-                    .unitPrice(product.getPrice())         // snapshot — survives price changes
+                    .unitPrice(unitPrice)                  // snapshot of original price — survives edits
+                    .productDiscountPercentage(discountPercentage)  // snapshot of discount — preserves calcs
                     .quantity(itemRequest.getQuantity())
                     .lineTotal(lineTotal)
                     .build());
+        }
+
+        // Validate loyalty points redemption and lock the discount into the order total.
+        // Points are validated here (balance check + max-discount guard) so the customer
+        // gets immediate feedback if their balance is insufficient, and the discounted total
+        // is persisted on the order. The actual ledger deduction is deferred to
+        // PaymentServiceImpl.applyPaidState() — points are only consumed after the Stripe
+        // payment is confirmed, so a failed payment never permanently burns a customer's points.
+        BigDecimal discount = BigDecimal.ZERO;
+        int pointsRedeemed = 0;
+        if (request.getPointsToRedeem() > 0) {
+            discount = loyaltyService.validatePointsRedemption(customer, request.getPointsToRedeem(), total);
+            pointsRedeemed = request.getPointsToRedeem();
+            total = total.subtract(discount);
         }
 
         // Build the order header and link items to it
@@ -187,6 +229,8 @@ public class OrderServiceImpl implements OrderService {
                 .customer(customer)
                 .deliveryAddress(request.getDeliveryAddress())
                 .totalAmount(total)
+                .discountAmount(discount)
+                .pointsRedeemed(pointsRedeemed)
                 .status(OrderStatus.PENDING)
                 .build();
 
@@ -195,6 +239,19 @@ public class OrderServiceImpl implements OrderService {
         order.getItems().addAll(orderItems);
 
         Order saved = orderRepository.save(order);
+
+        // Perform FIFO batch allocation for each saved item.
+        // Must happen after save so OrderItem IDs exist for the FK on allocation records.
+        // Only runs for items where a tracked product has allocatable batches; items from
+        // products without batch records are silently skipped (legacy / manual stock products).
+        for (int i = 0; i < saved.getItems().size(); i++) {
+            OrderItem savedItem = saved.getItems().get(i);
+            int qty = request.getItems().get(i).getQuantity();
+            Long productId = savedItem.getProduct() != null ? savedItem.getProduct().getId() : null;
+            if (productId != null && productBatchService.getTotalAvailableQuantity(productId) > 0) {
+                productBatchService.allocateBatchesFifo(savedItem, qty);
+            }
+        }
 
         // Loyalty points are awarded only after payment is confirmed (PENDING → CONFIRMED).
         // See PaymentServiceImpl.applyPaidState() for the award trigger.
@@ -351,12 +408,49 @@ public class OrderServiceImpl implements OrderService {
                                                 .changeReason(normalizeChangeReason(request.getChangeReason()))
                                                 .build());
 
+                                notificationService.createOrderStatusNotification(updated, targetStatus);
+
                                 Order detailedUpdatedOrder = orderRepository
                                                 .findDetailedByIdAndAssignedDeliveryPersonId(orderId, deliveryPerson.getId())
                                                 .orElse(updated);
 
                                 return toDeliveryOrderDetailsResponse(detailedUpdatedOrder);
                 }
+
+        /**
+         * Returns delivery profile summary counters for the authenticated delivery user.
+         *
+         * @param deliveryEmail email from JWT principal
+         * @return delivery profile summary metrics
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public DeliveryProfileSummaryResponse getDeliveryProfileSummary(String deliveryEmail) {
+                User deliveryPerson = userRepository.findByEmailAndRoleAndIsActiveTrue(deliveryEmail, Role.DELIVERY)
+                                .orElseThrow(() -> new UserNotFoundException("Delivery personnel not found: " + deliveryEmail));
+
+                Long assignedCount = orderRepository.countByAssignedDeliveryPersonId(deliveryPerson.getId());
+                Long outForDeliveryCount = orderRepository.countByAssignedDeliveryPersonIdAndStatus(
+                                deliveryPerson.getId(),
+                                OrderStatus.OUT_FOR_DELIVERY
+                );
+                Long deliveredCount = orderRepository.countByAssignedDeliveryPersonIdAndStatus(
+                                deliveryPerson.getId(),
+                                OrderStatus.DELIVERED
+                );
+                Long returnedCount = orderRepository.countByAssignedDeliveryPersonIdAndStatus(
+                                deliveryPerson.getId(),
+                                OrderStatus.RETURNED
+                );
+
+                return DeliveryProfileSummaryResponse.builder()
+                                .assignedOrderCount(assignedCount)
+                                .outForDeliveryCount(outForDeliveryCount)
+                                .deliveredCount(deliveredCount)
+                                .returnedCount(returnedCount)
+                                .completedOrderCount(deliveredCount + returnedCount)
+                                .build();
+        }
 
         /**
          * Returns paginated orders assigned to the authenticated delivery user.
@@ -498,6 +592,10 @@ public class OrderServiceImpl implements OrderService {
                 }
 
                 order.setStatus(targetStatus);
+                // When an order is cancelled, return the allocated stock back to its batches
+                if (targetStatus == OrderStatus.CANCELLED) {
+                        restoreStockForOrder(order);
+                }
                 Order updated = orderRepository.save(order);
 
                 orderStatusHistoryRepository.save(OrderStatusHistory.builder()
@@ -508,7 +606,72 @@ public class OrderServiceImpl implements OrderService {
                                 .changeReason(normalizedReason)
                                 .build());
 
+                notificationService.createOrderStatusNotification(updated, targetStatus);
+
                 return toAdminOrderResponse(updated);
+        }
+
+        /**
+         * Restores batch availableQuantity and product stockQuantity for every allocation
+         * belonging to a cancelled order. Batches already EXPIRED are skipped — their stock
+         * was written off by the expiry scheduler and a WasteRecord was already created.
+         *
+         * @param order the order whose allocations should be reversed
+         */
+        private void restoreStockForOrder(Order order) {
+                for (OrderItem item : order.getItems()) {
+                        List<OrderItemBatchAllocation> allocations =
+                                allocationRepository.findByOrderItemId(item.getId());
+                        for (OrderItemBatchAllocation alloc : allocations) {
+                                ProductBatch batch = alloc.getBatch();
+                                // Skip batches that have actually expired by date — the scheduler
+                                // already zeroed their stock and wrote a WasteRecord for them.
+                                if (batch.getExpiryDate() != null &&
+                                        batch.getExpiryDate().isBefore(java.time.LocalDate.now())) {
+                                        continue;
+                                }
+                                int qty = alloc.getAllocatedQuantity();
+                                batch.setAvailableQuantity(batch.getAvailableQuantity() + qty);
+                                productBatchRepository.save(batch);
+                                Product product = batch.getProduct();
+                                product.setStockQuantity(product.getStockQuantity() + qty);
+                                productRepository.save(product);
+                        }
+                }
+        }
+
+        /**
+         * Finds all PENDING orders older than 24 hours and cancels them, restoring stock.
+         * PENDING orders are those where payment was never confirmed (abandoned or failed).
+         * Called by the scheduler every hour.
+         */
+        @Override
+        @Transactional
+        public void cancelStalePendingOrders() {
+                LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
+                List<Order> staleOrders = orderRepository.findByStatusAndCreatedAtBefore(
+                        OrderStatus.PENDING, cutoff);
+
+                for (Order order : staleOrders) {
+                        restoreStockForOrder(order);
+                        order.setStatus(OrderStatus.CANCELLED);
+                        Order saved = orderRepository.save(order);
+
+                        orderStatusHistoryRepository.save(OrderStatusHistory.builder()
+                                .order(saved)
+                                .previousStatus(OrderStatus.PENDING)
+                                .newStatus(OrderStatus.CANCELLED)
+                                .changedByAdmin(null)
+                                .changeReason("Automatically cancelled after 24 hours — payment was not completed.")
+                                .build());
+
+                        notificationService.createOrderStatusNotification(saved, OrderStatus.CANCELLED);
+                        log.info("[OrderService] Auto-cancelled stale PENDING order id={}", saved.getId());
+                }
+
+                if (!staleOrders.isEmpty()) {
+                        log.info("[OrderService] Auto-cancelled {} stale PENDING order(s).", staleOrders.size());
+                }
         }
 
         /**
@@ -559,6 +722,8 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(resolvePersistedPaymentStatus(order))
                 .deliveryAddress(order.getDeliveryAddress())
                 .totalAmount(order.getTotalAmount())
+                .discountAmount(order.getDiscountAmount())
+                .pointsRedeemed(order.getPointsRedeemed())
                 .createdAt(order.getCreatedAt())
                 .items(itemResponses)
                 .build();
@@ -576,8 +741,28 @@ public class OrderServiceImpl implements OrderService {
                         .productId(item.getProduct() != null ? item.getProduct().getId() : null)
                         .productName(item.getProductName())
                         .unitPrice(item.getUnitPrice())
+                        .productDiscountPercentage(item.getProductDiscountPercentage())
                         .quantity(item.getQuantity())
                         .lineTotal(item.getLineTotal())
+                        .batchAllocations(toBatchAllocationDtos(item.getId()))
+                        .build())
+                .toList();
+    }
+
+    /**
+     * Fetches batch allocation records for an order item and maps them to DTOs.
+     * Returns an empty list for legacy order items (placed before batch tracking).
+     *
+     * @param orderItemId ID of the order item to look up allocations for
+     * @return list of batch allocation DTOs; empty if none
+     */
+    private List<BatchAllocationDto> toBatchAllocationDtos(Long orderItemId) {
+        if (orderItemId == null) return List.of();
+        return allocationRepository.findByOrderItemId(orderItemId).stream()
+                .map(alloc -> BatchAllocationDto.builder()
+                        .batchNumber(alloc.getBatch().getBatchNumber())
+                        .expiryDate(alloc.getBatch().getExpiryDate())
+                        .allocatedQuantity(alloc.getAllocatedQuantity())
                         .build())
                 .toList();
     }
@@ -604,6 +789,8 @@ public class OrderServiceImpl implements OrderService {
                                 .itemCount(order.getItems() != null ? order.getItems().size() : 0)
                                 .itemsSummary(toItemsSummary(order))
                                 .totalAmount(order.getTotalAmount())
+                                .discountAmount(order.getDiscountAmount())
+                                .pointsRedeemed(order.getPointsRedeemed())
                                 .paymentStatus(resolvePersistedPaymentStatus(order))
                                 .paymentMethod(resolveDeliveryPaymentMethod())
                                 .createdAt(order.getCreatedAt())
@@ -713,6 +900,8 @@ public class OrderServiceImpl implements OrderService {
                                 .orderStatus(order.getStatus().name())
                                 .paymentStatus(resolvePersistedPaymentStatus(order))
                                 .totalAmount(order.getTotalAmount())
+                                .discountAmount(order.getDiscountAmount())
+                                .pointsRedeemed(order.getPointsRedeemed())
                                 .orderDate(order.getCreatedAt())
                                 .deliveryPersonId(deliveryPerson != null ? deliveryPerson.getId() : null)
                                 .deliveryPersonName(deliveryPerson != null ? deliveryPerson.getName() : null)
@@ -745,7 +934,7 @@ public class OrderServiceImpl implements OrderService {
 
                 // Payment/tax modules are not integrated yet; keep explicit zero values
                 // so the review response remains schema-stable for current frontend screens.
-                BigDecimal discounts = BigDecimal.ZERO;
+                BigDecimal discounts = order.getDiscountAmount();
                 BigDecimal taxes = BigDecimal.ZERO;
                 BigDecimal shippingCost = BigDecimal.ZERO;
 
@@ -766,6 +955,7 @@ public class OrderServiceImpl implements OrderService {
                                 .deliveryPersonId(deliveryPerson != null ? deliveryPerson.getId() : null)
                                 .deliveryPersonName(deliveryPerson != null ? deliveryPerson.getName() : null)
                                 .orderDate(order.getCreatedAt())
+                                .pointsRedeemed(order.getPointsRedeemed())
                                 .lastUpdatedDate(resolveLastUpdatedDate(order, historyRows))
                                 .customer(AdminOrderReviewResponse.CustomerInfo.builder()
                                                 .customerName(order.getCustomer().getName())
@@ -856,6 +1046,8 @@ public class OrderServiceImpl implements OrderService {
                                                 .customerPhone(order.getCustomer() != null ? order.getCustomer().getPhone() : null)
                                                 .deliveryAddress(order.getDeliveryAddress())
                                                 .totalAmount(order.getTotalAmount())
+                                                .discountAmount(order.getDiscountAmount())
+                                                .pointsRedeemed(order.getPointsRedeemed())
                                                 .paymentStatus(resolvePersistedPaymentStatus(order))
                                                 .paymentMethod(resolveDeliveryPaymentMethod())
                                                 .items(toOrderItemResponses(order))
@@ -920,6 +1112,11 @@ public class OrderServiceImpl implements OrderService {
                                 .changedByAdmin(adminUser)
                                 .changeReason("Assigned to delivery personnel: " + deliveryPerson.getName())
                                 .build());
+
+                // Only notify when the status actually changed (READY → OUT_FOR_DELIVERY)
+                if (updated.getStatus() != previousStatus) {
+                        notificationService.createOrderStatusNotification(updated, updated.getStatus());
+                }
 
                 return toAdminOrderResponse(updated);
         }

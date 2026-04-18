@@ -3,6 +3,7 @@ package com.urbanfresh.service;
 import java.util.List;
 
 import com.urbanfresh.dto.request.InventoryUpdateRequest;
+import com.urbanfresh.dto.response.BatchResponse;
 import com.urbanfresh.dto.response.InventoryResponse;
 
 /**
@@ -29,4 +30,13 @@ public interface InventoryService {
      * @return InventoryResponse reflecting the persisted state
      */
     InventoryResponse updateInventory(Long productId, InventoryUpdateRequest request, String updatedBy);
+
+    /**
+     * Returns all batches for a product ordered by expiry date ascending.
+     * Allows admin to inspect batch composition and identify near-expiry batches.
+     *
+     * @param productId ID of the product whose batches to retrieve
+     * @return list of BatchResponse ordered oldest-expiry-first
+     */
+    List<BatchResponse> getProductBatches(Long productId);
 }

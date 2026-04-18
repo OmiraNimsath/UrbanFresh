@@ -9,6 +9,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
+import com.urbanfresh.dto.response.ApiErrorResponse;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -34,10 +36,15 @@ public class JwtAuthEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        // Build JSON manually to avoid hard dependency on ObjectMapper import
+        ApiErrorResponse payload = ApiErrorResponse.builder()
+            .status(HttpStatus.UNAUTHORIZED.value())
+            .message("Session expired or invalid token. Please log in again.")
+            .timestamp(LocalDateTime.now())
+            .build();
+
         String json = String.format(
-                "{\"status\":401,\"message\":\"Session expired or invalid token. Please log in again.\",\"timestamp\":\"%s\"}",
-                LocalDateTime.now()
+            "{\"status\":%d,\"message\":\"%s\",\"timestamp\":\"%s\"}",
+            payload.getStatus(), payload.getMessage(), payload.getTimestamp()
         );
         response.getWriter().write(json);
     }
