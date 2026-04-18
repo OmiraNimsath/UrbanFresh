@@ -94,6 +94,7 @@ public class SupplierServiceImpl implements SupplierService {
                         .price(product.getPrice())
                         .unit(product.getUnit())
                         .stockQuantity(product.getStockQuantity())
+                        .reorderThreshold(product.getReorderThreshold())
                         .approvalStatus(product.getApprovalStatus() != null ? product.getApprovalStatus().name() : "APPROVED")
                         .build())
                 .toList();

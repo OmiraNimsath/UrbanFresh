@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
+import { FiPackage, FiEye, FiEyeOff, FiSearch } from 'react-icons/fi';
 import {
   getAdminProducts,
   createProduct,
@@ -22,13 +23,20 @@ import { formatPrice } from '../../utils/priceUtils';
 export default function AdminProductsPage() {
   const [activeTab, setActiveTab] = useState('catalog');
 
-  const [pageData, setPageData] = useState(null);
+  const [allProducts, setAllProducts] = useState([]);
   const [pendingData, setPendingData] = useState(null);
-  const [currentPage, setCurrentPage] = useState(0);
   const [currentPendingPage, setCurrentPendingPage] = useState(0);
   const [loadingTable, setLoadingTable] = useState(false);
   const [tableError, setTableError] = useState(null);
   const [brands, setBrands] = useState([]);
+
+  const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+  const [catalogPage, setCatalogPage] = useState(0);
+  const CATALOG_PAGE_SIZE = 10;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
@@ -42,11 +50,11 @@ export default function AdminProductsPage() {
     setTableError(null);
     try {
       const [data, pData, activeBrands] = await Promise.all([
-        getAdminProducts(currentPage, 20),
+        getAdminProducts(0, 1000),
         getPendingProducts(currentPendingPage, 20),
         getActiveBrands(),
       ]);
-      setPageData(data);
+      setAllProducts(data.content || []);
       setPendingData(pData);
       setBrands(activeBrands);
     } catch {
@@ -54,7 +62,7 @@ export default function AdminProductsPage() {
     } finally {
       setLoadingTable(false);
     }
-  }, [currentPage, currentPendingPage]);
+  }, [currentPendingPage]);
 
   useEffect(() => {
     fetchPage();
@@ -100,11 +108,7 @@ export default function AdminProductsPage() {
     try {
       const updated = await toggleHideProduct(product.id);
       toast.success(updated.hidden ? 'Product hidden from store' : 'Product visible in store');
-      setPageData((prev) =>
-        prev
-          ? { ...prev, content: prev.content.map((p) => (p.id === updated.id ? updated : p)) }
-          : prev
-      );
+      setAllProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } catch {
       toast.error('Failed to update product visibility');
     } finally {
@@ -138,9 +142,49 @@ export default function AdminProductsPage() {
     }
   };
 
-  const pageSummary = pageData?.content || [];
-  const hiddenCount = pageSummary.filter((item) => item.hidden).length;
-  const visibleCount = pageSummary.length - hiddenCount;
+  const hiddenCount = allProducts.filter((p) => p.hidden).length;
+  const visibleCount = allProducts.length - hiddenCount;
+
+  const categories = useMemo(
+    () => [...new Set(allProducts.map((p) => p.category).filter(Boolean))].sort(),
+    [allProducts]
+  );
+
+  const filtered = useMemo(() => {
+    let list = allProducts;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name?.toLowerCase().includes(q) ||
+          p.category?.toLowerCase().includes(q) ||
+          p.brandName?.toLowerCase().includes(q)
+      );
+    }
+    if (filterCategory) list = list.filter((p) => p.category === filterCategory);
+    if (filterStatus === 'hidden') list = list.filter((p) => p.hidden);
+    else if (filterStatus === 'visible') list = list.filter((p) => !p.hidden);
+    return [...list].sort((a, b) => {
+      let va = a[sortField] ?? '';
+      let vb = b[sortField] ?? '';
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [allProducts, search, filterCategory, filterStatus, sortField, sortDir]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setCatalogPage(0); }, [search, filterCategory, filterStatus, sortField, sortDir]);
+
+  const totalCatalogPages = Math.max(1, Math.ceil(filtered.length / CATALOG_PAGE_SIZE));
+  const pagedProducts = filtered.slice(catalogPage * CATALOG_PAGE_SIZE, (catalogPage + 1) * CATALOG_PAGE_SIZE);
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortField(field); setSortDir('asc'); }
+  };
 
   return (
     <AdminDeliveryLayout
@@ -160,10 +204,10 @@ export default function AdminProductsPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{tableError}</div>
       )}
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <SummaryCard label="Loaded Products" value={pageData?.totalElements ?? 0} tone="default" />
-        <SummaryCard label="Visible in Store" value={visibleCount} tone="green" />
-        <SummaryCard label="Hidden from Store" value={hiddenCount} tone="slate" />
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <SummaryCard label="Total Products" value={allProducts.length} tone="default" icon={FiPackage} />
+        <SummaryCard label="Visible in Store" value={visibleCount} tone="green" icon={FiEye} />
+        <SummaryCard label="Hidden from Store" value={hiddenCount} tone="slate" icon={FiEyeOff} />
       </section>
 
       <section className="rounded-2xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
@@ -203,31 +247,64 @@ export default function AdminProductsPage() {
           </div>
         )}
 
-        {!loadingTable && activeTab === 'catalog' && pageData && (
+        {!loadingTable && activeTab === 'catalog' && (
           <>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-45 flex-1">
+                <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f7770]" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name, category or brand…"
+                  className="w-full rounded-xl border border-[#dce8e3] bg-[#f4f7f6] py-2 pl-9 pr-3 text-sm text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+                />
+              </div>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 py-2 text-sm font-semibold text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+              >
+                <option value="">All Categories</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 py-2 text-sm font-semibold text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+              >
+                <option value="">All Statuses</option>
+                <option value="visible">Visible only</option>
+                <option value="hidden">Hidden only</option>
+              </select>
+              <span className="ml-auto text-xs text-[#6f817b]">
+                {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
             <div className="mt-4 hidden overflow-x-auto rounded-xl border border-[#edf2ef] md:block">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className={th}>Name</th>
-                    <th className={th}>Category</th>
-                    <th className={th}>Brand</th>
-                    <th className={th}>Price</th>
-                    <th className={th}>Stock</th>
+                    <SortableHeader label="Name" field="name" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <SortableHeader label="Category" field="category" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <SortableHeader label="Brand" field="brandName" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <SortableHeader label="Price" field="price" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                    <SortableHeader label="Stock" field="stockQuantity" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
                     <th className={th}>Status</th>
-                    <th className={th}>Expiry</th>
+                    <SortableHeader label="Expiry" field="earliestExpiryDate" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
                     <th className={th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pageData.content?.length === 0 ? (
+                  {pagedProducts.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
                         No products found.
                       </td>
                     </tr>
                   ) : (
-                    pageData.content?.map((p) => (
+                    pagedProducts.map((p) => (
                       <tr key={p.id} className="border-t border-[#edf2ef]">
                         <td className={td}><span className="font-medium text-slate-900">{p.name}</span></td>
                         <td className={td}>{p.category ?? '—'}</td>
@@ -277,12 +354,12 @@ export default function AdminProductsPage() {
             </div>
 
             <div className="mt-4 space-y-3 md:hidden">
-              {pageData.content?.length === 0 ? (
+              {pagedProducts.length === 0 ? (
                 <div className="rounded-xl border border-[#edf2ef] p-6 text-center text-sm text-slate-500">
                   No products found.
                 </div>
               ) : (
-                pageData.content?.map((p) => (
+                pagedProducts.map((p) => (
                   <article key={p.id} className="rounded-xl border border-[#edf2ef] bg-[#fbfdfc] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -317,11 +394,23 @@ export default function AdminProductsPage() {
               )}
             </div>
 
-            <Pagination
-              pageData={pageData}
-              onPrev={() => setCurrentPage((p) => p - 1)}
-              onNext={() => setCurrentPage((p) => p + 1)}
-            />
+            {totalCatalogPages > 1 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                <span>Page {catalogPage + 1} of {totalCatalogPages} · {filtered.length} products</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCatalogPage((p) => p - 1)}
+                    disabled={catalogPage === 0}
+                    className="rounded-lg border border-[#d4dfdb] px-3 py-1.5 text-sm transition hover:bg-slate-50 disabled:opacity-40"
+                  >Prev</button>
+                  <button
+                    onClick={() => setCatalogPage((p) => p + 1)}
+                    disabled={catalogPage >= totalCatalogPages - 1}
+                    className="rounded-lg border border-[#d4dfdb] px-3 py-1.5 text-sm transition hover:bg-slate-50 disabled:opacity-40"
+                  >Next</button>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -447,7 +536,7 @@ export default function AdminProductsPage() {
   );
 }
 
-function SummaryCard({ label, value, tone }) {
+function SummaryCard({ label, value, tone, icon: Icon }) {
   const toneClass =
     tone === 'green'
       ? 'bg-[#eaf5ef] text-[#0d4a38]'
@@ -457,6 +546,7 @@ function SummaryCard({ label, value, tone }) {
 
   return (
     <article className={`rounded-xl border border-[#e4ebe8] px-4 py-3 ${toneClass}`}>
+      {Icon && <Icon className="mb-2 h-5 w-5 opacity-80" />}
       <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
       <p className="mt-1 text-2xl font-bold">{value}</p>
     </article>
@@ -501,6 +591,20 @@ function Pagination({ pageData, onPrev, onNext }) {
         </button>
       </div>
     </div>
+  );
+}
+
+function SortableHeader({ label, field, sortField, sortDir, onSort, className }) {
+  const active = sortField === field;
+  return (
+    <th className={`${className} cursor-pointer select-none`} onClick={() => onSort(field)}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className={active ? 'text-[#0d4a38]' : 'text-slate-300'}>
+          {active && sortDir === 'desc' ? '▼' : '▲'}
+        </span>
+      </span>
+    </th>
   );
 }
 

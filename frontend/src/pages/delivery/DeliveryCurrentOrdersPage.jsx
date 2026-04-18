@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { FiMapPin } from 'react-icons/fi';
@@ -16,19 +16,29 @@ export default function DeliveryCurrentOrdersPage() {
   const { logout } = useAuth();
   const { currentOrders, loading, error, refreshOrders } = useDeliveryOrders();
   const [searchValue, setSearchValue] = useState('');
+  const [sortDir, setSortDir] = useState('desc');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 8;
 
   const filteredOrders = useMemo(() => {
-    const normalizedSearch = searchValue.trim().toLowerCase();
-
-    return currentOrders.filter((order) => {
-      if (!normalizedSearch) return true;
-
+    const q = searchValue.trim().toLowerCase();
+    let result = currentOrders.filter((order) => {
+      if (!q) return true;
       return (
-        String(order.orderId).includes(normalizedSearch) ||
-        String(order.customerName || '').toLowerCase().includes(normalizedSearch)
+        String(order.orderId).includes(q) ||
+        String(order.customerName || '').toLowerCase().includes(q)
       );
     });
-  }, [currentOrders, searchValue]);
+    result = [...result].sort((a, b) =>
+      sortDir === 'desc' ? b.orderId - a.orderId : a.orderId - b.orderId,
+    );
+    return result;
+  }, [currentOrders, searchValue, sortDir]);
+
+  useEffect(() => { setPage(0); }, [searchValue]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const pagedOrders = filteredOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const handleOpenOrder = (orderId) => {
     navigate(`/delivery/orders/${orderId}`);
@@ -97,9 +107,19 @@ export default function DeliveryCurrentOrdersPage() {
       </section>
 
       <section className="mt-4 rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
-        <div className="mb-3 flex items-end justify-between gap-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-2xl font-semibold leading-tight text-[#0d3f31] sm:text-3xl">Active Orders</h3>
-          <p className="text-sm font-medium text-[#8a9993]">Total active: {currentOrders.length}</p>
+          <div className="flex items-center gap-2">
+            <select
+              value={sortDir}
+              onChange={(e) => { setSortDir(e.target.value); setPage(0); }}
+              className="h-9 rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 text-sm text-[#5f7770] focus:outline-none"
+            >
+              <option value="desc">Newest first</option>
+              <option value="asc">Oldest first</option>
+            </select>
+            <p className="text-sm font-medium text-[#8a9993]">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
 
         {loading && <p className="mt-4 text-sm text-slate-500">Loading orders...</p>}
@@ -107,17 +127,54 @@ export default function DeliveryCurrentOrdersPage() {
         {!loading && error === 'failed' && <p className="mt-4 text-sm text-slate-700">Failed to load orders. Please refresh.</p>}
 
         {!loading && !error && filteredOrders.length === 0 && (
-          <p className="mt-4 text-sm text-slate-500">No newly assigned orders match your search.</p>
+          <p className="mt-4 text-sm text-slate-500">
+            {currentOrders.length === 0 ? 'No active orders at the moment.' : 'No orders match your search.'}
+          </p>
         )}
 
         {!loading && !error && filteredOrders.length > 0 && (
           <ul className="mt-4 space-y-3">
-            {filteredOrders.map((delivery) => (
+            {pagedOrders.map((delivery) => (
               <li key={delivery.orderId}>
                 <DeliveryOrderCard delivery={delivery} onOpen={handleOpenOrder} showNewlyAssigned />
               </li>
             ))}
           </ul>
+        )}
+
+        {!loading && !error && totalPages > 1 && (
+          <div className="mt-5 flex items-center justify-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dce8e3] bg-white text-[#0d4a38] disabled:opacity-30"
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setPage(i)}
+                className={`flex h-10 min-w-10 items-center justify-center rounded-xl border px-2 text-sm font-semibold transition ${
+                  i === page
+                    ? 'border-[#0d4a38] bg-[#0d4a38] text-white'
+                    : 'border-[#dce8e3] bg-white text-[#4a6259] hover:bg-[#f1f6f4]'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dce8e3] bg-white text-[#0d4a38] disabled:opacity-30"
+            >
+              ›
+            </button>
+          </div>
         )}
       </section>
     </DeliveryPageLayout>

@@ -47,7 +47,7 @@ export default function DeliveryDashboard() {
         </p>
       </section>
 
-      <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Link to="/delivery/orders/current" className="rounded-3xl bg-[#a7ecc6] p-5 text-[#1b5e45] shadow-sm transition hover:brightness-[0.98]">
           <FiTruck size={24} />
           <p className="mt-4 text-xs font-medium tracking-[0.08em]">Current Orders</p>

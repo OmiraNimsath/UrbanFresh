@@ -82,7 +82,7 @@ export default function ProductListingPage() {
         setLoading(true);
         setError(null);
 
-        return getProducts({ search: committedSearch, category, sortBy, page, size: 12 });
+        return getProducts({ search: committedSearch, category, sortBy, page, size: 8 });
       })
       .then((data) => {
         if (!cancelled && data) {
@@ -233,23 +233,53 @@ export default function ProductListingPage() {
 
         {/* ── Pagination ── */}
         {result && result.totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-center gap-2">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+            {/* Prev */}
             <button
               onClick={() => handlePageChange(Math.max(0, page - 1))}
               disabled={page === 0}
               className="rounded-lg border border-[#ccd7d1] bg-white px-4 py-2 text-sm text-[#2a4d3f] transition-colors hover:bg-[#f3f7f5] disabled:opacity-40"
             >
-              Prev
+              ← Prev
             </button>
-            <span className="rounded-full bg-[#0f5b3f] px-3 py-1 text-xs font-semibold text-white">
-              Page {page + 1} of {result.totalPages}
-            </span>
+
+            {/* Numbered buttons — show up to 5 around the current page */}
+            {Array.from({ length: result.totalPages }, (_, i) => i)
+              .filter((i) => {
+                if (result.totalPages <= 7) return true;
+                if (i === 0 || i === result.totalPages - 1) return true;
+                return Math.abs(i - page) <= 2;
+              })
+              .reduce((acc, i, idx, arr) => {
+                if (idx > 0 && i - arr[idx - 1] > 1) acc.push('...');
+                acc.push(i);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-sm text-[#8fa89f]">&hellip;</span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => handlePageChange(item)}
+                    className={`min-w-9 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      item === page
+                        ? 'border-[#0d4a38] bg-[#0d4a38] text-white'
+                        : 'border-[#ccd7d1] bg-white text-[#2a4d3f] hover:bg-[#f3f7f5]'
+                    }`}
+                  >
+                    {item + 1}
+                  </button>
+                ),
+              )}
+
+            {/* Next */}
             <button
               onClick={() => handlePageChange(Math.min(result.totalPages - 1, page + 1))}
               disabled={page >= result.totalPages - 1}
               className="rounded-lg border border-[#ccd7d1] bg-white px-4 py-2 text-sm text-[#2a4d3f] transition-colors hover:bg-[#f3f7f5] disabled:opacity-40"
             >
-              Next
+              Next →
             </button>
           </div>
         )}

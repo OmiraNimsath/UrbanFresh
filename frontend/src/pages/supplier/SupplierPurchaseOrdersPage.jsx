@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { FiCheck, FiDownload, FiSend, FiX } from 'react-icons/fi';
+import { FiCheck, FiDownload, FiSearch, FiSend, FiX } from 'react-icons/fi';
 import useSupplierPurchaseOrders from '../../hooks/useSupplierPurchaseOrders';
 import UpdatePurchaseOrderStatusModal from '../../components/supplier/UpdatePurchaseOrderStatusModal';
 import toast from 'react-hot-toast';
@@ -22,10 +22,23 @@ export default function SupplierPurchaseOrdersPage() {
   const [noticeOrderId, setNoticeOrderId] = useState(null);
   const [noticeText, setNoticeText] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState('id');
+  const [sortDir, setSortDir] = useState('desc');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 8;
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => { setPage(0); }, [statusFilter, search]);
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortField(field); setSortDir('asc'); }
+    setPage(0);
+  };
 
   const handleLogout = () => {
     logout();
@@ -82,11 +95,28 @@ export default function SupplierPurchaseOrdersPage() {
   };
 
   const filteredOrders = useMemo(() => {
-    if (statusFilter === 'ALL') {
-      return orders;
+    let result = statusFilter === 'ALL' ? [...orders] : orders.filter((o) => o.status === statusFilter);
+    const q = search.toLowerCase();
+    if (q) {
+      result = result.filter(
+        (o) =>
+          `PO-${o.id}`.toLowerCase().includes(q) ||
+          (o.brandName || '').toLowerCase().includes(q) ||
+          (o.items || []).some((item) => item.productName?.toLowerCase().includes(q)),
+      );
     }
-    return orders.filter((order) => order.status === statusFilter);
-  }, [orders, statusFilter]);
+    result.sort((a, b) => {
+      if (sortField === 'id') return sortDir === 'asc' ? a.id - b.id : b.id - a.id;
+      const av = sortField === 'brand' ? (a.brandName || '') : (a.status || '');
+      const bv = sortField === 'brand' ? (b.brandName || '') : (b.status || '');
+      const cmp = av.localeCompare(bv);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return result;
+  }, [orders, statusFilter, search, sortField, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const pagedOrders = filteredOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const activeOrders = orders.filter((order) => !['COMPLETED', 'CANCELLED'].includes(order.status)).length;
   const pendingActions = orders.filter((order) => order.status === 'PENDING').length;
@@ -201,9 +231,37 @@ export default function SupplierPurchaseOrdersPage() {
               <p className="text-sm text-[#6f817b]">Logged in as {user?.name}</p>
             </div>
 
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-48 flex-1">
+                <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8fa89f]" />
+                <input
+                  type="search"
+                  placeholder="Search by PO#, brand or item..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-9 w-full rounded-xl border border-[#dce8e3] bg-[#f4f7f6] pl-9 pr-3 text-sm text-[#5f7770] focus:outline-none"
+                />
+              </div>
+              <select
+                value={`${sortField}:${sortDir}`}
+                onChange={(e) => {
+                  const [f, d] = e.target.value.split(':');
+                  setSortField(f); setSortDir(d); setPage(0);
+                }}
+                className="h-9 rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 text-sm text-[#5f7770] focus:outline-none"
+              >
+                <option value="id:desc">Newest first</option>
+                <option value="id:asc">Oldest first</option>
+                <option value="brand:asc">Brand A–Z</option>
+                <option value="brand:desc">Brand Z–A</option>
+                <option value="status:asc">Status A–Z</option>
+              </select>
+              <span className="text-xs text-[#6f817b]">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}</span>
+            </div>
+
             {filteredOrders.length === 0 ? (
               <div className="rounded-xl border border-[#e4ebe8] bg-[#f8fbf9] p-8 text-center text-sm text-[#6f817b]">
-                No purchase orders found for your assigned brands.
+                {orders.length === 0 ? 'No purchase orders found for your assigned brands.' : 'No orders match your search or filter.'}
               </div>
             ) : (
               <>
@@ -211,16 +269,16 @@ export default function SupplierPurchaseOrdersPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-[#f7f9f8] text-[11px] uppercase tracking-[0.08em] text-[#667872]">
                       <tr>
-                        <th className={th}>Order/PO #</th>
-                        <th className={th}>Brand</th>
+                        <SortableHeader label="Order/PO #" field="id" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
+                        <SortableHeader label="Brand" field="brand" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
                         <th className={th}>Items</th>
                         <th className={th}>Delivery ETA</th>
-                        <th className={th}>Status</th>
+                        <SortableHeader label="Status" field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort} className={th} />
                         <th className={th}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredOrders.map((order) => (
+                      {pagedOrders.map((order) => (
                         <tr key={order.id} className="border-t border-[#edf2f0] align-top text-[#26443a]">
                           <td className={`${td} font-semibold`}>PO-{order.id}</td>
                           <td className={td}>{order.brandName || 'Unknown'}</td>
@@ -268,7 +326,7 @@ export default function SupplierPurchaseOrdersPage() {
                 </div>
 
                 <div className="space-y-3 md:hidden">
-                  {filteredOrders.map((order) => (
+                  {pagedOrders.map((order) => (
                     <article key={order.id} className="rounded-xl border border-[#e4ebe8] bg-white p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -307,6 +365,17 @@ export default function SupplierPurchaseOrdersPage() {
                     </article>
                   ))}
                 </div>
+                {totalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between border-t border-[#edf2f0] pt-4">
+                    <span className="text-xs text-[#6f817b]">
+                      Page {page + 1} of {totalPages} &middot; {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+                    </span>
+                    <div className="flex gap-2">
+                      <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="rounded-lg border border-[#dce8e3] bg-white px-3 py-1.5 text-xs font-medium text-[#5f7770] disabled:opacity-40">Prev</button>
+                      <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded-lg border border-[#dce8e3] bg-white px-3 py-1.5 text-xs font-medium text-[#5f7770] disabled:opacity-40">Next</button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -353,6 +422,21 @@ export default function SupplierPurchaseOrdersPage() {
         onUpdateSuccess={() => fetchOrders()}
       />
     </SupplierLayout>
+  );
+}
+
+function SortableHeader({ label, field, sortField, sortDir, onSort, className }) {
+  const active = sortField === field;
+  return (
+    <th className={className}>
+      <button onClick={() => onSort(field)} className="inline-flex items-center gap-1 font-semibold hover:text-[#0d4a38]">
+        {label}
+        <span className="flex flex-col text-[8px] leading-none">
+          <span className={active && sortDir === 'asc' ? 'text-[#0d4a38]' : 'opacity-40'}>▲</span>
+          <span className={active && sortDir === 'desc' ? 'text-[#0d4a38]' : 'opacity-40'}>▼</span>
+        </span>
+      </button>
+    </th>
   );
 }
 

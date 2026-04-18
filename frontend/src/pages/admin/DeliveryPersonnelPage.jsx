@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { FiUserCheck, FiUserX, FiTruck } from 'react-icons/fi';
 import {
   createDeliveryPersonnel,
   getDeliveryPersonnelList,
@@ -280,7 +281,7 @@ export default function DeliveryPersonnelPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
               <InfoCard label="Email" value={selectedPerson.email} />
               <InfoCard label="Phone" value={selectedPerson.phone || 'Not provided'} />
               <InfoCard
@@ -409,10 +410,10 @@ export default function DeliveryPersonnelPage() {
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <MetricCard label="Active Personnel" value={activeCount} tone="green" />
-          <MetricCard label="Inactive Personnel" value={inactiveCount} tone="slate" />
-          <MetricCard label="Total Fleet" value={allPersonnel.length} tone="mint" />
+        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <MetricCard label="Active Personnel" value={activeCount} tone="green" icon={FiUserCheck} />
+          <MetricCard label="Inactive Personnel" value={inactiveCount} tone="slate" icon={FiUserX} />
+          <MetricCard label="Total Fleet" value={allPersonnel.length} tone="mint" icon={FiTruck} />
         </div>
 
         <div className="mt-5 overflow-hidden rounded-xl border border-[#e4ebe8]">
@@ -557,7 +558,7 @@ async function getOrdersForDeliveryPerson(deliveryPersonId) {
   return collected;
 }
 
-function MetricCard({ label, value, tone }) {
+function MetricCard({ label, value, tone, icon: Icon }) {
   const cardToneByKey = {
     slate: 'bg-[#f4f7f6] text-[#425d55]',
     green: 'bg-[#eaf5ef] text-[#0d4a38]',
@@ -572,6 +573,7 @@ function MetricCard({ label, value, tone }) {
 
   return (
     <div className={`rounded-xl border border-[#e4ebe8] px-4 py-3 ${cardToneByKey[tone] || cardToneByKey.slate}`}>
+      {Icon && <Icon className="mb-2 h-5 w-5 opacity-80" />}
       <p className="text-xs uppercase tracking-wide opacity-80">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${valueToneByKey[tone] || valueToneByKey.slate}`}>{value}</p>
     </div>

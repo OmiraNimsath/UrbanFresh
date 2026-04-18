@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { FiTrash2, FiPackage } from 'react-icons/fi';
 import {
   BarChart,
   Bar,
@@ -72,7 +73,7 @@ export default function AdminWasteReportPage() {
 
       {loading ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             {[1, 2].map((i) => (
               <div key={i} className="h-24 animate-pulse rounded-2xl border border-[#e4ebe8] bg-white" />
             ))}
@@ -82,9 +83,9 @@ export default function AdminWasteReportPage() {
         </div>
       ) : (
         <>
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <MetricCard icon="Waste Value" label="Total Waste Value" value={formatAmount(totalWasteValue)} tone="danger" />
-            <MetricCard icon="Units" label="Total Wasted Units" value={Number(totalWastedUnits).toLocaleString()} tone="warning" />
+          <section className="grid grid-cols-2 gap-4">
+            <MetricCard icon={<FiTrash2 className="h-5 w-5" />} label="Total Waste Value" value={formatAmount(totalWasteValue)} tone="danger" />
+            <MetricCard icon={<FiPackage className="h-5 w-5" />} label="Total Wasted Units" value={Number(totalWastedUnits).toLocaleString()} tone="warning" />
           </section>
 
           <section className="rounded-2xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
@@ -201,7 +202,7 @@ function MetricCard({ icon, label, value, tone }) {
 
   return (
     <article className={`rounded-xl border border-[#e4ebe8] px-4 py-3 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{icon}</p>
+      {icon && <span className="mb-2 inline-block opacity-80">{icon}</span>}
       <p className="mt-1 text-sm font-medium opacity-90">{label}</p>
       <p className="mt-1 text-2xl font-bold">{value}</p>
     </article>

@@ -75,7 +75,7 @@ export default function LoyaltyHistoryPage() {
       breadcrumbItems={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Loyalty' }]}
       rightAside={rightAside}
     >
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <section className="grid grid-cols-2 gap-4">
         <div className="rounded-2xl border border-[#cae3d6] bg-[#eaf5ef] p-5">
           <p className="text-xs uppercase tracking-wide text-[#5f7f72]">Total Points</p>
           <p className="mt-2 text-4xl font-semibold text-[#163a2f]">{loading ? '-' : Number(loyalty?.totalPoints || 0)}</p>

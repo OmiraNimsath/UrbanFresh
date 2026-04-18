@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { FiUser } from 'react-icons/fi';
+import { FiCheckCircle, FiPackage, FiRefreshCcw, FiTruck, FiUser } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
@@ -145,23 +145,21 @@ export default function DeliveryProfilePage() {
         </div>
       </section>
 
-      <section className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-3xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Assigned Orders</p>
-          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">{summary.assignedOrderCount}</p>
-        </div>
-        <div className="rounded-3xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Out For Delivery</p>
-          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">{summary.outForDeliveryCount}</p>
-        </div>
-        <div className="rounded-3xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Completed Orders</p>
-          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">{summary.completedOrderCount}</p>
-        </div>
-        <div className="rounded-3xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium tracking-[0.08em] text-[#5f6d68]">Returned Orders</p>
-          <p className="mt-2 text-3xl font-semibold leading-none text-[#0d3f31] sm:text-4xl">{summary.returnedCount}</p>
-        </div>
+      <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: 'Assigned', value: summary.assignedOrderCount, icon: <FiPackage size={18} />, bg: 'bg-[#fef3c7]', color: 'text-[#92400e]' },
+          { label: 'Out For Delivery', value: summary.outForDeliveryCount, icon: <FiTruck size={18} />, bg: 'bg-[#dbeafe]', color: 'text-[#1d4ed8]' },
+          { label: 'Completed', value: summary.completedOrderCount, icon: <FiCheckCircle size={18} />, bg: 'bg-[#d1fae5]', color: 'text-[#065f46]' },
+          { label: 'Returned', value: summary.returnedCount, icon: <FiRefreshCcw size={18} />, bg: 'bg-[#fee2e2]', color: 'text-[#991b1b]' },
+        ].map(({ label, value, icon, bg, color }) => (
+          <div key={label} className="rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm">
+            <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${bg} ${color}`}>
+              {icon}
+            </div>
+            <p className="mt-3 text-[11px] font-medium leading-tight tracking-[0.07em] text-[#5f6d68]">{label}</p>
+            <p className="mt-1 text-3xl font-semibold leading-none text-[#0d3f31]">{value}</p>
+          </div>
+        ))}
       </section>
 
       <section className="mt-4 rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">

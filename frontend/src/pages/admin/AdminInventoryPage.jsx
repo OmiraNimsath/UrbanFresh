@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { FiDatabase, FiAlertTriangle, FiCheckCircle, FiSearch } from 'react-icons/fi';
 import { getInventory, updateInventory, getProductBatches } from '../../services/inventoryService';
 import { createPurchaseOrder } from '../../services/adminPurchaseOrderService';
 import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
@@ -26,6 +27,14 @@ export default function AdminInventoryPage() {
   const [batchDrawerItem, setBatchDrawerItem] = useState(null);
   const [batches, setBatches] = useState([]);
   const [batchesLoading, setBatchesLoading] = useState(false);
+
+  const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [sortField, setSortField] = useState('productName');
+  const [sortDir, setSortDir] = useState('asc');
+  const [invPage, setInvPage] = useState(0);
+  const INV_PAGE_SIZE = 10;
 
   const fetchInventory = async () => {
     setLoading(true);
@@ -132,6 +141,43 @@ export default function AdminInventoryPage() {
   const healthyCount = inventory.length - lowStockCount;
   const totalQuantity = inventory.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
 
+  const categories = useMemo(
+    () => [...new Set(inventory.map((i) => i.category).filter(Boolean))].sort(),
+    [inventory]
+  );
+
+  const filtered = useMemo(() => {
+    let list = inventory;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (i) => i.productName?.toLowerCase().includes(q) || i.category?.toLowerCase().includes(q)
+      );
+    }
+    if (filterCategory) list = list.filter((i) => i.category === filterCategory);
+    if (filterStatus === 'low') list = list.filter((i) => i.lowStock);
+    else if (filterStatus === 'healthy') list = list.filter((i) => !i.lowStock);
+    return [...list].sort((a, b) => {
+      let va = a[sortField] ?? '';
+      let vb = b[sortField] ?? '';
+      if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [inventory, search, filterCategory, filterStatus, sortField, sortDir]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setInvPage(0); }, [search, filterCategory, filterStatus, sortField, sortDir]);
+
+  const totalInvPages = Math.max(1, Math.ceil(filtered.length / INV_PAGE_SIZE));
+  const pagedInventory = filtered.slice(invPage * INV_PAGE_SIZE, (invPage + 1) * INV_PAGE_SIZE);
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortField(field); setSortDir('asc'); }
+  };
+
   return (
     <AdminDeliveryLayout
       title="Inventory Management"
@@ -159,10 +205,10 @@ export default function AdminInventoryPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       )}
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <MetricCard label="Total Stock Units" value={totalQuantity} tone="default" />
-        <MetricCard label="Low Stock Items" value={lowStockCount} tone="red" />
-        <MetricCard label="Healthy Items" value={healthyCount} tone="green" />
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <MetricCard label="Total Stock Units" value={totalQuantity} tone="default" icon={FiDatabase} />
+        <MetricCard label="Low Stock Items" value={lowStockCount} tone="red" icon={FiAlertTriangle} />
+        <MetricCard label="Healthy Items" value={healthyCount} tone="green" icon={FiCheckCircle} />
       </section>
 
       <section className="rounded-2xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
@@ -171,16 +217,49 @@ export default function AdminInventoryPage() {
           View and update quantity and reorder thresholds for all products.
         </p>
 
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-45 flex-1">
+            <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f7770]" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by product or category…"
+              className="w-full rounded-xl border border-[#dce8e3] bg-[#f4f7f6] py-2 pl-9 pr-3 text-sm text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 py-2 text-sm font-semibold text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="rounded-xl border border-[#dce8e3] bg-[#f4f7f6] px-3 py-2 text-sm font-semibold text-[#5f7770] focus:border-[#0d4a38] focus:outline-none"
+          >
+            <option value="">All Statuses</option>
+            <option value="low">Low Stock only</option>
+            <option value="healthy">In Stock only</option>
+          </select>
+          <span className="ml-auto text-xs text-[#6f817b]">
+            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
         <div className="mt-4 hidden overflow-x-auto rounded-xl border border-[#edf2ef] md:block">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className={th}>Product</th>
-                <th className={th}>Category</th>
-                <th className={`${th} text-right`}>Quantity</th>
-                <th className={`${th} text-right`}>Reorder Threshold</th>
+                <SortableHeader label="Product" field="productName" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Category" field="category" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Quantity" field="quantity" sortField={sortField} sortDir={sortDir} onSort={handleSort} right />
+                <SortableHeader label="Reorder Threshold" field="reorderThreshold" sortField={sortField} sortDir={sortDir} onSort={handleSort} right />
                 <th className={th}>Status</th>
-                <th className={th}>Last Updated</th>
+                <SortableHeader label="Last Updated" field="updatedAt" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 <th className={th}>Updated By</th>
                 <th className={th}>Actions</th>
               </tr>
@@ -199,7 +278,7 @@ export default function AdminInventoryPage() {
                 ))}
 
               {!loading &&
-                inventory.map((item) => {
+                pagedInventory.map((item) => {
                   if (editItem?.productId === item.productId) {
                     return (
                       <tr key={item.productId} className="border-t border-[#edf2ef] bg-amber-50/70">
@@ -332,7 +411,7 @@ export default function AdminInventoryPage() {
             </tbody>
           </table>
 
-          {!loading && inventory.length === 0 && (
+          {!loading && filtered.length === 0 && (
             <div className="py-16 text-center text-sm text-slate-400">No products found.</div>
           )}
         </div>
@@ -343,12 +422,12 @@ export default function AdminInventoryPage() {
               <div key={i} className="h-28 animate-pulse rounded-xl bg-slate-100" />
             ))}
 
-          {!loading && inventory.length === 0 && (
+          {!loading && filtered.length === 0 && (
             <div className="rounded-xl border border-[#edf2ef] p-6 text-center text-sm text-slate-500">No products found.</div>
           )}
 
           {!loading &&
-            inventory.map((item) => (
+            pagedInventory.map((item) => (
               <article key={item.productId} className="rounded-xl border border-[#edf2ef] bg-[#fbfdfc] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -372,6 +451,24 @@ export default function AdminInventoryPage() {
               </article>
             ))}
         </div>
+
+        {!loading && totalInvPages > 1 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <span>Page {invPage + 1} of {totalInvPages} · {filtered.length} items</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setInvPage((p) => p - 1)}
+                disabled={invPage === 0}
+                className="rounded-lg border border-[#d4dfdb] px-3 py-1.5 text-sm transition hover:bg-slate-50 disabled:opacity-40"
+              >Prev</button>
+              <button
+                onClick={() => setInvPage((p) => p + 1)}
+                disabled={invPage >= totalInvPages - 1}
+                className="rounded-lg border border-[#d4dfdb] px-3 py-1.5 text-sm transition hover:bg-slate-50 disabled:opacity-40"
+              >Next</button>
+            </div>
+          </div>
+        )}
       </section>
 
       {batchDrawerItem && (
@@ -386,7 +483,7 @@ export default function AdminInventoryPage() {
   );
 }
 
-function MetricCard({ label, value, tone }) {
+function MetricCard({ label, value, tone, icon: Icon }) {
   const toneClass =
     tone === 'red'
       ? 'bg-[#fdecee] text-red-700'
@@ -396,6 +493,7 @@ function MetricCard({ label, value, tone }) {
 
   return (
     <article className={`rounded-xl border border-[#e4ebe8] px-4 py-3 ${toneClass}`}>
+      {Icon && <Icon className="mb-2 h-5 w-5 opacity-80" />}
       <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
       <p className="mt-1 text-2xl font-bold">{value}</p>
     </article>
@@ -471,6 +569,21 @@ function BatchDrawer({ item, batches, loading, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function SortableHeader({ label, field, sortField, sortDir, onSort, right }) {
+  const active = sortField === field;
+  const base = 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 cursor-pointer select-none';
+  return (
+    <th className={`${base} ${right ? 'text-right' : 'text-left'}`} onClick={() => onSort(field)}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className={active ? 'text-[#0d4a38]' : 'text-slate-300'}>
+          {active && sortDir === 'desc' ? '▼' : '▲'}
+        </span>
+      </span>
+    </th>
   );
 }
 

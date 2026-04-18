@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { FiShoppingBag, FiClock, FiDollarSign, FiCheckCircle } from 'react-icons/fi';
 import {
   assignDeliveryPersonnel,
   getActiveDeliveryPersonnel,
@@ -14,6 +15,7 @@ import DeliveryStatusBadge from '../../components/admin/delivery/DeliveryStatusB
 import DeliveryStatusConfirmModal from '../../components/admin/delivery/DeliveryStatusConfirmModal';
 
 const PAGE_SIZE = 20;
+const FILTERED_PAGE_SIZE = 8;
 
 /**
  * Presentation Layer – Admin order management page.
@@ -26,6 +28,7 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
+  const [filteredPage, setFilteredPage] = useState(0);
   const [pendingCorrection, setPendingCorrection] = useState(null);
   const [orderReviewOpen, setOrderReviewOpen] = useState(false);
   const [loadingOrderReview, setLoadingOrderReview] = useState(false);
@@ -184,6 +187,15 @@ export default function AdminOrdersPage() {
     [pageData, searchTerm, statusFilter]
   );
 
+  // Reset filtered page when search or filter changes
+  useEffect(() => { setFilteredPage(0); }, [searchTerm, statusFilter]);
+
+  const totalFilteredPages = Math.max(1, Math.ceil(filteredOrders.length / FILTERED_PAGE_SIZE));
+  const pagedFilteredOrders = filteredOrders.slice(
+    filteredPage * FILTERED_PAGE_SIZE,
+    (filteredPage + 1) * FILTERED_PAGE_SIZE
+  );
+
   const stats = useMemo(() => {
     const source = pageData?.content || [];
     const total = source.length;
@@ -249,11 +261,11 @@ export default function AdminOrdersPage() {
         }}
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total Orders Today" value={String(stats.total)} note="+12% from yesterday" />
-        <MetricCard label="Pending Processing" value={String(stats.processing)} note="Requires action" />
-        <MetricCard label="Revenue (Daily)" value={`Rs. ${formatLkr(stats.revenue)}`} note="Healthy flow" />
-        <MetricCard label="Delivered" value={String(stats.delivered)} note="98% success rate" />
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <MetricCard label="Total Orders Today" value={String(stats.total)} note="+12% from yesterday" icon={FiShoppingBag} />
+        <MetricCard label="Pending Processing" value={String(stats.processing)} note="Requires action" icon={FiClock} />
+        <MetricCard label="Revenue (Daily)" value={`Rs. ${formatLkr(stats.revenue)}`} note="Healthy flow" icon={FiDollarSign} />
+        <MetricCard label="Delivered" value={String(stats.delivered)} note="98% success rate" icon={FiCheckCircle} />
       </section>
 
       <section className="rounded-2xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-5">
@@ -338,7 +350,7 @@ export default function AdminOrdersPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredOrders.map((order) => (
+                    pagedFilteredOrders.map((order) => (
                       <tr key={order.orderId} className="border-t border-[#edf2f0] align-top">
                         <td className={td}>#UF-ORD-{order.orderId}</td>
                         <td className={td}>
@@ -436,7 +448,7 @@ export default function AdminOrdersPage() {
                   />
                 </div>
               ) : (
-                filteredOrders.map((order) => (
+                pagedFilteredOrders.map((order) => (
                   <article key={order.orderId} className="rounded-2xl border border-[#e4ebe8] bg-[#f8fbf9] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -509,26 +521,49 @@ export default function AdminOrdersPage() {
               )}
             </div>
 
-            {pageData.totalPages > 1 && (
+            {(totalFilteredPages > 1 || pageData.totalPages > 1) && (
               <div className="mt-4 flex flex-col gap-3 text-sm text-[#6f817b] sm:flex-row sm:items-center sm:justify-between">
                 <span>
-                  Page {pageData.number + 1} of {pageData.totalPages} - {pageData.totalElements ?? 0} orders total
+                  Showing {filteredOrders.length === 0 ? 0 : filteredPage * FILTERED_PAGE_SIZE + 1}–{Math.min((filteredPage + 1) * FILTERED_PAGE_SIZE, filteredOrders.length)} of {filteredOrders.length} orders
+                  {pageData.totalPages > 1 && ` (page ${pageData.number + 1}/${pageData.totalPages} loaded)`}
                 </span>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentPage((value) => value - 1)}
-                    disabled={pageData.first}
-                    className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-50"
-                  >
-                    Prev
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage((value) => value + 1)}
-                    disabled={pageData.last}
-                    className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-50"
-                  >
-                    Next
-                  </button>
+                  {pageData.totalPages > 1 && (
+                    <>
+                      <button
+                        onClick={() => { setCurrentPage((v) => v - 1); setFilteredPage(0); }}
+                        disabled={pageData.first}
+                        className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-50"
+                      >
+                        Load Prev
+                      </button>
+                      <button
+                        onClick={() => { setCurrentPage((v) => v + 1); setFilteredPage(0); }}
+                        disabled={pageData.last}
+                        className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-50"
+                      >
+                        Load Next
+                      </button>
+                    </>
+                  )}
+                  {totalFilteredPages > 1 && (
+                    <>
+                      <button
+                        onClick={() => setFilteredPage((p) => p - 1)}
+                        disabled={filteredPage === 0}
+                        className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-50"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setFilteredPage((p) => p + 1)}
+                        disabled={filteredPage >= totalFilteredPages - 1}
+                        className="rounded-lg border border-[#d5dfdb] bg-white px-3 py-1.5 font-medium text-[#526b64] transition hover:bg-[#f2f7f5] disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -622,9 +657,14 @@ function OrdersEmptyState({ searchTerm, statusFilter, onReset }) {
   );
 }
 
-function MetricCard({ label, value, note }) {
+function MetricCard({ label, value, note, icon: Icon }) {
   return (
     <article className="rounded-2xl border border-[#e4ebe8] bg-white p-5 shadow-sm">
+      {Icon && (
+        <div className="mb-3 inline-flex rounded-xl bg-[#eaf5ef] p-2.5 text-[#0d4a38]">
+          <Icon className="h-5 w-5" />
+        </div>
+      )}
       <p className="text-sm font-medium text-[#6f817b]">{label}</p>
       <p className="mt-1 text-4xl font-bold tracking-tight text-[#133b31]">{value}</p>
       <p className="mt-1 text-sm text-[#58957a]">{note}</p>

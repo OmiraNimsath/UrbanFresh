@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FiShoppingCart, FiTrendingUp, FiBox, FiUsers } from 'react-icons/fi';
 import adminDashboardService from '../../services/adminDashboardService';
 import { useAuth } from '../../context/AuthContext';
 import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
@@ -38,7 +39,9 @@ const AdminDashboard = () => {
       label: 'Total Orders',
       value: dashboardData?.totalOrders || 0,
       hint: 'All-time customer orders',
-      tone: 'text-[#0d4a38]'
+      tone: 'text-[#0d4a38]',
+      icon: FiShoppingCart,
+      iconBg: 'bg-amber-100 text-amber-600',
     },
     {
       label: 'Total Revenue',
@@ -47,19 +50,25 @@ const AdminDashboard = () => {
         maximumFractionDigits: 2,
       })}`,
       hint: 'From confirmed orders',
-      tone: 'text-[#0d4a38]'
+      tone: 'text-[#0d4a38]',
+      icon: FiTrendingUp,
+      iconBg: 'bg-green-100 text-green-700',
     },
     {
       label: 'Total Products',
       value: dashboardData?.totalProductsCount || 0,
       hint: 'Active catalog items',
-      tone: 'text-slate-900'
+      tone: 'text-slate-900',
+      icon: FiBox,
+      iconBg: 'bg-blue-100 text-blue-700',
     },
     {
       label: 'Active Suppliers',
       value: dashboardData?.activeSuppliersCount || 0,
       hint: 'Registered suppliers',
-      tone: 'text-slate-900'
+      tone: 'text-slate-900',
+      icon: FiUsers,
+      iconBg: 'bg-purple-100 text-purple-700',
     },
   ];
 
@@ -76,7 +85,7 @@ const AdminDashboard = () => {
       )}
 
       {loading && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-28 animate-pulse rounded-2xl border border-[#e4ebe8] bg-white" />
           ))}
@@ -97,12 +106,17 @@ const AdminDashboard = () => {
 
       {!loading && !error && (
         <>
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {summaryCards.map((card) => (
               <article
                 key={card.label}
                 className="rounded-2xl border border-[#e4ebe8] bg-white p-5 shadow-sm"
               >
+                {card.icon && (
+                  <div className={`mb-3 inline-flex rounded-xl p-2.5 ${card.iconBg}`}>
+                    <card.icon className="h-5 w-5" />
+                  </div>
+                )}
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
                 <p className={`mt-2 text-2xl font-bold sm:text-3xl ${card.tone}`}>{card.value}</p>
                 <p className="mt-2 text-xs text-slate-500">{card.hint}</p>

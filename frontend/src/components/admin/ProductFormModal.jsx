@@ -118,9 +118,9 @@ export default function ProductFormModal({ product, brands, onSubmit, onClose, l
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/35 px-2 pb-0 pt-4 backdrop-blur-sm sm:items-start sm:px-4 sm:py-8">
-      <div className="my-auto w-full max-w-md rounded-t-2xl border border-[#e4ebe8] bg-white shadow-xl sm:rounded-2xl">
-        <div className="flex items-start justify-between border-b border-[#edf2ef] px-6 pb-4 pt-5">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="flex w-full max-w-md flex-col rounded-t-2xl border border-[#e4ebe8] bg-white shadow-xl sm:rounded-2xl" style={{ maxHeight: 'min(92dvh, 680px)' }}>
+        <div className="flex shrink-0 items-start justify-between border-b border-[#edf2ef] px-6 pb-4 pt-5">
           <div>
             <h2 className="text-base font-semibold text-slate-900">{isEdit ? 'Edit Product' : 'Create Product'}</h2>
             <p className="mt-1 text-xs text-slate-500">Add core product details for inventory management.</p>
@@ -137,7 +137,7 @@ export default function ProductFormModal({ product, brands, onSubmit, onClose, l
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="max-h-[70dvh] space-y-4 overflow-y-auto px-6 py-5 sm:max-h-[75vh]">
+        <form onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto px-6 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
           <Field label="PRODUCT NAME">
             <input
               name="name"

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { FiAlertCircle, FiAlertTriangle, FiClock } from 'react-icons/fi';
 import { getExpiryBuckets } from '../../services/adminExpiryService';
 import { applyProductDiscount } from '../../services/adminProductService';
 import AdminDeliveryLayout from '../../components/admin/delivery/AdminDeliveryLayout';
@@ -130,10 +131,10 @@ export default function AdminExpiryPage() {
         <div className="rounded-xl border border-[#f2cccc] bg-[#fdecee] p-4 text-sm text-[#b03a3a]">{error}</div>
       )}
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <MetricCard label="Total Near-Expiry" value={buckets?.totalNearExpiryCount ?? 0} tone="slate" />
-        <MetricCard label="Critical (0-1 days)" value={buckets?.within1Day?.length ?? 0} tone="danger" />
-        <MetricCard label="Urgent (2-7 days)" value={buckets?.within7Days?.length ?? 0} tone="warning" />
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <MetricCard label="Total Near-Expiry" value={buckets?.totalNearExpiryCount ?? 0} tone="slate" icon={FiAlertCircle} />
+        <MetricCard label="Critical (0-1 days)" value={buckets?.within1Day?.length ?? 0} tone="danger" icon={FiAlertTriangle} />
+        <MetricCard label="Urgent (2-7 days)" value={buckets?.within7Days?.length ?? 0} tone="warning" icon={FiClock} />
       </section>
 
       {loading ? (
@@ -390,7 +391,7 @@ function BucketSection({
   );
 }
 
-function MetricCard({ label, value, tone }) {
+function MetricCard({ label, value, tone, icon: Icon }) {
   const toneClass =
     tone === 'danger'
       ? 'bg-[#fdecee] text-[#b03a3a]'
@@ -400,6 +401,7 @@ function MetricCard({ label, value, tone }) {
 
   return (
     <article className={`rounded-xl border border-[#e4ebe8] px-4 py-3 ${toneClass}`}>
+      {Icon && <Icon className="mb-2 h-5 w-5 opacity-80" />}
       <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
       <p className="mt-1 text-2xl font-bold">{value}</p>
     </article>
