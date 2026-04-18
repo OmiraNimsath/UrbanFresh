@@ -1,6 +1,7 @@
 HELP.md
 target/
 uploads/
+src/main/resources/application-local.properties
 logs/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
