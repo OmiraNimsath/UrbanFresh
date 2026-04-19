@@ -201,7 +201,7 @@ export default function OrderSuccessPage() {
         <Breadcrumbs
           items={[
             { label: 'Products', to: '/products' },
-            { label: 'Orders', to: '/dashboard' },
+            { label: 'Orders', to: '/orders' },
             { label: order?.orderId ? `Order #${order.orderId}` : 'Order Status' },
           ]}
         />
@@ -268,7 +268,7 @@ export default function OrderSuccessPage() {
                 </>
               ) : (
                 <Link
-                  to="/dashboard"
+                  to="/orders"
                   className={`px-6 py-2.5 text-white text-sm font-semibold rounded-xl transition-colors ${tone.primaryButton}`}
                 >
                   View Orders
@@ -652,7 +652,7 @@ function EmptyState({ isAuthenticated }) {
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         {isAuthenticated && (
           <Link
-            to="/dashboard"
+            to="/orders"
             className="px-6 py-2.5 bg-[#0d4a38] hover:bg-[#083a2c] text-white text-sm font-semibold rounded-xl transition-colors"
           >
             View Orders
@@ -678,7 +678,7 @@ function UnauthorizedState() {
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <Link
-          to="/dashboard"
+          to="/orders"
           className="px-6 py-2.5 bg-[#0d4a38] hover:bg-[#083a2c] text-white text-sm font-semibold rounded-xl transition-colors"
         >
           View Orders

@@ -181,10 +181,14 @@ function CartItemRow({ item, onUpdate, onRemove }) {
                 formatPrice(item.unitPrice, item.unit)
               )}
             </p>
-            {/* Flag out-of-stock items so the customer knows before checkout */}
-            {!item.inStock && (
+            {/* Stock availability */}
+            {!item.inStock ? (
               <span className="inline-block mt-1 text-xs text-red-500 font-medium">
                 ⚠ Out of stock
+              </span>
+            ) : item.stockQuantity > 0 && (
+              <span className="inline-block mt-1 text-xs text-[#7e8d87]">
+                {item.stockQuantity} available
               </span>
             )}
           </div>
