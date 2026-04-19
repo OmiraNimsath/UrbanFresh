@@ -79,7 +79,7 @@ export default function CustomerDashboard() {
       </button>
 
       {loyalty && (
-        <div className="rounded-2xl bg-[#0d4a38] p-4 text-white shadow-sm">
+        <div className="hidden xl:block rounded-2xl bg-[#0d4a38] p-4 text-white shadow-sm">
           <p className="text-xs uppercase tracking-wide text-[#b4d2c5]">Loyalty Points</p>
           <p className="mt-1 text-3xl font-semibold">{loyalty.totalPoints}</p>
           <p className="mt-1 text-xs text-[#d6e8df]">Use points at checkout for instant discounts.</p>
@@ -141,11 +141,22 @@ export default function CustomerDashboard() {
         </section>
 
         {loyalty && (
-          <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <MetricTile label="Available" value={loyalty.totalPoints} emphasized />
-            <MetricTile label="Total Earned" value={loyalty.earnedPoints} />
-            <MetricTile label="Redeemed" value={loyalty.redeemedPoints} />
-            <MetricTile label="Value" value={`Rs. ${Number(loyalty.totalPoints || 0) * 5}`} />
+          <section className="rounded-2xl border border-[#e4ebe8] bg-white p-5 shadow-sm md:p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[#163a2f]">Loyalty Points</h3>
+              <Link
+                to="/loyalty"
+                className="text-sm font-medium text-[#2f6550] hover:text-[#0d4a38]"
+              >
+                View history
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <MetricTile label="Available" value={loyalty.totalPoints} emphasized />
+              <MetricTile label="Total Earned" value={loyalty.earnedPoints} />
+              <MetricTile label="Redeemed" value={loyalty.redeemedPoints} />
+              <MetricTile label="Value" value={`Rs. ${Number(loyalty.totalPoints || 0) * 5}`} />
+            </div>
           </section>
         )}
 
