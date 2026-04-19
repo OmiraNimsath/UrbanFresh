@@ -5,6 +5,7 @@ import { getProducts, getCategories } from '../../services/productService';
 import Navbar from '../../components/Navbar';
 import SearchBar from '../../components/SearchBar';
 import Footer from '../../components/Footer';
+import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import { formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
 
 /**
@@ -287,6 +288,7 @@ export default function ProductListingPage() {
 
       {/* ── Footer ── */}
       <Footer />
+      <MobileBottomNav activeKey="shop" />
     </div>
   );
 }

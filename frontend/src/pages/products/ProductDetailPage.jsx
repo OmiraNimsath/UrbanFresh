@@ -214,6 +214,9 @@ function ProductDetail({ product }) {
               <div className="flex items-center gap-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-[#0d4a38]"></span>
                 <span className="text-sm font-medium text-[#0d4a38]">In Stock</span>
+                {product.stockQuantity > 0 && (
+                  <span className="text-xs text-[#7e8d87]">&middot; {product.stockQuantity} available</span>
+                )}
               </div>
 
               {/* Quantity stepper */}

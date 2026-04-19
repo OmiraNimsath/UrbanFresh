@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getFeaturedProducts, getNearExpiryProducts } from '../../services/productService';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
+import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import { useAuth } from '../../context/AuthContext';
 import { formatPrice } from '../../utils/priceUtils';
 
@@ -137,6 +138,7 @@ export default function LandingPage() {
 
       {/* ── Footer ── */}
       <Footer />
+      {isAuthenticated && user?.role === 'CUSTOMER' && <MobileBottomNav activeKey="shop" />}
     </div>
   );
 }
