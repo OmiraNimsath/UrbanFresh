@@ -5,7 +5,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import MobileBottomNav from '../../components/customer/MobileBottomNav';
 import { useAuth } from '../../context/AuthContext';
-import { formatPrice } from '../../utils/priceUtils';
+import { formatPrice, calculateDiscountedPrice } from '../../utils/priceUtils';
 
 /**
  * Page Layer – Public landing page for UrbanFresh.
@@ -129,7 +129,7 @@ export default function LandingPage() {
           {!loadingNearExpiry && !errorNearExpiry && nearExpiry.length > 0 && (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
               {nearExpiry.map((product) => (
-                <ProductCard key={product.id} product={product} showExpiry />
+                <ProductCard key={product.id} product={product} />
               ))}
             </div>
           )}
@@ -149,10 +149,18 @@ export default function LandingPage() {
 
 /**
  * Displays a single product card.
- * @param {Object}  product    - ProductResponse from the API
- * @param {boolean} showExpiry - whether to show the expiry date badge
+ * @param {Object} product - ProductResponse from the API
  */
-function ProductCard({ product, showExpiry = false }) {
+function ProductCard({ product }) {
+  // Prefer the batch-aware flag from the API; fall back to the legacy single expiryDate
+  const isNearExpiry = product.hasNearExpiryBatches
+    ?? (product.expiryDate
+      ? Math.ceil((new Date(product.expiryDate) - new Date()) / 86400000) <= 7
+      : false);
+
+  // Show the earliest batch expiry date when available, otherwise the legacy field
+  const expiryLabel = product.earliestExpiryDate ?? product.expiryDate;
+
   return (
     <Link
       to={`/products/${product.id}`}
@@ -164,7 +172,7 @@ function ProductCard({ product, showExpiry = false }) {
           <img
             src={product.imageUrl}
             alt={product.name}
-            className="h-36 w-full object-cover sm:h-44"
+            className="h-36 w-full object-cover transition-opacity group-hover:opacity-95 sm:h-44"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
               e.currentTarget.nextElementSibling.style.display = 'flex';
@@ -183,7 +191,7 @@ function ProductCard({ product, showExpiry = false }) {
         </div>
       )}
 
-      <div className="flex min-h-33 flex-col p-3 sm:p-4">
+      <div className="flex min-h-37 flex-col p-3 sm:p-4">
         {product.category && (
           <span className="mb-1 inline-flex w-fit rounded-full bg-[#e9f2ec] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#2d664d]">
             {product.category}
@@ -196,19 +204,36 @@ function ProductCard({ product, showExpiry = false }) {
           <p className="mt-1 line-clamp-1 text-xs text-[#7a8b83]">{product.description}</p>
         )}
 
-        <div className="mt-auto flex items-center justify-between pt-2">
-          <span className="text-base font-bold text-[#123f2f]">{formatPrice(product.price, product.unit)}</span>
-          {!product.inStock && (
-            <span className="rounded-full bg-[#f0f0f0] px-2 py-0.5 text-[10px] font-semibold text-[#8a8a8a]">Out of stock</span>
+        <div className="mt-auto space-y-1 pt-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-col">
+              {product.discountPercentage ? (
+                <>
+                  <div className="text-xs text-[#ad3d3d] line-through">
+                    {formatPrice(product.price, product.unit)}
+                  </div>
+                  <div className="text-base font-bold text-[#123f2f]">
+                    {formatPrice(calculateDiscountedPrice(product.price, product.discountPercentage), product.unit)}
+                  </div>
+                  <div className="mt-1 inline-flex w-fit rounded bg-[#f6dede] px-1.5 py-0.5 text-[10px] font-semibold text-[#af3434]">
+                    {product.discountPercentage}% OFF
+                  </div>
+                </>
+              ) : (
+                <span className="text-base font-bold text-[#123f2f]">{formatPrice(product.price, product.unit)}</span>
+              )}
+            </div>
+            {!product.inStock && (
+              <span className="rounded-full bg-[#f0f0f0] px-2 py-0.5 text-[10px] font-semibold text-[#8a8a8a]">Out of stock</span>
+            )}
+          </div>
+          {/* Near-expiry badge — highlights discount opportunity */}
+          {isNearExpiry && expiryLabel && (
+            <div className="rounded bg-[#f5d8d8] px-2 py-1 text-center text-[11px] font-semibold text-[#b02e2e]">
+              🕐 Expires {expiryLabel}
+            </div>
           )}
         </div>
-
-        {/* Show expiry badge only in the near-expiry section */}
-        {showExpiry && product.expiryDate && (
-          <div className="mt-2 rounded bg-[#f5d8d8] px-2 py-1 text-center text-[11px] font-semibold text-[#b02e2e]">
-            Expires {product.expiryDate}
-          </div>
-        )}
       </div>
     </Link>
   );
