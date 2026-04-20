@@ -492,6 +492,82 @@ public class OrderServiceImpl implements OrderService {
         }
 
         /**
+         * Returns paginated READY orders that are not assigned to any delivery person.
+         *
+         * @param page zero-based page index
+         * @param size requested page size
+         * @return page of available delivery order cards
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public Page<DeliveryAssignedOrderResponse> getAvailableOrdersForDelivery(int page, int size) {
+                int safePage = Math.max(0, page);
+                int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+
+                Pageable pageable = PageRequest.of(
+                                safePage,
+                                safeSize,
+                                Sort.by(Sort.Direction.DESC, "createdAt")
+                );
+
+                Page<Order> availableOrdersPage = orderRepository
+                                .findByStatusAndAssignedDeliveryPersonIsNullOrderByCreatedAtDesc(OrderStatus.READY, pageable);
+
+                List<DeliveryAssignedOrderResponse> rows = availableOrdersPage.getContent().stream()
+                                .map(order -> toDeliveryAssignedOrderResponse(order, null))
+                                .toList();
+
+                return new PageImpl<>(rows, pageable, availableOrdersPage.getTotalElements());
+        }
+
+        /**
+         * Accepts a READY order for the authenticated delivery user.
+         * Uses row-level locking to prevent concurrent double assignment.
+         *
+         * @param orderId order ID requested by delivery personnel
+         * @param deliveryEmail email from JWT principal
+         * @return updated delivery dashboard summary row
+         */
+        @Override
+        @Transactional
+        public DeliveryAssignedOrderResponse acceptOrderForDelivery(Long orderId, String deliveryEmail) {
+                User deliveryPerson = userRepository.findByEmailAndRoleAndIsActiveTrue(deliveryEmail, Role.DELIVERY)
+                                .orElseThrow(() -> new UserNotFoundException("Delivery personnel not found: " + deliveryEmail));
+
+                Order order = orderRepository.findByIdForUpdate(orderId)
+                                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+                if (order.getAssignedDeliveryPerson() != null) {
+                        throw new InvalidOrderStatusTransitionException(
+                                        "Order is already assigned to a delivery person."
+                        );
+                }
+
+                if (order.getStatus() != OrderStatus.READY) {
+                        throw new InvalidOrderStatusTransitionException(
+                                        "Only READY unassigned orders can be accepted. Current status: " + order.getStatus() + "."
+                        );
+                }
+
+                OrderStatus previousStatus = order.getStatus();
+                order.setAssignedDeliveryPerson(deliveryPerson);
+                order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+                Order updated = orderRepository.save(order);
+
+                orderStatusHistoryRepository.save(OrderStatusHistory.builder()
+                                .order(updated)
+                                .previousStatus(previousStatus)
+                                .newStatus(OrderStatus.OUT_FOR_DELIVERY)
+                                .changedByDelivery(deliveryPerson)
+                                .changeReason("Accepted by delivery personnel")
+                                .build());
+
+                notificationService.createOrderStatusNotification(updated, OrderStatus.OUT_FOR_DELIVERY);
+
+                return toDeliveryAssignedOrderResponse(updated, null);
+        }
+
+        /**
          * Returns a paginated list of all orders for admin order operations.
          * Results are sorted newest first to prioritize operational visibility.
          *

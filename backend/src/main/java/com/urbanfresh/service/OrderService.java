@@ -95,6 +95,15 @@ public interface OrderService {
     Page<DeliveryAssignedOrderResponse> getAssignedOrdersForDelivery(String deliveryEmail, int page, int size);
 
     /**
+     * Returns unassigned READY orders available for delivery personnel acceptance.
+     *
+     * @param page zero-based page index
+     * @param size number of records per page
+     * @return page of available delivery order cards
+     */
+    Page<DeliveryAssignedOrderResponse> getAvailableOrdersForDelivery(int page, int size);
+
+    /**
      * Returns delivery details for an order assigned to the authenticated delivery user.
      * Denies access when the order is not assigned to that delivery person.
      *
@@ -118,6 +127,16 @@ public interface OrderService {
             OrderStatusUpdateRequest request,
             String deliveryEmail
     );
+
+        /**
+         * Accepts an available READY order for the authenticated delivery user.
+         * Transitions status to OUT_FOR_DELIVERY and assigns the delivery person.
+         *
+         * @param orderId order ID to accept
+         * @param deliveryEmail email extracted from JWT principal
+         * @return updated delivery dashboard order row
+         */
+        DeliveryAssignedOrderResponse acceptOrderForDelivery(Long orderId, String deliveryEmail);
 
         /**
          * Returns aggregate delivery profile metrics for the authenticated delivery user.

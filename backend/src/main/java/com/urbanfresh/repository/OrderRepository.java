@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,6 +18,8 @@ import com.urbanfresh.dto.response.RecommendationResponse;
 import com.urbanfresh.model.Order;
 import com.urbanfresh.model.OrderStatus;
 import com.urbanfresh.model.PaymentStatus;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * Repository Layer – Spring Data JPA repository for Order entities.
@@ -84,6 +87,27 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @EntityGraph(attributePaths = {"customer", "items", "assignedDeliveryPerson"})
     Page<Order> findByAssignedDeliveryPersonIdOrderByCreatedAtDesc(Long assignedDeliveryPersonId, Pageable pageable);
+
+    /**
+     * Loads unassigned READY orders, newest first.
+     * Used by delivery personnel to accept newly available orders.
+     *
+     * @param status order status to filter (READY)
+     * @param pageable paging instructions
+     * @return page of available unassigned orders
+     */
+    @EntityGraph(attributePaths = {"customer", "items"})
+    Page<Order> findByStatusAndAssignedDeliveryPersonIsNullOrderByCreatedAtDesc(OrderStatus status, Pageable pageable);
+
+    /**
+     * Loads one order with a pessimistic write lock to avoid double-accept races.
+     *
+     * @param id order ID
+     * @return optional locked order row
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    Optional<Order> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * Counts all orders currently or historically assigned to the given delivery person.

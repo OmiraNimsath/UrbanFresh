@@ -7,6 +7,7 @@ import DeliveryOrderCard from '../../components/delivery/DeliveryOrderCard';
 import DeliveryPageLayout from '../../components/delivery/DeliveryPageLayout';
 import useDeliveryOrders from '../../hooks/useDeliveryOrders';
 import { useAuth } from '../../context/AuthContext';
+import { acceptDeliveryOrder } from '../../services/orderService';
 
 /**
  * Delivery current orders page focused on active fulfillment operations.
@@ -14,13 +15,15 @@ import { useAuth } from '../../context/AuthContext';
 export default function DeliveryCurrentOrdersPage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { currentOrders, loading, error, refreshOrders } = useDeliveryOrders();
+  const { currentOrders, activeOrders, loading, error, refreshOrders } = useDeliveryOrders();
   const [searchValue, setSearchValue] = useState('');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(0);
+  const [pendingAcceptOrder, setPendingAcceptOrder] = useState(null);
+  const [acceptingOrderId, setAcceptingOrderId] = useState(null);
   const PAGE_SIZE = 8;
 
-  const filteredOrders = useMemo(() => {
+  const filteredCurrentOrders = useMemo(() => {
     const q = searchValue.trim().toLowerCase();
     let result = currentOrders.filter((order) => {
       if (!q) return true;
@@ -35,10 +38,25 @@ export default function DeliveryCurrentOrdersPage() {
     return result;
   }, [currentOrders, searchValue, sortDir]);
 
+  const filteredActiveOrders = useMemo(() => {
+    const q = searchValue.trim().toLowerCase();
+    const filtered = activeOrders.filter((order) => {
+      if (!q) return true;
+      return (
+        String(order.orderId).includes(q) ||
+        String(order.customerName || '').toLowerCase().includes(q)
+      );
+    });
+
+    return [...filtered].sort((a, b) =>
+      sortDir === 'desc' ? b.orderId - a.orderId : a.orderId - b.orderId,
+    );
+  }, [activeOrders, searchValue, sortDir]);
+
   useEffect(() => { setPage(0); }, [searchValue]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
-  const pagedOrders = filteredOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filteredActiveOrders.length / PAGE_SIZE));
+  const pagedOrders = filteredActiveOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const handleOpenOrder = (orderId) => {
     navigate(`/delivery/orders/${orderId}`);
@@ -46,7 +64,36 @@ export default function DeliveryCurrentOrdersPage() {
 
   const handleRefresh = async () => {
     await refreshOrders();
-    toast.success('Current orders refreshed.');
+    toast.success('Ready orders refreshed.');
+  };
+
+  const handleOpenAcceptModal = (order) => {
+    setPendingAcceptOrder(order);
+  };
+
+  const handleCancelAccept = () => {
+    setPendingAcceptOrder(null);
+  };
+
+  const handleConfirmAccept = async () => {
+    if (!pendingAcceptOrder?.orderId || acceptingOrderId) {
+      return;
+    }
+
+    const orderId = pendingAcceptOrder.orderId;
+    setAcceptingOrderId(orderId);
+
+    try {
+      await acceptDeliveryOrder(orderId);
+      await refreshOrders();
+      toast.success(`Order #${orderId} accepted and moved to Active Orders.`);
+      setPendingAcceptOrder(null);
+    } catch (requestError) {
+      const serverMessage = requestError?.response?.data?.message;
+      toast.error(serverMessage || 'Failed to accept order. Please try again.');
+    } finally {
+      setAcceptingOrderId(null);
+    }
   };
 
   const handleLogout = () => {
@@ -61,13 +108,18 @@ export default function DeliveryCurrentOrdersPage() {
       pageTitle="Newly Assigned"
       pageTitleRight={
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f2c500] text-base font-semibold text-[#173f2f]">
-          {Math.min(currentOrders.length, 9)}
+          {Math.min(activeOrders.length, 9)}
         </span>
       }
       onRefresh={handleRefresh}
       onLogout={handleLogout}
     >
       <section className="rounded-3xl border border-[#e4ebe8] bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="text-2xl font-semibold leading-tight text-[#0d3f31] sm:text-3xl">Ready Orders</h3>
+          <p className="text-sm font-medium text-[#8a9993]">{filteredCurrentOrders.length} ready order{filteredCurrentOrders.length !== 1 ? 's' : ''}</p>
+        </div>
+
         <input
           type="text"
           value={searchValue}
@@ -77,10 +129,11 @@ export default function DeliveryCurrentOrdersPage() {
         />
 
         <div className="mt-4 space-y-3">
-          {currentOrders.slice(0, 2).map((order) => (
+          {filteredCurrentOrders.slice(0, 2).map((order) => (
             <div key={order.orderId} className="rounded-3xl bg-[#f6f8f7] p-4 sm:p-5">
               <div className="flex items-center justify-between gap-2">
                 <div>
+                  <p className="text-xs font-medium tracking-[0.08em] text-[#709188]">Order ID #{order.orderId}</p>
                   <p className="text-2xl font-semibold text-[#202827]">{order.customerName || 'Customer'}</p>
                   <p className="mt-1 text-base text-[#5f6f68]">{order.customerPhone || 'Phone not available'}</p>
                 </div>
@@ -96,13 +149,17 @@ export default function DeliveryCurrentOrdersPage() {
 
               <button
                 type="button"
-                onClick={() => handleOpenOrder(order.orderId)}
+                onClick={() => handleOpenAcceptModal(order)}
                 className="mt-5 h-12 w-full rounded-2xl bg-[#01412d] text-base font-semibold text-white transition hover:bg-[#083a2c]"
               >
                 Accept Order
               </button>
             </div>
           ))}
+
+          {!loading && !error && filteredCurrentOrders.length === 0 && (
+            <p className="text-sm text-slate-500">No unassigned READY orders available right now.</p>
+          )}
         </div>
       </section>
 
@@ -118,7 +175,7 @@ export default function DeliveryCurrentOrdersPage() {
               <option value="desc">Newest first</option>
               <option value="asc">Oldest first</option>
             </select>
-            <p className="text-sm font-medium text-[#8a9993]">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}</p>
+            <p className="text-sm font-medium text-[#8a9993]">{filteredActiveOrders.length} order{filteredActiveOrders.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
 
@@ -126,17 +183,17 @@ export default function DeliveryCurrentOrdersPage() {
         {!loading && error === 'forbidden' && <p className="mt-4 text-sm text-red-700">You are not authorized to access delivery orders.</p>}
         {!loading && error === 'failed' && <p className="mt-4 text-sm text-slate-700">Failed to load orders. Please refresh.</p>}
 
-        {!loading && !error && filteredOrders.length === 0 && (
+        {!loading && !error && filteredActiveOrders.length === 0 && (
           <p className="mt-4 text-sm text-slate-500">
-            {currentOrders.length === 0 ? 'No active orders at the moment.' : 'No orders match your search.'}
+            No active assigned orders at the moment.
           </p>
         )}
 
-        {!loading && !error && filteredOrders.length > 0 && (
+        {!loading && !error && filteredActiveOrders.length > 0 && (
           <ul className="mt-4 space-y-3">
             {pagedOrders.map((delivery) => (
               <li key={delivery.orderId}>
-                <DeliveryOrderCard delivery={delivery} onOpen={handleOpenOrder} showNewlyAssigned />
+                <DeliveryOrderCard delivery={delivery} onOpen={handleOpenOrder} />
               </li>
             ))}
           </ul>
@@ -177,6 +234,40 @@ export default function DeliveryCurrentOrdersPage() {
           </div>
         )}
       </section>
+
+      {pendingAcceptOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-xl sm:p-6">
+            <h4 className="text-xl font-semibold text-[#173f2f]">Confirm Order Acceptance</h4>
+            <p className="mt-2 text-sm text-[#52645e]">Are you sure you want to accept this order?</p>
+
+            <div className="mt-4 space-y-2 rounded-2xl bg-[#f6f8f7] p-4 text-sm text-[#2b3f39]">
+              <p><span className="font-semibold">Order ID:</span> #{pendingAcceptOrder.orderId}</p>
+              <p><span className="font-semibold">Customer:</span> {pendingAcceptOrder.customerName || 'Customer'}</p>
+              <p><span className="font-semibold">Address:</span> {pendingAcceptOrder.fullDeliveryAddress || pendingAcceptOrder.shortDeliveryAddress || 'Address not available'}</p>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCancelAccept}
+                disabled={!!acceptingOrderId}
+                className="h-11 rounded-xl border border-[#d7e3de] px-5 text-sm font-semibold text-[#4c625b] transition hover:bg-[#f4f7f6] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAccept}
+                disabled={acceptingOrderId === pendingAcceptOrder.orderId}
+                className="h-11 rounded-xl bg-[#01412d] px-5 text-sm font-semibold text-white transition hover:bg-[#083a2c] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {acceptingOrderId === pendingAcceptOrder.orderId ? 'Accepting...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DeliveryPageLayout>
   );
 }

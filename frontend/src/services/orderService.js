@@ -175,6 +175,33 @@ export const getAssignedDeliveryOrders = (page = 0, size = 20) =>
 	}).then((res) => res.data);
 
 /**
+ * Fetches paginated READY orders that are not assigned to any delivery person.
+ * GET /api/delivery/orders/available?page={page}&size={size}
+ *
+ * @param {number} [page=0] zero-based page index
+ * @param {number} [size=20] page size
+ * @returns {Promise<{content: Array, totalElements: number, totalPages: number, number: number}>}
+ */
+export const getAvailableDeliveryOrders = (page = 0, size = 20) =>
+	api.get('/api/delivery/orders/available', {
+		params: { page, size },
+		headers: {
+			'Cache-Control': 'no-store',
+			Pragma: 'no-cache',
+		},
+	}).then((res) => res.data);
+
+/**
+ * Accepts a READY unassigned order for the authenticated delivery user.
+ * PATCH /api/delivery/orders/{orderId}/accept
+ *
+ * @param {number|string} orderId order ID
+ * @returns {Promise<Object>} updated delivery order summary payload
+ */
+export const acceptDeliveryOrder = (orderId) =>
+	api.patch(`/api/delivery/orders/${orderId}/accept`).then((res) => res.data);
+
+/**
  * Updates the status of an order assigned to the authenticated delivery user.
  * PATCH /api/delivery/orders/{orderId}/status
  *

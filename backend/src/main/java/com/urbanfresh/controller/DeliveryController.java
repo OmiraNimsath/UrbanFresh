@@ -73,6 +73,25 @@ public class DeliveryController {
     }
 
     /**
+     * Returns paginated READY orders that are not yet assigned to any delivery person.
+     *
+     * @param page zero-based page index (default 0)
+     * @param size items per page (default 20)
+     * @return paginated available order cards for acceptance
+     */
+    @GetMapping("/orders/available")
+    public ResponseEntity<Page<DeliveryAssignedOrderResponse>> getAvailableOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Page<DeliveryAssignedOrderResponse> response = orderService.getAvailableOrdersForDelivery(page, size);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(response);
+    }
+
+    /**
      * Returns order delivery details for the authenticated delivery person.
      * Access is allowed only when the order is assigned to that user.
      *
@@ -117,4 +136,25 @@ public class DeliveryController {
                 .cacheControl(CacheControl.noStore())
                 .body(response);
     }
+
+        /**
+         * Accepts a READY unassigned order for the authenticated delivery person.
+         * Transitions status to OUT_FOR_DELIVERY and assigns the order.
+         *
+         * @param orderId order ID requested from the route path
+         * @param authentication authenticated delivery principal
+         * @return updated delivery dashboard summary row
+         */
+        @PatchMapping("/orders/{orderId}/accept")
+        public ResponseEntity<DeliveryAssignedOrderResponse> acceptOrder(
+                        @PathVariable Long orderId,
+                        Authentication authentication
+        ) {
+                String deliveryEmail = authentication.getName();
+                DeliveryAssignedOrderResponse response = orderService.acceptOrderForDelivery(orderId, deliveryEmail);
+
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(response);
+        }
 }

@@ -87,6 +87,19 @@ export default function DeliveryOrderDetailsPage() {
   }, [errorState, navigate]);
 
   const handleBack = () => {
+    // Prefer navigating back to the previous page when possible (ready/active listings).
+    // React Router stores an index on history.state; when idx>0 we can safely go back.
+    try {
+      const idx = window.history?.state?.idx;
+      if (typeof idx === 'number' && idx > 0) {
+        navigate(-1);
+        return;
+      }
+    } catch (e) {
+      // ignore and fall through to fallback
+    }
+
+    // Fallback: go to delivery dashboard
     navigate('/delivery');
   };
 
@@ -170,9 +183,21 @@ export default function DeliveryOrderDetailsPage() {
           >
             Back
           </button>
-          <div className="text-right">
+
+          <div className="text-center">
             <p className="text-xs font-medium tracking-[0.08em] text-[#6d847d]">Delivery Order</p>
             <h1 className="text-xl font-semibold text-[#0d4a38] sm:text-2xl">#{orderId}</h1>
+          </div>
+
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isActionBusy}
+              className="inline-flex h-10 items-center rounded-xl border border-[#cfdad5] bg-white px-4 text-sm font-semibold text-[#3f5f54] transition hover:bg-[#eef4f1] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isActionBusy ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
         </div>
       </header>
@@ -294,45 +319,25 @@ export default function DeliveryOrderDetailsPage() {
         )}
       </main>
 
-      {!loading && !errorState && order && (
+      {!loading && !errorState && order && canUpdateStatus && (
         <div className="fixed bottom-17 left-0 right-0 z-20 border-t border-[#dfe7e3] bg-white/95 px-4 py-3 backdrop-blur md:bottom-0 sm:px-6">
           <div className="mx-auto w-full max-w-6xl space-y-2">
-            {canUpdateStatus && (
-              <div className="mx-auto grid grid-cols-2 gap-2 md:max-w-xl">
-                <button
-                  type="button"
-                  disabled={isActionBusy}
-                  onClick={() => requestStatusUpdate('RETURNED')}
-                  className="h-12 rounded-2xl border-2 border-[#c92d2d] bg-white px-4 text-sm font-medium text-[#c92d2d] transition hover:bg-[#fff4f4] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Mark Returned
-                </button>
-                <button
-                  type="button"
-                  disabled={isActionBusy}
-                  onClick={() => requestStatusUpdate('DELIVERED')}
-                  className="h-12 rounded-2xl bg-[#01412d] px-4 text-sm font-medium text-white transition hover:bg-[#083a2c] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Mark Delivered
-                </button>
-              </div>
-            )}
-
-            <div className="flex items-center justify-center gap-2">
+            <div className="mx-auto grid grid-cols-2 gap-2 md:max-w-xl">
               <button
                 type="button"
-                onClick={handleRefresh}
                 disabled={isActionBusy}
-                className="h-11 min-w-40 rounded-xl border border-[#cfdad5] bg-white px-4 text-sm font-medium text-[#3f5f54] transition hover:bg-[#eef4f1] disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => requestStatusUpdate('RETURNED')}
+                className="h-12 rounded-2xl border-2 border-[#c92d2d] bg-white px-4 text-sm font-medium text-[#c92d2d] transition hover:bg-[#fff4f4] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isActionBusy ? 'Refreshing...' : 'Refresh Details'}
+                Mark Returned
               </button>
               <button
                 type="button"
-                onClick={handleBack}
-                className="h-11 min-w-40 rounded-xl bg-[#01412d] px-4 text-sm font-medium text-white transition hover:bg-[#083a2c]"
+                disabled={isActionBusy}
+                onClick={() => requestStatusUpdate('DELIVERED')}
+                className="h-12 rounded-2xl bg-[#01412d] px-4 text-sm font-medium text-white transition hover:bg-[#083a2c] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Back to Dashboard
+                Mark Delivered
               </button>
             </div>
           </div>

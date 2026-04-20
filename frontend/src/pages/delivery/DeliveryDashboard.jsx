@@ -15,7 +15,7 @@ export default function DeliveryDashboard() {
   const navigate = useNavigate();
   const {
     orders,
-    currentOrders,
+    activeOrders,
     historyOrders,
     outForDeliveryOrders,
     loading,
@@ -41,17 +41,17 @@ export default function DeliveryDashboard() {
       onLogout={handleLogout}
     >
       <section className="rounded-[26px] bg-linear-to-r from-[#114f39] to-[#1b5a42] p-6 text-white shadow-sm sm:p-8">
-        <h2 className="text-3xl font-semibold leading-tight sm:text-[32px]">Ready to Harvest?</h2>
+        <h2 className="text-3xl font-semibold leading-tight sm:text-[32px]">Ready to Deliver?</h2>
         <p className="mt-3 max-w-xl text-base text-[#c6ddd4]">
-          {user?.name || 'Delivery partner'}, you have {currentOrders.length} fresh orders waiting for dispatch today.
+          {user?.name || 'Delivery partner'}, you have {activeOrders.length} active orders assigned for delivery today.
         </p>
       </section>
 
       <section className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Link to="/delivery/orders/current" className="rounded-3xl bg-[#a7ecc6] p-5 text-[#1b5e45] shadow-sm transition hover:brightness-[0.98]">
           <FiTruck size={24} />
-          <p className="mt-4 text-xs font-medium tracking-[0.08em]">Current Orders</p>
-          <p className="mt-2 text-3xl font-semibold leading-none">{currentOrders.length}</p>
+          <p className="mt-4 text-xs font-medium tracking-[0.08em]">Active Orders</p>
+          <p className="mt-2 text-3xl font-semibold leading-none">{activeOrders.length}</p>
         </Link>
         <Link to="/delivery/orders/history" className="rounded-3xl border border-[#dce7e2] bg-white p-5 shadow-sm transition hover:border-[#c9dbd2]">
           <FiClock size={24} className="text-[#0d4a38]" />
@@ -65,7 +65,7 @@ export default function DeliveryDashboard() {
         </Link>
         <div className="rounded-3xl border border-[#dce7e2] bg-white p-5 shadow-sm">
           <FiPackage size={24} className="text-[#0d4a38]" />
-          <p className="mt-4 text-xs font-medium tracking-[0.08em] text-[#576d65]">Total Visible</p>
+          <p className="mt-4 text-xs font-medium tracking-[0.08em] text-[#576d65]">Total Orders</p>
           <p className="mt-2 text-2xl font-semibold text-[#123f32]">{orders.length}</p>
         </div>
       </section>
@@ -98,10 +98,14 @@ export default function DeliveryDashboard() {
                 onClick={() => navigate(`/delivery/orders/${order.orderId}`)}
                 className="flex w-full items-center gap-3 rounded-2xl border border-[#e7eeea] bg-white px-3 py-3 text-left transition hover:border-[#cddfd6] hover:bg-[#f8fbf9]"
               >
-                <div className="h-14 w-14 shrink-0 rounded-xl bg-[#dfeee6]" />
+                <div className={`h-14 w-14 shrink-0 rounded-xl flex items-center justify-center ${order?.status === 'OUT_FOR_DELIVERY' ? 'bg-[#dfeee6]' : 'bg-[#f3f7f4]'}`}>
+                  <FiPackage size={20} className="text-[#1b5e45]" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium tracking-wide text-[#6f817b]">#PO-{order.orderId}</p>
+                  <p className="text-xs font-medium tracking-wide text-[#6f817b]">Order ID #{order.orderId}</p>
                   <p className="truncate text-lg font-semibold text-[#123f32] sm:text-xl">{order.customerName || 'Customer'}</p>
+                  <p className="text-sm text-[#6f817b] mt-1">{order.customerPhone || 'No phone'}</p>
+                  <p className="text-sm text-[#63716d] mt-1 truncate">{order.shortDeliveryAddress || order.fullDeliveryAddress || 'Address not available'}</p>
                 </div>
                 <span className="text-2xl text-[#8da49d]">›</span>
               </button>
