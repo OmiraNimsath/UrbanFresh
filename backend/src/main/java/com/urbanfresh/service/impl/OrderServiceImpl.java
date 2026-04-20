@@ -46,6 +46,7 @@ import com.urbanfresh.model.User;
 import com.urbanfresh.repository.OrderItemBatchAllocationRepository;
 import com.urbanfresh.repository.OrderRepository;
 import com.urbanfresh.repository.OrderStatusHistoryRepository;
+import com.urbanfresh.repository.PaymentRepository;
 import com.urbanfresh.repository.ProductBatchRepository;
 import com.urbanfresh.repository.ProductRepository;
 import com.urbanfresh.repository.UserRepository;
@@ -122,6 +123,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductBatchService productBatchService;
     private final ProductBatchRepository productBatchRepository;
     private final OrderItemBatchAllocationRepository allocationRepository;
+        private final PaymentRepository paymentRepository;
 
     /**
      * Places an order for the authenticated customer.
@@ -993,6 +995,7 @@ public class OrderServiceImpl implements OrderService {
          */
         private AdminOrderReviewResponse toAdminOrderReviewResponse(Order order, List<OrderStatusHistory> historyRows) {
                 User deliveryPerson = order.getAssignedDeliveryPerson();
+                var latestPayment = paymentRepository.findTopByOrderIdOrderByCreatedAtDesc(order.getId()).orElse(null);
                 List<AdminOrderReviewResponse.OrderItemInfo> itemRows = order.getItems().stream()
                                 .map(item -> AdminOrderReviewResponse.OrderItemInfo.builder()
                                                 .productId(item.getProduct() != null ? item.getProduct().getId() : null)
@@ -1048,12 +1051,14 @@ public class OrderServiceImpl implements OrderService {
                                                 .shippingCost(shippingCost)
                                                 .finalTotal(order.getTotalAmount())
                                                 .build())
-                                // Payment details are currently unavailable until payment integration
-                                // persists method/reference metadata on orders or a payment ledger.
                                 .payment(AdminOrderReviewResponse.PaymentInfo.builder()
-                                                .paymentMethod(null)
+                                                .paymentMethod("STRIPE")
                                                 .paymentStatus(resolvePersistedPaymentStatus(order))
-                                                .transactionReference(null)
+                                                .transactionReference(
+                                                                latestPayment != null
+                                                                                ? latestPayment.getStripePaymentIntentId()
+                                                                                : null
+                                                )
                                                 .build())
                                 .statusHistory(historyEntries)
                                 .build();

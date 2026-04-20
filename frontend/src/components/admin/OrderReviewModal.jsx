@@ -17,6 +17,79 @@ export default function OrderReviewModal({
   const statusHistory = order?.statusHistory ?? [];
   const resolvedDeliveryPersonName = order?.deliveryPersonName ?? order?.deliveryPerson?.name ?? null;
 
+  const handleDownloadInvoice = () => {
+    if (!order) {
+      return;
+    }
+
+    const invoiceNumber = `UF-INV-${order.orderId}`;
+    const orderNumber = `UF-ORD-${order.orderId}`;
+    const paymentMethod = order.payment?.paymentMethod || 'STRIPE';
+    const transactionRef = order.payment?.transactionReference || 'N/A';
+
+    const rows = (order.items ?? [])
+      .map((item, index) => {
+        const qty = Number(item.quantity ?? 0);
+        const unitPrice = Number(item.unitPrice ?? 0).toFixed(2);
+        const subtotal = Number(item.subtotal ?? 0).toFixed(2);
+        return `<tr>
+          <td style="padding:8px;border:1px solid #d9e6e0;">${index + 1}</td>
+          <td style="padding:8px;border:1px solid #d9e6e0;">${escapeHtml(item.productName || 'N/A')}</td>
+          <td style="padding:8px;border:1px solid #d9e6e0;text-align:right;">${qty}</td>
+          <td style="padding:8px;border:1px solid #d9e6e0;text-align:right;">${unitPrice}</td>
+          <td style="padding:8px;border:1px solid #d9e6e0;text-align:right;">${subtotal}</td>
+        </tr>`;
+      })
+      .join('');
+
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Invoice ${invoiceNumber}</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #17392f; padding: 24px;">
+  <h1 style="margin: 0 0 8px;">UrbanFresh Invoice</h1>
+  <p style="margin: 0 0 18px; color: #526b64;">Invoice #${invoiceNumber}</p>
+
+  <table style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
+    <tr><td style="padding:6px 0;"><strong>Order:</strong> #${orderNumber}</td><td style="padding:6px 0;"><strong>Date:</strong> ${escapeHtml(formatDateTime(order.orderDate))}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>Customer:</strong> ${escapeHtml(order.customer?.customerName || 'N/A')}</td><td style="padding:6px 0;"><strong>Payment Status:</strong> ${escapeHtml(order.payment?.paymentStatus || order.paymentStatus || 'N/A')}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>Payment Method:</strong> ${escapeHtml(paymentMethod)}</td><td style="padding:6px 0;"><strong>Transaction Ref:</strong> ${escapeHtml(transactionRef)}</td></tr>
+  </table>
+
+  <table style="border-collapse: collapse; width: 100%; margin-bottom: 16px;">
+    <thead>
+      <tr style="background:#f5f8f7;">
+        <th style="padding:8px;border:1px solid #d9e6e0;text-align:left;">#</th>
+        <th style="padding:8px;border:1px solid #d9e6e0;text-align:left;">Item</th>
+        <th style="padding:8px;border:1px solid #d9e6e0;text-align:right;">Qty</th>
+        <th style="padding:8px;border:1px solid #d9e6e0;text-align:right;">Unit Price (LKR)</th>
+        <th style="padding:8px;border:1px solid #d9e6e0;text-align:right;">Subtotal (LKR)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || '<tr><td colspan="5" style="padding:8px;border:1px solid #d9e6e0;">No items</td></tr>'}
+    </tbody>
+  </table>
+
+  <p style="margin:4px 0;"><strong>Subtotal:</strong> LKR ${Number(order.pricing?.subtotal ?? 0).toFixed(2)}</p>
+  <p style="margin:4px 0;"><strong>Discounts:</strong> LKR ${Number(order.pricing?.discounts ?? 0).toFixed(2)}</p>
+  <p style="margin:4px 0;"><strong>Final Total:</strong> LKR ${Number(order.pricing?.finalTotal ?? 0).toFixed(2)}</p>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${invoiceNumber}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-3 py-3 backdrop-blur-sm">
       <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-[#d9e6e0] bg-[#f5f7f6] shadow-[0_22px_50px_rgba(10,40,32,0.32)]">
@@ -186,20 +259,26 @@ export default function OrderReviewModal({
         <footer className="flex flex-col justify-end gap-2.5 border-t border-[#e3ebe7] bg-white px-4 py-3 sm:flex-row sm:px-5">
           <button
             type="button"
+            onClick={handleDownloadInvoice}
+            disabled={!order || loading}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-[#0d4a38] bg-white px-4 text-sm font-semibold text-[#0d4a38] transition hover:bg-[#f1f7f4]"
           >
             Download Invoice
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-[#0d4a38] px-4 text-sm font-semibold text-white transition hover:bg-[#083a2c]"
-          >
-            Mark as Out for Delivery
           </button>
         </footer>
       </div>
     </div>
   );
+}
+
+function escapeHtml(value) {
+  const raw = String(value ?? '');
+  return raw
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function SectionTitle({ title }) {
