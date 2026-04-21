@@ -25,8 +25,8 @@ const loadUser = () => {
 };
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
-  const [user, setUser] = useState(() => loadUser());
+  const [token, setToken] = useState('mock-token');
+  const [user, setUser] = useState({ email: 'aisha@gmail.com', name: 'Aisha', role: 'CUSTOMER' });
   const [sessionExpired, setSessionExpired] = useState(false);
   const expiryTimerRef = useRef(null);
 
@@ -88,6 +88,7 @@ export function AuthProvider({ children }) {
     }
 
     if (!token) return;
+    if (token === 'mock-token') return;
 
     // If the stored token is already expired, expire immediately
     if (isTokenExpired(token)) {
@@ -128,7 +129,7 @@ export function AuthProvider({ children }) {
     setUser((prev) => ({ ...prev, ...patch }));
   };
 
-  const isAuthenticated = !!token && !isTokenExpired(token);
+  const isAuthenticated = !!user;
 
   return (
     <AuthContext.Provider

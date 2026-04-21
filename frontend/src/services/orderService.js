@@ -5,6 +5,19 @@
 
 import api from './api';
 
+/* ── Mock data for Figma design preview ── */
+const MOCK_ORDERS = [
+  { orderId: 1001, status: 'DELIVERED', paymentStatus: 'SUCCESS', totalAmount: 17.44, discountAmount: 0, pointsRedeemed: 0, deliveryAddress: '12 Green Lane, Colombo 05', createdAt: '2026-04-18T10:30:00', items: [{ productId: 101, productName: 'Organic Bananas', quantity: 2, unitPrice: 2.49, subtotal: 4.98 }, { productId: 102, productName: 'Fresh Spinach', quantity: 1, unitPrice: 1.99, subtotal: 1.99 }, { productId: 103, productName: 'Cherry Tomatoes', quantity: 3, unitPrice: 3.49, subtotal: 10.47 }] },
+  { orderId: 1002, status: 'SHIPPED', paymentStatus: 'SUCCESS', totalAmount: 12.97, discountAmount: 2.50, pointsRedeemed: 50, deliveryAddress: '12 Green Lane, Colombo 05', createdAt: '2026-04-19T14:15:00', items: [{ productId: 104, productName: 'Red Apples', quantity: 2, unitPrice: 4.99, subtotal: 9.98 }, { productId: 105, productName: 'Avocado', quantity: 1, unitPrice: 2.99, subtotal: 2.99 }] },
+  { orderId: 1003, status: 'PENDING', paymentStatus: 'PENDING', totalAmount: 8.47, discountAmount: 0, pointsRedeemed: 0, deliveryAddress: '12 Green Lane, Colombo 05', createdAt: '2026-04-21T09:00:00', items: [{ productId: 106, productName: 'Cucumber', quantity: 2, unitPrice: 1.49, subtotal: 2.98 }, { productId: 107, productName: 'Bell Peppers Mix', quantity: 1, unitPrice: 5.49, subtotal: 5.49 }] },
+];
+const MOCK_LOYALTY = { totalPoints: 240, earnedPoints: 290, redeemedPoints: 50, conversionRule: '1 point = Rs. 5 discount' };
+const MOCK_RECOMMENDATIONS = [
+  { productId: 101, productName: 'Organic Bananas', price: 2.49, unit: 'bunch', imageUrl: null, purchaseCount: 5 },
+  { productId: 104, productName: 'Red Apples', price: 4.99, unit: 'kg', imageUrl: null, purchaseCount: 3 },
+  { productId: 108, productName: 'Sweet Corn', price: 3.29, unit: '3 pack', imageUrl: null, purchaseCount: 2 },
+];
+
 /**
  * Place a new order for the authenticated customer.
  * POST /api/orders
@@ -15,7 +28,7 @@ import api from './api';
  * @returns {Promise<OrderResponse>} created order with orderId, status, totalAmount, discountAmount, pointsRedeemed, items
  */
 export const placeOrder = (deliveryAddress, items, pointsToRedeem = 0) =>
-  api.post('/api/orders', { deliveryAddress, items, pointsToRedeem }).then((res) => res.data);
+  Promise.resolve({ orderId: 1004, status: 'CONFIRMED', paymentStatus: 'SUCCESS', totalAmount: 17.44, discountAmount: pointsToRedeem * 5, pointsRedeemed: pointsToRedeem, deliveryAddress, createdAt: new Date().toISOString(), items: items.map((i, idx) => ({ productId: i.productId, productName: `Product ${idx + 1}`, quantity: i.quantity, unitPrice: 2.99, subtotal: i.quantity * 2.99 })) });
 
 /**
  * Fetch the authenticated customer's order history, newest first.
@@ -23,7 +36,7 @@ export const placeOrder = (deliveryAddress, items, pointsToRedeem = 0) =>
  *
  * @returns {Promise<OrderResponse[]>} list of orders; empty array when no orders exist
  */
-export const getMyOrders = () => api.get('/api/customer/orders').then((res) => res.data);
+export const getMyOrders = () => Promise.resolve(MOCK_ORDERS);
 
 /**
  * Fetch up to 5 "Buy Again" product recommendations for the authenticated customer.
@@ -32,7 +45,7 @@ export const getMyOrders = () => api.get('/api/customer/orders').then((res) => r
  *
  * @returns {Promise<RecommendationResponse[]>} ordered recommendation list (empty when no history)
  */
-export const getRecommendations = () => api.get('/api/customer/recommendations').then((res) => res.data);
+export const getRecommendations = () => Promise.resolve(MOCK_RECOMMENDATIONS);
 
 /**
  * Fetch one authenticated customer's order by ID.
@@ -47,12 +60,7 @@ export const getRecommendations = () => api.get('/api/customer/recommendations')
  * @returns {Promise<Object>} OrderResponse
  */
 export const getMyOrderById = (orderId) =>
-	api.get(`/api/customer/orders/${orderId}`, {
-		headers: {
-			'Cache-Control': 'no-store',
-			Pragma: 'no-cache',
-		},
-	}).then((res) => res.data);
+  Promise.resolve(MOCK_ORDERS.find((o) => String(o.orderId) === String(orderId)) ?? MOCK_ORDERS[0]);
 
 /**
  * Resolve order details for /order-success with robust fallback rules:
@@ -64,41 +72,11 @@ export const getMyOrderById = (orderId) =>
  * @returns {Promise<{order: Object|null, source: 'id'|'history'|'latest'|'none', unauthorized: boolean}>}
  */
 export const resolveOrderForSuccess = async ({ orderId } = {}) => {
-	const normalizedId = orderId ? String(orderId) : null;
-
-	if (normalizedId) {
-		try {
-			const order = await getMyOrderById(normalizedId);
-			return { order, source: 'id', unauthorized: false };
-		} catch (error) {
-			if (error?.response?.status === 403) {
-				return { order: null, source: 'none', unauthorized: true };
-			}
-		}
-	}
-
-	const historyResponse = await api.get('/api/customer/orders', {
-		headers: {
-			'Cache-Control': 'no-store',
-			Pragma: 'no-cache',
-		},
-	});
-	const orders = Array.isArray(historyResponse?.data) ? historyResponse.data : [];
-
-	if (normalizedId) {
-		const matchedOrder = orders.find((order) => String(order?.orderId) === normalizedId);
-		return {
-			order: matchedOrder ?? null,
-			source: matchedOrder ? 'history' : 'none',
-			unauthorized: false,
-		};
-	}
-
-	if (orders.length === 0) {
-		return { order: null, source: 'none', unauthorized: false };
-	}
-
-	return { order: orders[0], source: 'latest', unauthorized: false };
+  const normalizedId = orderId ? String(orderId) : null;
+  const found = normalizedId
+    ? (MOCK_ORDERS.find((o) => String(o.orderId) === normalizedId) ?? MOCK_ORDERS[0])
+    : MOCK_ORDERS[0];
+  return { order: found, source: 'id', unauthorized: false };
 };
 
 /**
@@ -107,7 +85,7 @@ export const resolveOrderForSuccess = async ({ orderId } = {}) => {
  *
  * @returns {Promise<LoyaltyPointsResponse>} totalPoints, earnedPoints, redeemedPoints, conversionRule
  */
-export const getLoyaltyPoints = () => api.get('/api/customer/loyalty').then((res) => res.data);
+export const getLoyaltyPoints = () => Promise.resolve(MOCK_LOYALTY);
 
 /**
  * Fetches a paginated list of all customer orders for admin operations.

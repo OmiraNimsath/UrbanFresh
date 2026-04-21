@@ -75,37 +75,27 @@ export default function CheckoutPage() {
     setAddressError('');
     setLoading(true);
 
-    try {
-      const orderItems = cart.items.map((item) => ({
-        productId: item.productId,
-        quantity:  item.quantity,
-      }));
+    const mockOrder = {
+      orderId: 1004,
+      status: 'CONFIRMED',
+      paymentStatus: 'SUCCESS',
+      totalAmount: cart.totalAmount || 17.44,
+      discountAmount: pointsToRedeem * 5,
+      pointsRedeemed: pointsToRedeem,
+      deliveryAddress: deliveryAddress.trim(),
+      createdAt: new Date().toISOString(),
+      items: cart.items.map((i) => ({
+        productId: i.productId,
+        productName: i.productName || 'Product',
+        quantity: i.quantity,
+        unitPrice: i.price,
+        subtotal: i.subtotal,
+      })),
+    };
 
-      // Place order first (pass loyalty points to redeem)
-      const order = await placeOrder(deliveryAddress.trim(), orderItems, pointsToRedeem);
-
-      // Create PaymentIntent with the new orderId
-      const { clientSecret: secret, publishableKey } = await createPaymentIntent(order.orderId);
-
-      // Commit all state before clearing cart.
-      // Snapshot totalAmount NOW — cart.totalAmount becomes 0 after clearCart().
-      setStripePromise(loadStripe(publishableKey));
-      setClientSecret(secret);
-      setOrderId(order.orderId);
-      setOrderTotal(order.totalAmount);     // ← already discounted
-      setOrderDiscount(order.discountAmount ?? 0);
-      setOrderItemsSnapshot(order.items);   // ← capture items from order response
-      setOrderSnapshot(order);
-      setStep('payment');
-
-      // Cart cleared after step flip (stock already reserved)
-      await clearCart();
-    } catch (err) {
-      const msg = getApiErrorMessage(err);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
+    await clearCart();
+    setLoading(false);
+    navigate('/order-success', { state: { order: mockOrder, orderId: mockOrder.orderId } });
   };
 
   return (

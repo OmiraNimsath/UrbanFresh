@@ -31,7 +31,7 @@ export const setExpireSessionCallback = (fn) => {
 /* ── Request interceptor: attach Bearer token ── */
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('uf_token');
-  if (token) {
+  if (token && token !== 'mock-token') {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -43,7 +43,8 @@ api.interceptors.response.use(
   (error) => {
     // Only expire session on 401 from protected endpoints (not login attempts)
     const isLoginRequest = error.config?.url?.includes('/api/auth/login');
-    if (error.response?.status === 401 && !isLoginRequest && expireSessionFn) {
+    const isMockToken = localStorage.getItem('uf_token') === 'mock-token';
+    if (error.response?.status === 401 && !isLoginRequest && !isMockToken && expireSessionFn) {
       expireSessionFn();
     }
     return Promise.reject(error);
